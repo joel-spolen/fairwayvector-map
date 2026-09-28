@@ -1,0 +1,88 @@
+import Foundation
+import Testing
+@testable import fairwayvector_map
+
+@MainActor
+struct GolfGeometryTests {
+    // ~20 m square green north of the origin.
+    private let origin = GeoPoint(lat: 57.6200, lon: 12.0000)
+    private var squareGreen: [GeoPoint] {
+        let south = 57.6200 + 100 / 111_195.0
+        let north = south + 20 / 111_195.0
+        let halfWidthLon = 10 / (111_195.0 * cos(57.62 * .pi / 180))
+        return [
+            GeoPoint(lat: south, lon: 12.0 - halfWidthLon),
+            GeoPoint(lat: south, lon: 12.0 + halfWidthLon),
+            GeoPoint(lat: north, lon: 12.0 + halfWidthLon),
+            GeoPoint(lat: north, lon: 12.0 - halfWidthLon),
+        ]
+    }
+
+    @Test func distanceBetweenKnownPoints() {
+        let north = GeoPoint(lat: origin.lat + 100 / 111_195.0, lon: origin.lon)
+        #expect(abs(GolfGeometry.distance(origin, north) - 100) < 1)
+    }
+
+    @Test func bearingPointsNorthAndEast() {
+        #expect(abs(GolfGeometry.bearing(from: origin, to: GeoPoint(lat: 57.63, lon: 12.0))) < 0.01)
+        #expect(abs(GolfGeometry.bearing(from: origin, to: GeoPoint(lat: 57.62, lon: 12.01)) - 90) < 0.1)
+    }
+
+    @Test func centroidOfSquareIsItsMiddle() throws {
+        let center = try #require(GolfGeometry.centroid(of: squareGreen))
+        #expect(abs(GolfGeometry.distance(origin, center) - 110) < 0.5)
+    }
+
+    @Test func pointInPolygon() throws {
+        let center = try #require(GolfGeometry.centroid(of: squareGreen))
+        #expect(GolfGeometry.contains(center, in: squareGreen))
+        #expect(!GolfGeometry.contains(origin, in: squareGreen))
+    }
+
+    @Test func frontAndBackAlongLineOfPlay() throws {
+        let result = try #require(GolfGeometry.frontBack(from: origin, green: squareGreen))
+        #expect(abs(result.front - 100) < 0.5)
+        #expect(abs(result.back - 120) < 0.5)
+    }
+}
+
+@MainActor
+struct CourseBuilderTests {
+    private let fixture = """
+    {"elements":[
+      {"type":"way","id":1,"tags":{"golf":"hole","ref":"2","par":"3"},
+       "geometry":[{"lat":57.6200,"lon":12.0000},{"lat":57.6215,"lon":12.0000}]},
+      {"type":"way","id":2,"tags":{"golf":"hole","ref":"1","par":"4"},
+       "geometry":[{"lat":57.6100,"lon":12.0000},{"lat":57.6130,"lon":12.0000}]},
+      {"type":"way","id":3,"tags":{"golf":"green"},
+       "geometry":[{"lat":57.6214,"lon":11.9998},{"lat":57.6214,"lon":12.0002},{"lat":57.6217,"lon":12.0002},{"lat":57.6217,"lon":11.9998},{"lat":57.6214,"lon":11.9998}]},
+      {"type":"node","id":4,"lat":57.6216,"lon":12.0001,"tags":{"golf":"pin"}}
+    ]}
+    """
+
+    @Test func buildsSortedHolesAndMatchesGreens() throws {
+        let elements = try OverpassClient.decode(Data(fixture.utf8))
+        let course = try CourseBuilder.build(reference: .hills, elements: elements)
+
+        #expect(course.holes.map(\.number) == [1, 2])
+        #expect(course.holes[0].par == 4)
+        #expect(course.holes[0].green.isEmpty)
+        #expect(course.holes[1].green.count == 5)
+        #expect(course.holes[1].pin == GeoPoint(lat: 57.6216, lon: 12.0001))
+    }
+
+    @Test func throwsWhenNoHoles() throws {
+        let elements = try OverpassClient.decode(Data(#"{"elements":[]}"#.utf8))
+        #expect(throws: CourseBuilderError.self) {
+            try CourseBuilder.build(reference: .hills, elements: elements)
+        }
+    }
+}
+
+@MainActor
+struct DistanceUnitTests {
+    @Test func convertsToYards() {
+        #expect(DistanceUnit.meters.value(150) == 150)
+        #expect(DistanceUnit.yards.value(150) == 164)
+    }
+}

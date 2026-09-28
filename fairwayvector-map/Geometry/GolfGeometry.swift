@@ -1,0 +1,103 @@
+import CoreLocation
+
+enum GolfGeometry {
+    private static let earthRadius = 6_371_000.0
+
+    static func distance(_ a: GeoPoint, _ b: GeoPoint) -> Double {
+        CLLocation(latitude: a.lat, longitude: a.lon)
+            .distance(from: CLLocation(latitude: b.lat, longitude: b.lon))
+    }
+
+    /// Initial bearing in degrees clockwise from north.
+    static func bearing(from a: GeoPoint, to b: GeoPoint) -> Double {
+        let lat1 = a.lat * .pi / 180
+        let lat2 = b.lat * .pi / 180
+        let dLon = (b.lon - a.lon) * .pi / 180
+        let y = sin(dLon) * cos(lat2)
+        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        let degrees = atan2(y, x) * 180 / .pi
+        return (degrees + 360).truncatingRemainder(dividingBy: 360)
+    }
+
+    static func interpolate(_ a: GeoPoint, _ b: GeoPoint, fraction: Double) -> GeoPoint {
+        GeoPoint(lat: a.lat + (b.lat - a.lat) * fraction, lon: a.lon + (b.lon - a.lon) * fraction)
+    }
+
+    /// Local east/north metres around `origin`; accurate enough at golf-hole scale.
+    static func project(_ point: GeoPoint, origin: GeoPoint) -> SIMD2<Double> {
+        let x = (point.lon - origin.lon) * .pi / 180 * earthRadius * cos(origin.lat * .pi / 180)
+        let y = (point.lat - origin.lat) * .pi / 180 * earthRadius
+        return SIMD2(x, y)
+    }
+
+    static func unproject(_ v: SIMD2<Double>, origin: GeoPoint) -> GeoPoint {
+        let lat = origin.lat + v.y / earthRadius * 180 / .pi
+        let lon = origin.lon + v.x / (earthRadius * cos(origin.lat * .pi / 180)) * 180 / .pi
+        return GeoPoint(lat: lat, lon: lon)
+    }
+
+    static func centroid(of polygon: [GeoPoint]) -> GeoPoint? {
+        guard let origin = polygon.first else { return nil }
+        let pts = polygon.map { project($0, origin: origin) }
+        var area = 0.0
+        var c = SIMD2<Double>(0, 0)
+        for i in pts.indices {
+            let p = pts[i]
+            let q = pts[(i + 1) % pts.count]
+            let cross = p.x * q.y - q.x * p.y
+            area += cross
+            c += (p + q) * cross
+        }
+        if abs(area) < 1e-9 {
+            let mean = pts.reduce(SIMD2<Double>(0, 0), +) / Double(pts.count)
+            return unproject(mean, origin: origin)
+        }
+        return unproject(c / (3 * area), origin: origin)
+    }
+
+    static func contains(_ point: GeoPoint, in polygon: [GeoPoint]) -> Bool {
+        guard polygon.count >= 3 else { return false }
+        let pts = polygon.map { project($0, origin: point) }
+        var inside = false
+        var j = pts.count - 1
+        for i in pts.indices {
+            let a = pts[i]
+            let b = pts[j]
+            if (a.y > 0) != (b.y > 0), 0 < (b.x - a.x) * (0 - a.y) / (b.y - a.y) + a.x {
+                inside.toggle()
+            }
+            j = i
+        }
+        return inside
+    }
+
+    /// Front/back of the green along the line from the player through the green centre.
+    static func frontBack(from player: GeoPoint, green: [GeoPoint]) -> (front: Double, back: Double)? {
+        guard green.count >= 3, let center = centroid(of: green) else { return nil }
+        let target = project(center, origin: player)
+        let length = (target * target).sum().squareRoot()
+        let pts = green.map { project($0, origin: player) }
+
+        if length > 0.5 {
+            let dir = target / length
+            var hits: [Double] = []
+            for i in pts.indices {
+                let a = pts[i]
+                let b = pts[(i + 1) % pts.count]
+                let edge = b - a
+                let denom = dir.x * edge.y - dir.y * edge.x
+                guard abs(denom) > 1e-12 else { continue }
+                let t = (a.x * edge.y - a.y * edge.x) / denom
+                let s = (a.x * dir.y - a.y * dir.x) / denom
+                if t >= 0, s >= 0, s <= 1 { hits.append(t) }
+            }
+            if hits.count >= 2, let front = hits.min(), let back = hits.max() {
+                return (front, back)
+            }
+        }
+
+        let distances = pts.map { ($0 * $0).sum().squareRoot() }
+        guard let front = distances.min(), let back = distances.max() else { return nil }
+        return (front, back)
+    }
+}
