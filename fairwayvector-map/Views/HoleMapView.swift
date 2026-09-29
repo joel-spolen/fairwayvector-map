@@ -10,10 +10,11 @@ struct HoleMapView: View {
     @State private var position: MapCameraPosition = .automatic
     @State private var cameraRevision = 0
     @State private var isDraggingTarget = false
+    @State private var isZoomedIn = false
 
     var body: some View {
         MapReader { proxy in
-            Map(position: $position, bounds: cameraBounds, interactionModes: [.zoom]) {
+            Map(position: $position, bounds: cameraBounds, interactionModes: isZoomedIn ? [.pan, .zoom] : [.zoom]) {
                 if usesGPS {
                     UserAnnotation()
                 }
@@ -96,8 +97,13 @@ struct HoleMapView: View {
                 }
             }
             .mapStyle(.imagery(elevation: .flat))
-            .onMapCameraChange(frequency: .continuous) { _ in
+            .onMapCameraChange(frequency: .continuous) { context in
                 cameraRevision &+= 1
+                isZoomedIn = context.camera.distance < initialCameraDistance * 0.98
+                if !isZoomedIn,
+                   GolfGeometry.distance(GeoPoint(context.camera.centerCoordinate), initialCameraCenter) > 5 {
+                    position = .camera(initialCamera)
+                }
             }
             .simultaneousGesture(
                 DragGesture(minimumDistance: 8, coordinateSpace: .local)
@@ -209,28 +215,38 @@ struct HoleMapView: View {
     private var cameraBounds: MapCameraBounds {
         MapCameraBounds(
             centerCoordinateBounds: holeRect,
-            minimumDistance: 100,
+            minimumDistance: 1,
             maximumDistance: maximumCameraDistance
         )
     }
 
     private var maximumCameraDistance: Double {
+        initialCameraDistance
+    }
+
+    private var initialCameraCenter: GeoPoint {
+        guard let tee = hole.tee, let target = hole.greenCenter else { return hole.tee ?? GeoPoint(lat: 0, lon: 0) }
+        return GolfGeometry.interpolate(tee, target, fraction: 0.65)
+    }
+
+    private var initialCamera: MapCamera {
+        MapCamera(
+            centerCoordinate: initialCameraCenter.coordinate,
+            distance: initialCameraDistance,
+            heading: hole.tee.flatMap { tee in hole.greenCenter.map { GolfGeometry.bearing(from: tee, to: $0) } } ?? 0,
+            pitch: 0
+        )
+    }
+
+    private var initialCameraDistance: Double {
         guard let tee = hole.tee, let target = hole.greenCenter else { return 500 }
-        return max(GolfGeometry.distance(tee, target) * 4.2, 500)
+        return max(GolfGeometry.distance(tee, target) * 3.8, 500)
     }
 
     /// Keeps the hole framed while preventing the camera from escaping the active hole bounds.
     private func frameHole() {
-        guard let tee = hole.tee, let target = hole.greenCenter else { return }
-        let length = GolfGeometry.distance(tee, target)
-        let center = GolfGeometry.interpolate(tee, target, fraction: 0.5)
-        position = .camera(
-            MapCamera(
-                centerCoordinate: center.coordinate,
-                distance: min(max(length * 3.8, 500), maximumCameraDistance),
-                heading: GolfGeometry.bearing(from: tee, to: target),
-                pitch: 0
-            )
-        )
+        guard hole.tee != nil, hole.greenCenter != nil else { return }
+        isZoomedIn = false
+        position = .camera(initialCamera)
     }
 }
