@@ -6,17 +6,12 @@ struct HoleMapView: View {
     let origin: GeoPoint?
     @Binding var tapPoint: GeoPoint?
 
-    @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var position: MapCameraPosition = .automatic
 
     var body: some View {
         MapReader { proxy in
-            Map(position: $position) {
+            Map(position: $position, bounds: cameraBounds, interactionModes: [.zoom]) {
                 UserAnnotation()
-
-                if hole.path.count >= 2 {
-                    MapPolyline(coordinates: hole.path.map(\.coordinate))
-                        .stroke(.white.opacity(0.8), style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
-                }
 
                 if hole.green.count >= 3 {
                     MapPolygon(coordinates: hole.green.map(\.coordinate))
@@ -53,10 +48,6 @@ struct HoleMapView: View {
                 }
             }
             .mapStyle(.imagery(elevation: .flat))
-            .mapControls {
-                MapUserLocationButton()
-                MapCompass()
-            }
             .onTapGesture { screenPoint in
                 if let coordinate = proxy.convert(screenPoint, from: .local) {
                     tapPoint = GeoPoint(coordinate)
@@ -67,7 +58,35 @@ struct HoleMapView: View {
         .onChange(of: hole.number) { frameHole() }
     }
 
-    /// Orients the camera so the hole plays bottom-to-top, leaving room for the distance card.
+    private var holeCoordinates: [CLLocationCoordinate2D] {
+        (hole.path + hole.green).map(\.coordinate)
+    }
+
+    private var holeRect: MKMapRect {
+        guard let first = holeCoordinates.first else { return .world }
+        var rect = MKMapRect(origin: MKMapPoint(first), size: MKMapSize(width: 0, height: 0))
+        for coordinate in holeCoordinates.dropFirst() {
+            rect = rect.union(MKMapRect(origin: MKMapPoint(coordinate), size: MKMapSize(width: 0, height: 0)))
+        }
+        let paddingX = max(rect.size.width * 0.1, 18)
+        let paddingY = max(rect.size.height * 0.1, 18)
+        return rect.insetBy(dx: -paddingX, dy: -paddingY)
+    }
+
+    private var cameraBounds: MapCameraBounds {
+        MapCameraBounds(
+            centerCoordinateBounds: holeRect,
+            minimumDistance: 100,
+            maximumDistance: maximumCameraDistance
+        )
+    }
+
+    private var maximumCameraDistance: Double {
+        guard let tee = hole.tee, let target = hole.greenCenter else { return 500 }
+        return max(GolfGeometry.distance(tee, target) * 3.2, 400)
+    }
+
+    /// Keeps the hole framed while preventing the camera from escaping the active hole bounds.
     private func frameHole() {
         guard let tee = hole.tee, let target = hole.greenCenter else { return }
         let length = GolfGeometry.distance(tee, target)
@@ -75,7 +94,7 @@ struct HoleMapView: View {
         position = .camera(
             MapCamera(
                 centerCoordinate: center.coordinate,
-                distance: max(length * 2.6, 300),
+                distance: min(max(length * 2.6, 300), maximumCameraDistance),
                 heading: GolfGeometry.bearing(from: tee, to: target),
                 pitch: 0
             )

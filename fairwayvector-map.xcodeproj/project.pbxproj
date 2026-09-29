@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D4B1C0A1306A3B6400309840 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B1C0A2306A3B6400309840 /* ContentView.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		1C6738A6306A3B6400309840 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,11 +31,15 @@
 		1C673896306A3B6200309840 /* fairwayvector-map.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "fairwayvector-map.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C6738A5306A3B6400309840 /* fairwayvector-mapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "fairwayvector-mapTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C6738AF306A3B6400309840 /* fairwayvector-mapUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "fairwayvector-mapUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4B1C0A2306A3B6400309840 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "fairwayvector-map/ContentView.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1C673898306A3B6200309840 /* fairwayvector-map */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D4B1C0A3306A3B6400309840 /* Exceptions for ContentView.swift in fairwayvector-map target */,
+			);
 			path = "fairwayvector-map";
 			sourceTree = "<group>";
 		};
@@ -46,6 +54,16 @@
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D4B1C0A3306A3B6400309840 /* Exceptions for ContentView.swift in fairwayvector-map target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ContentView.swift,
+			);
+			target = 1C673895306A3B6200309840 /* fairwayvector-map */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		1C673893306A3B6200309840 /* Frameworks */ = {
@@ -76,6 +94,7 @@
 			isa = PBXGroup;
 			children = (
 				1C673898306A3B6200309840 /* fairwayvector-map */,
+				D4B1C0A2306A3B6400309840 /* ContentView.swift */,
 				1C6738A8306A3B6400309840 /* fairwayvector-mapTests */,
 				1C6738B2306A3B6400309840 /* fairwayvector-mapUITests */,
 				1C673897306A3B6200309840 /* Products */,
@@ -236,6 +255,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D4B1C0A1306A3B6400309840 /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
