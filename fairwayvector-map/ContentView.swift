@@ -5,7 +5,9 @@ struct ContentView: View {
     @State private var locationManager = LocationManager()
     @State private var holeIndex = 0
     @State private var tapPoint: GeoPoint?
+    @State private var isShowingFlagEditor = false
     @AppStorage("distanceUnit") private var unit: DistanceUnit = .meters
+    @AppStorage("customFlagPositions") private var customFlagPositions = ""
 
     var body: some View {
         NavigationStack {
@@ -19,6 +21,18 @@ struct ContentView: View {
             await store.load()
         }
         .onChange(of: holeIndex) { tapPoint = nil }
+        .sheet(isPresented: $isShowingFlagEditor) {
+            if let holes = store.course?.holes, !holes.isEmpty {
+                let hole = holes[min(holeIndex, holes.count - 1)]
+                if let flag = flagPosition(for: hole) {
+                    FlagPlacementView(hole: hole, initialFlag: flag) { movedFlag in
+                        saveFlagPosition(movedFlag, for: hole)
+                        isShowingFlagEditor = false
+                    }
+                    .presentationDetents([.medium, .large])
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -29,14 +43,16 @@ struct ContentView: View {
             ZStack {
                 HoleMapView(
                     hole: hole,
+                    flag: flagPosition(for: hole),
                     origin: origin?.point,
                     usesGPS: origin?.usesGPS == true,
-                    tapPoint: $tapPoint
+                    tapPoint: $tapPoint,
+                    onDoubleTapGreen: { isShowingFlagEditor = true }
                 )
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    topDistanceMenu(hole: hole, origin: origin)
+                    topDistanceMenu(hole: hole, origin: origin, flag: flagPosition(for: hole))
                     Spacer(minLength: 0)
                     bottomHoleMenu(hole: hole, holeCount: holes.count)
                 }
@@ -85,13 +101,13 @@ struct ContentView: View {
         }
     }
 
-    private func topDistanceMenu(hole: Hole, origin: DistanceOrigin?) -> some View {
+    private func topDistanceMenu(hole: Hole, origin: DistanceOrigin?, flag: GeoPoint?) -> some View {
         VStack(spacing: 4) {
             DistanceCard(hole: hole, origin: origin, unit: unit)
             HStack(spacing: 12) {
                 distanceSummary("POINT", pointDistanceText(origin: origin), color: FairwayVectorColors.orange)
                 Spacer(minLength: 0)
-                distanceSummary("TO FLAG", flagDistanceText(hole: hole, origin: origin), color: FairwayVectorColors.flightBlue)
+                distanceSummary("TO FLAG", flagDistanceText(flag: flag, origin: origin), color: FairwayVectorColors.flightBlue)
             }
         }
         .padding(.horizontal, 12)
@@ -124,9 +140,28 @@ struct ContentView: View {
         return unit.format(GolfGeometry.distance(origin.point, tapPoint))
     }
 
-    private func flagDistanceText(hole: Hole, origin: DistanceOrigin?) -> String {
-        guard let origin, let flag = hole.flag else { return "–" }
+    private func flagDistanceText(flag: GeoPoint?, origin: DistanceOrigin?) -> String {
+        guard let origin, let flag else { return "–" }
         return unit.format(GolfGeometry.distance(tapPoint ?? origin.point, flag))
+    }
+
+    private func flagPosition(for hole: Hole) -> GeoPoint? {
+        if let data = customFlagPositions.data(using: .utf8),
+           let positions = try? JSONDecoder().decode([String: GeoPoint].self, from: data),
+           let custom = positions["\(store.reference.osmRelationID)-\(hole.number)"] {
+            return custom
+        }
+        return hole.flag ?? hole.greenCenter
+    }
+
+    private func saveFlagPosition(_ position: GeoPoint, for hole: Hole) {
+        let key = "\(store.reference.osmRelationID)-\(hole.number)"
+        let data = customFlagPositions.data(using: .utf8) ?? Data()
+        var positions = (try? JSONDecoder().decode([String: GeoPoint].self, from: data)) ?? [:]
+        positions[key] = position
+        guard let encoded = try? JSONEncoder().encode(positions),
+              let value = String(data: encoded, encoding: .utf8) else { return }
+        customFlagPositions = value
     }
 
     private func holeSummary(_ hole: Hole) -> some View {

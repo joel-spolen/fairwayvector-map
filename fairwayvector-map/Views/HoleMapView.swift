@@ -3,9 +3,11 @@ import SwiftUI
 
 struct HoleMapView: View {
     let hole: Hole
+    let flag: GeoPoint?
     let origin: GeoPoint?
     let usesGPS: Bool
     @Binding var tapPoint: GeoPoint?
+    let onDoubleTapGreen: () -> Void
 
     @State private var position: MapCameraPosition = .automatic
     @State private var cameraRevision = 0
@@ -59,7 +61,7 @@ struct HoleMapView: View {
                         .stroke(FairwayVectorColors.gold, lineWidth: 2)
                 }
 
-                if let flag = hole.flag {
+                if let flag {
                     Annotation("Flag", coordinate: flag.coordinate, anchor: .bottomLeading) {
                         Image(systemName: "flag.fill")
                             .font(.title3)
@@ -74,7 +76,7 @@ struct HoleMapView: View {
                         MapPolyline(coordinates: [origin.coordinate, tapPoint.coordinate])
                             .stroke(FairwayVectorColors.orange, lineWidth: 3)
                     }
-                    if let flag = hole.flag {
+                    if let flag {
                         MapPolyline(coordinates: [tapPoint.coordinate, flag.coordinate])
                             .stroke(FairwayVectorColors.flightBlue, lineWidth: 3)
                     }
@@ -122,6 +124,14 @@ struct HoleMapView: View {
                     }
                     .onEnded { _ in
                         isDraggingTarget = false
+                    }
+            )
+            .simultaneousGesture(
+                SpatialTapGesture(count: 2, coordinateSpace: .local)
+                    .onEnded { value in
+                        guard let coordinate = proxy.convert(value.location, from: .local),
+                              GolfGeometry.contains(GeoPoint(coordinate), in: hole.green) else { return }
+                        onDoubleTapGreen()
                     }
             )
             .overlay {
