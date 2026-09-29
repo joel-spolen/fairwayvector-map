@@ -35,14 +35,8 @@ struct ContentView: View {
                 )
                 .ignoresSafeArea()
 
-                HStack {
-                    Spacer(minLength: 0)
-                    sideDistancePanel(hole: hole, origin: origin)
-                }
-                .padding(.trailing, 8)
-                .padding(.bottom, 96)
-
                 VStack(spacing: 0) {
+                    topDistanceMenu(hole: hole, origin: origin)
                     Spacer(minLength: 0)
                     bottomHoleMenu(hole: hole, holeCount: holes.count)
                 }
@@ -91,38 +85,37 @@ struct ContentView: View {
         }
     }
 
-    private func sideDistancePanel(hole: Hole, origin: DistanceOrigin?) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func topDistanceMenu(hole: Hole, origin: DistanceOrigin?) -> some View {
+        VStack(spacing: 4) {
             DistanceCard(hole: hole, origin: origin, unit: unit)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("POINT")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(FairwayVectorColors.slate)
-                Text(pointDistanceText(origin: origin))
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(FairwayVectorColors.orange)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.75)
+            HStack(spacing: 12) {
+                distanceSummary("POINT", pointDistanceText(origin: origin), color: FairwayVectorColors.orange)
+                Spacer(minLength: 0)
+                distanceSummary("TO FLAG", flagDistanceText(hole: hole, origin: origin), color: FairwayVectorColors.flightBlue)
             }
-            .accessibilityElement(children: .combine)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("TO FLAG")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(FairwayVectorColors.slate)
-                Text(flagDistanceText(hole: hole, origin: origin))
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(FairwayVectorColors.flightBlue)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.75)
-            }
-            .accessibilityElement(children: .combine)
         }
-        .padding(10)
-        .frame(width: 104, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(FairwayVectorColors.surface.opacity(0.8), lineWidth: 1)
+        .padding(.horizontal, 12)
+        .padding(.top, 0)
+        .padding(.bottom, 5)
+        .frame(height: 68, alignment: .bottom)
+        .frame(maxWidth: .infinity)
+        .background {
+            Rectangle()
+                .fill(.regularMaterial)
+                .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private func distanceSummary(_ title: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(FairwayVectorColors.slate)
+            Text(value)
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
     }
 
