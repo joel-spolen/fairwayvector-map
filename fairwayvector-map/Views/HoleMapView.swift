@@ -9,6 +9,7 @@ struct HoleMapView: View {
 
     @State private var position: MapCameraPosition = .automatic
     @State private var cameraRevision = 0
+    @State private var isDraggingTarget = false
 
     var body: some View {
         MapReader { proxy in
@@ -90,23 +91,33 @@ struct HoleMapView: View {
                                 .foregroundStyle(FairwayVectorColors.navy)
                         }
                         .contentShape(Circle())
-                        .gesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .named("holeMap"))
-                                .onChanged { value in
-                                    if let coordinate = proxy.convert(value.location, from: .named("holeMap")) {
-                                        self.tapPoint = GeoPoint(coordinate)
-                                    }
-                                }
-                        )
                     }
                     .annotationTitles(.hidden)
                 }
             }
-            .coordinateSpace(name: "holeMap")
             .mapStyle(.imagery(elevation: .flat))
             .onMapCameraChange(frequency: .continuous) { _ in
                 cameraRevision &+= 1
             }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 8, coordinateSpace: .local)
+                    .onChanged { value in
+                        guard let currentTarget = tapPoint else { return }
+                        if !isDraggingTarget {
+                            guard let markerPoint = proxy.convert(currentTarget.coordinate, to: .local) else { return }
+                            let dx = value.startLocation.x - markerPoint.x
+                            let dy = value.startLocation.y - markerPoint.y
+                            guard hypot(dx, dy) <= 40 else { return }
+                            isDraggingTarget = true
+                        }
+                        if let coordinate = proxy.convert(value.location, from: .local) {
+                            tapPoint = GeoPoint(coordinate)
+                        }
+                    }
+                    .onEnded { _ in
+                        isDraggingTarget = false
+                    }
+            )
             .overlay {
                 Canvas { context, size in
                     guard !visibleAreaPolygons.isEmpty else { return }
@@ -131,7 +142,7 @@ struct HoleMapView: View {
                 .allowsHitTesting(false)
             }
             .onTapGesture { screenPoint in
-                if let coordinate = proxy.convert(screenPoint, from: .local) {
+                if !isDraggingTarget, let coordinate = proxy.convert(screenPoint, from: .local) {
                     tapPoint = GeoPoint(coordinate)
                 }
             }
