@@ -67,6 +67,65 @@ enum GolfGeometry {
         return nearestPoint.map { unproject($0, origin: point) }
     }
 
+    static func smoothConnectorBoundary(from start: GeoPoint, to end: GeoPoint, radius: Double) -> [GeoPoint] {
+        let endVector = project(end, origin: start)
+        let length = (endVector * endVector).sum().squareRoot()
+        guard length > 0.5 else { return [] }
+
+        let heading = atan2(endVector.y, endVector.x)
+        let steps = 16
+        var boundary: [SIMD2<Double>] = []
+
+        for step in 0...steps {
+            let angle = heading - .pi / 2 + .pi * Double(step) / Double(steps)
+            boundary.append(endVector + SIMD2(cos(angle), sin(angle)) * radius)
+        }
+        for step in 0...steps {
+            let angle = heading + .pi / 2 + .pi * Double(step) / Double(steps)
+            boundary.append(SIMD2(cos(angle), sin(angle)) * radius)
+        }
+        return boundary.map { unproject($0, origin: start) }
+    }
+
+    static func convexHull(of polygons: [[GeoPoint]]) -> [GeoPoint] {
+        guard let origin = polygons.lazy.flatMap({ $0 }).first else { return [] }
+        var points: [SIMD2<Double>] = []
+        for polygon in polygons {
+            for point in polygon {
+                points.append(project(point, origin: origin))
+            }
+        }
+        points.sort {
+            if $0.x == $1.x { return $0.y < $1.y }
+            return $0.x < $1.x
+        }
+        guard points.count > 2 else { return points.map { unproject($0, origin: origin) } }
+
+        func cross(_ origin: SIMD2<Double>, _ a: SIMD2<Double>, _ b: SIMD2<Double>) -> Double {
+            (a.x - origin.x) * (b.y - origin.y) - (a.y - origin.y) * (b.x - origin.x)
+        }
+
+        var lower: [SIMD2<Double>] = []
+        for point in points {
+            while lower.count >= 2 && cross(lower[lower.count - 2], lower[lower.count - 1], point) <= 0 {
+                lower.removeLast()
+            }
+            lower.append(point)
+        }
+
+        var upper: [SIMD2<Double>] = []
+        for point in points.reversed() {
+            while upper.count >= 2 && cross(upper[upper.count - 2], upper[upper.count - 1], point) <= 0 {
+                upper.removeLast()
+            }
+            upper.append(point)
+        }
+
+        lower.removeLast()
+        upper.removeLast()
+        return (lower + upper).map { unproject($0, origin: origin) }
+    }
+
     /// Initial bearing in degrees clockwise from north.
     static func bearing(from a: GeoPoint, to b: GeoPoint) -> Double {
         let lat1 = a.lat * .pi / 180

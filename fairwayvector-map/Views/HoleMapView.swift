@@ -44,17 +44,10 @@ struct HoleMapView: View {
                         .foregroundStyle(FairwayVectorColors.gold.opacity(0.12))
                 }
 
-                ForEach(Array(boundaryPolygons.enumerated()), id: \.offset) { _, polygon in
-                    MapPolyline(coordinates: (polygon + [polygon[0]]).map(\.coordinate))
+                if highlightBoundary.count >= 3 {
+                    MapPolyline(coordinates: (highlightBoundary + [highlightBoundary[0]]).map(\.coordinate))
                         .stroke(FairwayVectorColors.gold.opacity(0.42), style: StrokeStyle(lineWidth: 7, lineJoin: .round))
-                    MapPolyline(coordinates: (polygon + [polygon[0]]).map(\.coordinate))
-                        .stroke(FairwayVectorColors.surface.opacity(0.92), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
-                }
-
-                ForEach(Array(teeConnectors.enumerated()), id: \.offset) { _, connector in
-                    MapPolyline(coordinates: (connector + [connector[0]]).map(\.coordinate))
-                        .stroke(FairwayVectorColors.gold.opacity(0.42), style: StrokeStyle(lineWidth: 7, lineJoin: .round))
-                    MapPolyline(coordinates: (connector + [connector[0]]).map(\.coordinate))
+                    MapPolyline(coordinates: (highlightBoundary + [highlightBoundary[0]]).map(\.coordinate))
                         .stroke(FairwayVectorColors.surface.opacity(0.92), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
                 }
 
@@ -158,10 +151,14 @@ struct HoleMapView: View {
         return fallback.isEmpty ? [] : [fallback]
     }
 
+    private var highlightBoundary: [GeoPoint] {
+        let polygons = boundaryPolygons + teeConnectors
+        guard polygons.count > 1 else { return polygons.first ?? [] }
+        return GolfGeometry.convexHull(of: polygons)
+    }
+
     private var visibleAreaPolygons: [[GeoPoint]] {
-        let mappedAreas = hole.roughs + hole.fairways + hole.tees + teeConnectors + (hole.green.count >= 3 ? [hole.green] : [])
-        if !mappedAreas.isEmpty { return mappedAreas }
-        return boundaryPolygons
+        highlightBoundary.count >= 3 ? [highlightBoundary] : boundaryPolygons
     }
 
     private var teeConnectors: [[GeoPoint]] {
@@ -169,6 +166,7 @@ struct HoleMapView: View {
         guard !hole.tees.isEmpty, !playableAreas.isEmpty else { return [] }
         return hole.tees.compactMap { teePolygon in
             guard let teeCenter = GolfGeometry.centroid(of: teePolygon) else { return nil }
+            let teeRadius = teePolygon.map { GolfGeometry.distance(teeCenter, $0) }.max() ?? 0
             let nearestAreaPoint = playableAreas
                 .compactMap { polygon -> (point: GeoPoint, distance: Double)? in
                     guard let nearest = GolfGeometry.nearestPoint(onPath: polygon + [polygon[0]], to: teeCenter) else { return nil }
@@ -177,7 +175,11 @@ struct HoleMapView: View {
                 .min { $0.distance < $1.distance }?
                 .point
             guard let nearestAreaPoint else { return nil }
-            let boundary = GolfGeometry.corridorBoundary(for: [teeCenter, nearestAreaPoint], halfWidth: 22)
+            let boundary = GolfGeometry.smoothConnectorBoundary(
+                from: teeCenter,
+                to: nearestAreaPoint,
+                radius: max(teeRadius + 5, 22)
+            )
             return boundary.count >= 3 ? boundary : nil
         }
     }

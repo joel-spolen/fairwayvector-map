@@ -70,6 +70,35 @@ struct GolfGeometryTests {
         let closest = try #require(GolfGeometry.nearestPoint(onPath: [edgeStart, edgeEnd], to: point))
         #expect(GolfGeometry.distance(closest, origin) < 0.5)
     }
+
+    @Test func smoothTeeConnectorUsesRoundedCaps() throws {
+        let end = GeoPoint(lat: origin.lat, lon: origin.lon + 100 / (111_195.0 * cos(origin.lat * .pi / 180)))
+        let boundary = GolfGeometry.smoothConnectorBoundary(from: origin, to: end, radius: 20)
+        #expect(boundary.count == 34)
+        #expect(abs(GolfGeometry.distance(origin, boundary[boundary.count - 1]) - 20) < 0.5)
+        #expect(abs(GolfGeometry.distance(end, boundary[0]) - 20) < 0.5)
+    }
+
+    @Test func combinedHighlightBoundaryEnclosesHoleAndTeeAreas() throws {
+        let holeArea = [
+            origin,
+            GeoPoint(lat: origin.lat, lon: origin.lon + 20 / (111_195.0 * cos(origin.lat * .pi / 180))),
+            GeoPoint(lat: origin.lat + 20 / 111_195.0, lon: origin.lon + 20 / (111_195.0 * cos(origin.lat * .pi / 180))),
+            GeoPoint(lat: origin.lat + 20 / 111_195.0, lon: origin.lon),
+        ]
+        let teeExtension = [
+            GeoPoint(lat: origin.lat - 30 / 111_195.0, lon: origin.lon - 10 / (111_195.0 * cos(origin.lat * .pi / 180))),
+            GeoPoint(lat: origin.lat - 30 / 111_195.0, lon: origin.lon + 10 / (111_195.0 * cos(origin.lat * .pi / 180))),
+            GeoPoint(lat: origin.lat - 20 / 111_195.0, lon: origin.lon),
+        ]
+        let boundary = GolfGeometry.convexHull(of: [holeArea, teeExtension])
+        let holeCenter = GeoPoint(lat: origin.lat + 10 / 111_195.0, lon: origin.lon + 10 / (111_195.0 * cos(origin.lat * .pi / 180)))
+        let teeCenter = GeoPoint(lat: origin.lat - 25 / 111_195.0, lon: origin.lon)
+
+        #expect(boundary.count >= 5)
+        #expect(GolfGeometry.contains(teeCenter, in: boundary))
+        #expect(GolfGeometry.contains(holeCenter, in: boundary))
+    }
 }
 
 @MainActor
