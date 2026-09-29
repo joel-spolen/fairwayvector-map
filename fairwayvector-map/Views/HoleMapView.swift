@@ -4,6 +4,7 @@ import SwiftUI
 struct HoleMapView: View {
     let hole: Hole
     let origin: GeoPoint?
+    let usesGPS: Bool
     @Binding var tapPoint: GeoPoint?
 
     @State private var position: MapCameraPosition = .automatic
@@ -11,7 +12,26 @@ struct HoleMapView: View {
     var body: some View {
         MapReader { proxy in
             Map(position: $position, bounds: cameraBounds, interactionModes: [.zoom]) {
-                UserAnnotation()
+                if usesGPS {
+                    UserAnnotation()
+                }
+
+                if let tee = hole.tee {
+                    Annotation(usesGPS ? "Tee" : "You · Tee", coordinate: tee.coordinate, anchor: .bottom) {
+                        VStack(spacing: 3) {
+                            Text(usesGPS ? "TEE" : "YOU · TEE")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(FairwayVectorColors.surface, in: Capsule())
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(usesGPS ? FairwayVectorColors.navy : FairwayVectorColors.orange)
+                                .shadow(color: .black.opacity(0.3), radius: 2)
+                        }
+                    }
+                    .annotationTitles(.hidden)
+                }
 
                 if hole.green.count >= 3 {
                     MapPolygon(coordinates: hole.green.map(\.coordinate))
@@ -90,11 +110,11 @@ struct HoleMapView: View {
     private func frameHole() {
         guard let tee = hole.tee, let target = hole.greenCenter else { return }
         let length = GolfGeometry.distance(tee, target)
-        let center = GolfGeometry.interpolate(tee, target, fraction: 0.4)
+        let center = GolfGeometry.interpolate(tee, target, fraction: 0.18)
         position = .camera(
             MapCamera(
                 centerCoordinate: center.coordinate,
-                distance: min(max(length * 2.6, 300), maximumCameraDistance),
+            distance: min(max(length * 2.3, 300), maximumCameraDistance),
                 heading: GolfGeometry.bearing(from: tee, to: target),
                 pitch: 0
             )

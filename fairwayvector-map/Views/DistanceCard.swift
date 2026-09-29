@@ -20,8 +20,8 @@ struct DistanceCard: View {
                     metric("Back", frontBack?.back, color: FairwayVectorColors.gold, font: .title3.bold())
                 }
 
-                if let tapPoint, let flag = hole.flag {
-                    tapRow(from: origin.point, tap: tapPoint, flag: flag)
+                if let tapPoint {
+                    tapRow(from: origin.point, tap: tapPoint, flag: hole.flag, startLabel: origin.usesGPS ? "from you" : "from tee")
                 }
 
                 Text(origin.caption(unit: unit))
@@ -54,20 +54,30 @@ struct DistanceCard: View {
         .accessibilityLabel("\(title): \(meters.map(unit.format) ?? "unavailable")")
     }
 
-    private func tapRow(from start: GeoPoint, tap: GeoPoint, flag: GeoPoint) -> some View {
-        HStack(spacing: 12) {
-            Label(unit.format(GolfGeometry.distance(start, tap)), systemImage: "scope")
-                .foregroundStyle(FairwayVectorColors.orange)
-            Image(systemName: "arrow.right")
-                .foregroundStyle(FairwayVectorColors.slate)
-            Label(unit.format(GolfGeometry.distance(tap, flag)), systemImage: "flag")
-                .foregroundStyle(FairwayVectorColors.flightBlue)
-            Spacer()
-            Button("Clear target", systemImage: "xmark.circle.fill", action: onClearTap)
-                .labelStyle(.iconOnly)
-                .foregroundStyle(FairwayVectorColors.slate)
+    private func tapRow(from start: GeoPoint, tap: GeoPoint, flag: GeoPoint?, startLabel: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Selected point")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(FairwayVectorColors.slate)
+                Spacer()
+                Button("Clear target", systemImage: "xmark.circle.fill", action: onClearTap)
+                    .labelStyle(.iconOnly)
+                    .foregroundStyle(FairwayVectorColors.slate)
+                    .accessibilityLabel("Clear selected point")
+            }
+            HStack(spacing: 8) {
+                Label("\(unit.format(GolfGeometry.distance(start, tap))) \(startLabel)", systemImage: "scope")
+                    .foregroundStyle(FairwayVectorColors.orange)
+                if let flag {
+                    Image(systemName: "arrow.right")
+                        .foregroundStyle(FairwayVectorColors.slate)
+                    Label(unit.format(GolfGeometry.distance(tap, flag)), systemImage: "flag")
+                        .foregroundStyle(FairwayVectorColors.flightBlue)
+                }
+            }
+            .font(.subheadline.weight(.semibold).monospacedDigit())
         }
-        .font(.subheadline.weight(.semibold).monospacedDigit())
         .padding(10)
         .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
     }
@@ -83,8 +93,12 @@ struct DistanceOrigin {
     var point: GeoPoint
     var source: Source
 
-    /// Beyond this, the player is clearly not on the hole, so distances fall back to the tee.
-    static let onCourseRadius = 1_500.0
+    static let onHoleCorridor = 100.0
+
+    var usesGPS: Bool {
+        if case .gps = source { return true }
+        return false
+    }
 
     static func resolve(location: CLLocation?, hole: Hole) -> DistanceOrigin? {
         guard let tee = hole.tee else { return nil }
@@ -92,9 +106,8 @@ struct DistanceOrigin {
             return DistanceOrigin(point: tee, source: .teeNoFix)
         }
         let player = GeoPoint(location.coordinate)
-        let reference = hole.greenCenter ?? tee
-        let away = GolfGeometry.distance(player, reference)
-        if away > onCourseRadius {
+        let away = GolfGeometry.distance(player, toPath: hole.path) ?? .infinity
+        if away > onHoleCorridor {
             return DistanceOrigin(point: tee, source: .teeFarAway(distance: away))
         }
         return DistanceOrigin(point: player, source: .gps(accuracy: location.horizontalAccuracy))

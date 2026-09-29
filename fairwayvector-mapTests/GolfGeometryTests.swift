@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import Testing
 @testable import fairwayvector_map
@@ -43,6 +44,40 @@ struct GolfGeometryTests {
         let result = try #require(GolfGeometry.frontBack(from: origin, green: squareGreen))
         #expect(abs(result.front - 100) < 0.5)
         #expect(abs(result.back - 120) < 0.5)
+    }
+
+    @Test func distanceToHolePath() throws {
+        let end = GeoPoint(lat: origin.lat + 200 / 111_195.0, lon: origin.lon)
+        let besidePath = GeoPoint(lat: origin.lat + 100 / 111_195.0, lon: origin.lon + 30 / (111_195.0 * cos(origin.lat * .pi / 180)))
+        let distance = try #require(GolfGeometry.distance(besidePath, toPath: [origin, end]))
+        #expect(abs(distance - 30) < 0.5)
+    }
+}
+
+@MainActor
+struct DistanceOriginTests {
+    private let tee = GeoPoint(lat: 57.6200, lon: 12.0000)
+    private var hole: Hole {
+        Hole(
+            number: 1,
+            par: 4,
+            path: [tee, GeoPoint(lat: tee.lat + 300 / 111_195.0, lon: tee.lon)],
+            green: [],
+            pin: nil
+        )
+    }
+
+    @Test func usesGPSWhenFixIsNearHolePath() throws {
+        let nearPath = CLLocation(latitude: tee.lat + 100 / 111_195.0, longitude: tee.lon)
+        let origin = try #require(DistanceOrigin.resolve(location: nearPath, hole: hole))
+        #expect(origin.usesGPS)
+    }
+
+    @Test func fallsBackToTeeWhenFixIsOffHole() throws {
+        let offHole = CLLocation(latitude: tee.lat + 100 / 111_195.0, longitude: tee.lon + 250 / (111_195.0 * cos(tee.lat * .pi / 180)))
+        let origin = try #require(DistanceOrigin.resolve(location: offHole, hole: hole))
+        #expect(!origin.usesGPS)
+        #expect(origin.point == tee)
     }
 }
 

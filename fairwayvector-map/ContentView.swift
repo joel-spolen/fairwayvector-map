@@ -37,9 +37,14 @@ struct ContentView: View {
         if let holes = store.course?.holes, !holes.isEmpty {
             let hole = holes[min(holeIndex, holes.count - 1)]
             let origin = DistanceOrigin.resolve(location: locationManager.location, hole: hole)
-            ZStack(alignment: .bottom) {
-                HoleMapView(hole: hole, origin: origin?.point, tapPoint: $tapPoint)
-                    .ignoresSafeArea(edges: .bottom)
+            VStack(spacing: 0) {
+                HoleMapView(
+                    hole: hole,
+                    origin: origin?.point,
+                    usesGPS: origin?.usesGPS == true,
+                    tapPoint: $tapPoint
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 VStack(spacing: 12) {
                     if locationManager.isDenied {

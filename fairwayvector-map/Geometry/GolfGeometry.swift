@@ -8,6 +8,23 @@ enum GolfGeometry {
             .distance(from: CLLocation(latitude: b.lat, longitude: b.lon))
     }
 
+    static func distance(_ point: GeoPoint, toPath path: [GeoPoint]) -> Double? {
+        guard path.count >= 2 else { return nil }
+        let projected = path.map { project($0, origin: point) }
+        var closest = Double.infinity
+        for index in 0..<(projected.count - 1) {
+            let start = projected[index]
+            let segment = projected[index + 1] - start
+            let lengthSquared = (segment * segment).sum()
+            let fraction = lengthSquared == 0
+                ? 0
+                : max(0, min(1, -(start * segment).sum() / lengthSquared))
+            let nearest = start + segment * fraction
+            closest = min(closest, (nearest * nearest).sum().squareRoot())
+        }
+        return closest.isFinite ? closest : nil
+    }
+
     /// Initial bearing in degrees clockwise from north.
     static func bearing(from a: GeoPoint, to b: GeoPoint) -> Double {
         let lat1 = a.lat * .pi / 180
