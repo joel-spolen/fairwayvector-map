@@ -7,25 +7,18 @@ struct DistanceCard: View {
     let unit: DistanceUnit
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             if let origin, let center = hole.greenCenter {
                 let frontBack = GolfGeometry.frontBack(from: origin.point, green: hole.green)
-                HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    metric("Front", frontBack?.front, color: FairwayVectorColors.gold)
-                    Spacer(minLength: 4)
-                    metric("Center", GolfGeometry.distance(origin.point, center), color: FairwayVectorColors.orange, prominent: true)
-                    Spacer(minLength: 4)
-                    metric("Back", frontBack?.back, color: FairwayVectorColors.gold)
-                }
+                metric("Front", frontBack?.front, color: FairwayVectorColors.gold)
+                metric("Center", GolfGeometry.distance(origin.point, center), color: FairwayVectorColors.orange, prominent: true)
+                metric("Back", frontBack?.back, color: FairwayVectorColors.gold)
 
             } else {
                 Text("No green is mapped for this hole yet.")
                     .font(.subheadline)
                     .foregroundStyle(FairwayVectorColors.slate)
             }
-            Text("© OpenStreetMap contributors")
-                .font(.system(size: 8))
-                .foregroundStyle(FairwayVectorColors.slate)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

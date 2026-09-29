@@ -35,10 +35,27 @@ struct ContentView: View {
                 )
                 .ignoresSafeArea()
 
+                HStack {
+                    Spacer(minLength: 0)
+                    sideDistancePanel(hole: hole, origin: origin)
+                }
+                .padding(.trailing, 8)
+                .padding(.bottom, 96)
+
                 VStack(spacing: 0) {
-                    topDistanceMenu(hole: hole, origin: origin)
                     Spacer(minLength: 0)
                     bottomHoleMenu(hole: hole, holeCount: holes.count)
+                }
+                VStack {
+                    Spacer(minLength: 0)
+                    HStack {
+                        Text("© OpenStreetMap contributors")
+                            .font(.system(size: 7))
+                            .foregroundStyle(.white.opacity(0.85))
+                        Spacer()
+                    }
+                    .padding(.leading, 8)
+                    .padding(.bottom, 66)
                 }
             }
         } else if store.isLoading || store.errorMessage == nil {
@@ -74,56 +91,49 @@ struct ContentView: View {
         }
     }
 
-    private func topDistanceMenu(hole: Hole, origin: DistanceOrigin?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "scope")
-                    .foregroundStyle(FairwayVectorColors.orange)
+    private func sideDistancePanel(hole: Hole, origin: DistanceOrigin?) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DistanceCard(hole: hole, origin: origin, unit: unit)
+            VStack(alignment: .leading, spacing: 2) {
                 Text("POINT")
-                    .font(.caption2.weight(.semibold))
+                    .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(FairwayVectorColors.slate)
                 Text(pointDistanceText(origin: origin))
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(FairwayVectorColors.orange)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Spacer(minLength: 0)
-                Text(flagDistanceText(hole: hole))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(FairwayVectorColors.flightBlue)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Button("Clear selected point", systemImage: "xmark.circle.fill") {
-                    self.tapPoint = nil
-                }
-                .labelStyle(.iconOnly)
-                .foregroundStyle(FairwayVectorColors.navy)
-                .disabled(tapPoint == nil)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
             }
-
-            DistanceCard(hole: hole, origin: origin, unit: unit)
+            .accessibilityElement(children: .combine)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("TO FLAG")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(FairwayVectorColors.slate)
+                Text(flagDistanceText(hole: hole, origin: origin))
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(FairwayVectorColors.flightBlue)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+            }
+            .accessibilityElement(children: .combine)
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 2)
-        .padding(.bottom, 7)
-        .frame(height: 86, alignment: .bottom)
-        .frame(maxWidth: .infinity)
-        .background {
-            Rectangle()
-                .fill(.regularMaterial)
-                .ignoresSafeArea(edges: .top)
+        .padding(10)
+        .frame(width: 104, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(FairwayVectorColors.surface.opacity(0.8), lineWidth: 1)
         }
     }
 
     private func pointDistanceText(origin: DistanceOrigin?) -> String {
-        guard let tapPoint, let origin else { return "–" }
-        let distance = unit.format(GolfGeometry.distance(origin.point, tapPoint))
-        return "\(distance) from \(origin.usesGPS ? "you" : "tee")"
+        guard let tapPoint, let origin else { return unit.format(0) }
+        return unit.format(GolfGeometry.distance(origin.point, tapPoint))
     }
 
-    private func flagDistanceText(hole: Hole) -> String {
-        guard let tapPoint, let flag = hole.flag else { return "To flag –" }
-        return "To flag \(unit.format(GolfGeometry.distance(tapPoint, flag)))"
+    private func flagDistanceText(hole: Hole, origin: DistanceOrigin?) -> String {
+        guard let origin, let flag = hole.flag else { return "–" }
+        return unit.format(GolfGeometry.distance(tapPoint ?? origin.point, flag))
     }
 
     private func holeSummary(_ hole: Hole) -> some View {
