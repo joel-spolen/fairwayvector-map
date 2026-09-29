@@ -2,14 +2,26 @@ import Foundation
 
 enum CourseBuilderError: LocalizedError {
     case noHoles
+    case missingOSMRelation
 
     var errorDescription: String? {
-        "No mapped holes were found for this course in OpenStreetMap."
+        switch self {
+        case .noHoles: "No mapped holes were found for this course in OpenStreetMap."
+        case .missingOSMRelation: "The selected course has no matching OpenStreetMap area."
+        }
     }
 }
 
 enum CourseBuilder {
-    static func build(reference: CourseReference, elements: [OverpassElement], fetchedAt: Date = .now) throws -> Course {
+    static func build(
+        reference: CourseReference,
+        elements: [OverpassElement],
+        osmRelationID: Int? = nil,
+        fetchedAt: Date = .now
+    ) throws -> Course {
+        guard let osmRelationID = osmRelationID ?? reference.osmRelationID else {
+            throw CourseBuilderError.missingOSMRelation
+        }
         let greens: [[GeoPoint]] = elements
             .filter { $0.type == "way" && $0.tags?["golf"] == "green" }
             .compactMap { $0.geometry }
@@ -81,7 +93,7 @@ enum CourseBuilder {
             holes[nearestHole.index].tees.append(polygon)
         }
 
-        return Course(osmRelationID: reference.osmRelationID, name: reference.name, holes: holes, fetchedAt: fetchedAt)
+        return Course(osmRelationID: osmRelationID, name: reference.courseName, holes: holes, fetchedAt: fetchedAt)
     }
 
     private static func matchGreen(for end: GeoPoint, in greens: [[GeoPoint]]) -> [GeoPoint]? {

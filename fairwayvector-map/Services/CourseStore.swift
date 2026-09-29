@@ -33,8 +33,16 @@ final class CourseStore {
         defer { isLoading = false }
 
         do {
-            let elements = try await client.fetchGolfFeatures(courseRelationID: reference.osmRelationID)
-            let built = try CourseBuilder.build(reference: reference, elements: elements)
+            let relationID: Int
+            if let cachedID = course?.osmRelationID {
+                relationID = cachedID
+            } else if let knownID = reference.osmRelationID {
+                relationID = knownID
+            } else {
+                relationID = try await client.findCourseRelationID(for: reference)
+            }
+            let elements = try await client.fetchGolfFeatures(courseRelationID: relationID)
+            let built = try CourseBuilder.build(reference: reference, elements: elements, osmRelationID: relationID)
             course = built
             writeCache(built)
         } catch {
@@ -46,7 +54,7 @@ final class CourseStore {
         guard let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
         }
-        return dir.appending(path: "course-\(reference.osmRelationID)-v4.json")
+        return dir.appending(path: "course-\(reference.cacheKey)-v5.json")
     }
 
     private func readCache() -> Course? {

@@ -179,3 +179,23 @@ struct DistanceUnitTests {
         #expect(DistanceUnit.yards.value(150) == 164)
     }
 }
+
+@MainActor
+struct CourseCatalogTests {
+    @Test func bundledSwedenCatalogLoadsClubCourseAndTeeMetadata() throws {
+        let catalog = SwedenCourseCatalogStore(bundle: Bundle(for: CourseStore.self)).catalog
+        #expect(catalog.country == "Sweden")
+        #expect(catalog.clubs.count == 394)
+
+        let club = try #require(catalog.clubs.first { $0.name == "Hills Golf & Sports Club" })
+        let course = try #require(club.courses.first { $0.name == "Hills Course" })
+        let tee = try #require(course.ratings.first { $0.tee == "62" && $0.sex == "male" })
+        let reference = CourseReference(selection: SelectedCourse(club: club, course: course, tee: tee))
+
+        #expect(reference.clubName == club.name)
+        #expect(reference.courseName == course.name)
+        #expect(reference.teeName == "62")
+        #expect(reference.totalPar == 71)
+        #expect(reference.slopeRating == 140)
+    }
+}

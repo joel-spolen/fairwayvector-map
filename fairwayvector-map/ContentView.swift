@@ -1,7 +1,10 @@
 import SwiftUI
 
-struct ContentView: View {
-    @State private var store = CourseStore(reference: .hills)
+struct CourseMapView: View {
+    let reference: CourseReference
+    let onChangeCourse: () -> Void
+
+    @State private var store: CourseStore
     @State private var locationManager = LocationManager()
     @State private var holeIndex = 0
     @State private var tapPoint: GeoPoint?
@@ -9,12 +12,25 @@ struct ContentView: View {
     @AppStorage("distanceUnit") private var unit: DistanceUnit = .meters
     @AppStorage("customFlagPositions") private var customFlagPositions = ""
 
+    init(reference: CourseReference, onChangeCourse: @escaping () -> Void = {}) {
+        self.reference = reference
+        self.onChangeCourse = onChangeCourse
+        _store = State(initialValue: CourseStore(reference: reference))
+    }
+
     var body: some View {
         NavigationStack {
             content
                 .background(FairwayVectorColors.background)
-                .navigationTitle(store.reference.name)
+                .navigationTitle(store.reference.courseName)
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Change course", systemImage: "arrow.left.arrow.right", action: onChangeCourse)
+                            .labelStyle(.iconOnly)
+                            .accessibilityLabel("Change course, club, or tee")
+                    }
+                }
         }
         .task {
             locationManager.start()
@@ -86,8 +102,11 @@ struct ContentView: View {
     private func bottomHoleMenu(hole: Hole, holeCount: Int) -> some View {
         HStack(alignment: .center, spacing: 10) {
             holeNavigationButton(isPrevious: true, count: holeCount)
-            holeSummary(hole)
-                .frame(maxWidth: .infinity)
+            VStack(spacing: 4) {
+                holeSummary(hole)
+                selectedCourseSummary
+            }
+            .frame(maxWidth: .infinity)
             holeNavigationButton(isPrevious: false, count: holeCount)
         }
         .padding(.horizontal, 12)
@@ -99,6 +118,19 @@ struct ContentView: View {
                 .fill(.regularMaterial)
                 .ignoresSafeArea(edges: .bottom)
         }
+    }
+
+    private var selectedCourseSummary: some View {
+        let location = store.reference.city.isEmpty ? store.reference.region : store.reference.city
+        return VStack(spacing: 1) {
+            Text("\(store.reference.clubName) · \(location) · \(store.reference.teeName) tee (\(store.reference.teeSex.capitalized))")
+            Text("\(store.reference.holeCount) holes · Par \(store.reference.totalPar) · CR \(store.reference.courseRating, specifier: "%.1f") · Slope \(store.reference.slopeRating)")
+        }
+        .font(.system(size: 8, weight: .medium))
+        .foregroundStyle(FairwayVectorColors.slate)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .multilineTextAlignment(.center)
     }
 
     private func topDistanceMenu(hole: Hole, origin: DistanceOrigin?, flag: GeoPoint?) -> some View {
@@ -148,14 +180,14 @@ struct ContentView: View {
     private func flagPosition(for hole: Hole) -> GeoPoint? {
         if let data = customFlagPositions.data(using: .utf8),
            let positions = try? JSONDecoder().decode([String: GeoPoint].self, from: data),
-           let custom = positions["\(store.reference.osmRelationID)-\(hole.number)"] {
+           let custom = positions["\(store.reference.cacheKey)-\(hole.number)"] {
             return custom
         }
         return hole.flag ?? hole.greenCenter
     }
 
     private func saveFlagPosition(_ position: GeoPoint, for hole: Hole) {
-        let key = "\(store.reference.osmRelationID)-\(hole.number)"
+        let key = "\(store.reference.cacheKey)-\(hole.number)"
         let data = customFlagPositions.data(using: .utf8) ?? Data()
         var positions = (try? JSONDecoder().decode([String: GeoPoint].self, from: data)) ?? [:]
         positions[key] = position
@@ -210,5 +242,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    CourseMapView(reference: .hills)
 }

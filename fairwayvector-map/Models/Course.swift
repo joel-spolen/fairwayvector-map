@@ -1,6 +1,6 @@
 import CoreLocation
 
-struct GeoPoint: Codable, Hashable {
+struct GeoPoint: Codable, Hashable, Sendable {
     var lat: Double
     var lon: Double
 
@@ -87,8 +87,56 @@ struct Hole: Codable, Hashable, Identifiable {
 }
 
 struct CourseReference: Hashable {
-    var osmRelationID: Int
-    var name: String
+    var osmRelationID: Int?
+    var clubName: String
+    var courseName: String
+    var city: String
+    var region: String
+    var holeCount: Int
+    var totalPar: Int
+    var teeName: String
+    var teeSex: String
+    var courseRating: Double
+    var slopeRating: Int
+
+    var name: String { courseName }
+
+    var cacheKey: String {
+        [clubName, courseName, teeName, teeSex]
+            .joined(separator: "-")
+            .unicodeScalars
+            .map { CharacterSet.alphanumerics.contains($0) ? String($0) : "-" }
+            .joined()
+            .lowercased()
+    }
+
+    init(selection: SelectedCourse) {
+        osmRelationID = nil
+        clubName = selection.club.name
+        courseName = selection.course.name
+        city = selection.club.city ?? ""
+        region = selection.club.region ?? ""
+        holeCount = selection.course.holes
+        totalPar = selection.course.par
+        teeName = selection.tee.tee
+        teeSex = selection.tee.sex
+        courseRating = selection.tee.courseRating
+        slopeRating = selection.tee.slopeRating
+    }
+
+    init(osmRelationID: Int, name: String) {
+        self.osmRelationID = osmRelationID
+        clubName = name
+        courseName = name
+        city = ""
+        region = ""
+        holeCount = 18
+        totalPar = 72
+        teeName = ""
+        teeSex = "male"
+        courseRating = 0
+        slopeRating = 0
+    }
 
     static let hills = CourseReference(osmRelationID: 10480238, name: "Hills Golf & Country Club")
 }
