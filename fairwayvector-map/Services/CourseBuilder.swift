@@ -30,8 +30,18 @@ enum CourseBuilder {
                       let end = path.last else { return nil }
                 let green = matchGreen(for: end, in: greens) ?? []
                 let pin = pins.first { GolfGeometry.contains($0, in: green) }
+                let handicapIndex = ["handicap", "stroke_index", "si"]
+                    .compactMap { element.tags?[$0].flatMap(Int.init) }
+                    .first
                 return (
-                    Hole(number: number, par: element.tags?["par"].flatMap { Int($0) }, path: path, green: green, pin: pin),
+                    Hole(
+                        number: number,
+                        par: element.tags?["par"].flatMap { Int($0) },
+                        handicapIndex: handicapIndex,
+                        path: path,
+                        green: green,
+                        pin: pin
+                    ),
                     end
                 )
             }

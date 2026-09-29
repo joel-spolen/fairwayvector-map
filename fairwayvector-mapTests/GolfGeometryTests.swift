@@ -134,7 +134,7 @@ struct CourseBuilderTests {
     {"elements":[
       {"type":"way","id":1,"tags":{"golf":"hole","ref":"2","par":"3"},
        "geometry":[{"lat":57.6200,"lon":12.0000},{"lat":57.6215,"lon":12.0000}]},
-      {"type":"way","id":2,"tags":{"golf":"hole","ref":"1","par":"4"},
+    {"type":"way","id":2,"tags":{"golf":"hole","ref":"1","par":"4","stroke_index":"7"},
        "geometry":[{"lat":57.6100,"lon":12.0000},{"lat":57.6130,"lon":12.0000}]},
       {"type":"way","id":3,"tags":{"golf":"green"},
        "geometry":[{"lat":57.6214,"lon":11.9998},{"lat":57.6214,"lon":12.0002},{"lat":57.6217,"lon":12.0002},{"lat":57.6217,"lon":11.9998},{"lat":57.6214,"lon":11.9998}]},
@@ -154,6 +154,8 @@ struct CourseBuilderTests {
 
         #expect(course.holes.map(\.number) == [1, 2])
         #expect(course.holes[0].par == 4)
+        #expect(course.holes[0].handicapIndex == 7)
+        #expect(abs(course.holes[0].length - 334) < 1)
         #expect(course.holes[0].green.isEmpty)
         #expect(course.holes[0].roughs.count == 1)
         #expect(course.holes[0].fairways.count == 1)

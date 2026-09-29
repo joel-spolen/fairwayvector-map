@@ -4,20 +4,18 @@ import SwiftUI
 struct DistanceCard: View {
     let hole: Hole
     let origin: DistanceOrigin?
-    let tapPoint: GeoPoint?
     let unit: DistanceUnit
-    let onClearTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             if let origin, let center = hole.greenCenter {
                 let frontBack = GolfGeometry.frontBack(from: origin.point, green: hole.green)
-                metric("Front", frontBack?.front, color: FairwayVectorColors.gold)
-                metric("Center", GolfGeometry.distance(origin.point, center), color: FairwayVectorColors.orange, prominent: true)
-                metric("Back", frontBack?.back, color: FairwayVectorColors.gold)
-
-                if let tapPoint {
-                    tapRow(from: origin.point, tap: tapPoint, flag: hole.flag, startLabel: origin.usesGPS ? "from you" : "from tee")
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    metric("Front", frontBack?.front, color: FairwayVectorColors.gold)
+                    Spacer(minLength: 4)
+                    metric("Center", GolfGeometry.distance(origin.point, center), color: FairwayVectorColors.orange, prominent: true)
+                    Spacer(minLength: 4)
+                    metric("Back", frontBack?.back, color: FairwayVectorColors.gold)
                 }
 
             } else {
@@ -29,23 +27,17 @@ struct DistanceCard: View {
                 .font(.system(size: 8))
                 .foregroundStyle(FairwayVectorColors.slate)
         }
-        .padding(10)
-        .frame(width: 94, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(FairwayVectorColors.surface.opacity(0.75), lineWidth: 1)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func metric(_ title: String, _ meters: Double?, color: Color, prominent: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title.uppercased())
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: 8, weight: .semibold))
                 .foregroundStyle(FairwayVectorColors.slate)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(meters.map { "\(unit.value($0))" } ?? "–")
-                    .font((prominent ? Font.title2.bold() : Font.title3.bold()).monospacedDigit())
+                    .font((prominent ? Font.title3.bold() : Font.subheadline.bold()).monospacedDigit())
                     .foregroundStyle(color)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
@@ -58,33 +50,6 @@ struct DistanceCard: View {
         .accessibilityLabel("\(title): \(meters.map(unit.format) ?? "unavailable")")
     }
 
-    private func tapRow(from start: GeoPoint, tap: GeoPoint, flag: GeoPoint?, startLabel: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text("TARGET")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(FairwayVectorColors.slate)
-                Spacer()
-                Button("Clear target", systemImage: "xmark.circle.fill", action: onClearTap)
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(FairwayVectorColors.slate)
-                    .accessibilityLabel("Clear selected point")
-            }
-            Text("\(unit.format(GolfGeometry.distance(start, tap))) \(startLabel)")
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(FairwayVectorColors.orange)
-            if let flag {
-                Text("\(unit.format(GolfGeometry.distance(tap, flag))) to flag")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(FairwayVectorColors.flightBlue)
-            }
-            Text("Drag marker to adjust")
-                .font(.caption2)
-                .foregroundStyle(FairwayVectorColors.slate)
-        }
-        .padding(10)
-        .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
-    }
 }
 
 struct DistanceOrigin {

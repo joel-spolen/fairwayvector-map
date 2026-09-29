@@ -21,6 +21,7 @@ struct GeoPoint: Codable, Hashable {
 struct Hole: Codable, Hashable, Identifiable {
     var number: Int
     var par: Int?
+    var handicapIndex: Int?
     /// Line of play from tee to green, as mapped in OpenStreetMap.
     var path: [GeoPoint]
     var green: [GeoPoint]
@@ -41,6 +42,7 @@ struct Hole: Codable, Hashable, Identifiable {
     init(
         number: Int,
         par: Int?,
+        handicapIndex: Int? = nil,
         path: [GeoPoint],
         green: [GeoPoint],
         fairways: [[GeoPoint]] = [],
@@ -50,6 +52,7 @@ struct Hole: Codable, Hashable, Identifiable {
     ) {
         self.number = number
         self.par = par
+        self.handicapIndex = handicapIndex
         self.path = path
         self.green = green
         self.fairways = fairways
@@ -59,19 +62,27 @@ struct Hole: Codable, Hashable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case number, par, path, green, fairways, roughs, tees, pin
+        case number, par, handicapIndex, path, green, fairways, roughs, tees, pin
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         number = try values.decode(Int.self, forKey: .number)
         par = try values.decodeIfPresent(Int.self, forKey: .par)
+        handicapIndex = try values.decodeIfPresent(Int.self, forKey: .handicapIndex)
         path = try values.decode([GeoPoint].self, forKey: .path)
         green = try values.decode([GeoPoint].self, forKey: .green)
         fairways = try values.decodeIfPresent([[GeoPoint]].self, forKey: .fairways) ?? []
         roughs = try values.decodeIfPresent([[GeoPoint]].self, forKey: .roughs) ?? []
         tees = try values.decodeIfPresent([[GeoPoint]].self, forKey: .tees) ?? []
         pin = try values.decodeIfPresent(GeoPoint.self, forKey: .pin)
+    }
+
+    var length: Double {
+        guard path.count > 1 else { return 0 }
+        return zip(path, path.dropFirst()).reduce(0) { total, segment in
+            total + GolfGeometry.distance(segment.0, segment.1)
+        }
     }
 }
 

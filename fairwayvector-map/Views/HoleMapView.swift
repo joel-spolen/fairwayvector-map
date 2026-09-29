@@ -205,18 +205,18 @@ struct HoleMapView: View {
 
     private var maximumCameraDistance: Double {
         guard let tee = hole.tee, let target = hole.greenCenter else { return 500 }
-        return max(GolfGeometry.distance(tee, target) * 3.5, 400)
+        return max(GolfGeometry.distance(tee, target) * 4.2, 500)
     }
 
     /// Keeps the hole framed while preventing the camera from escaping the active hole bounds.
     private func frameHole() {
         guard let tee = hole.tee, let target = hole.greenCenter else { return }
         let length = GolfGeometry.distance(tee, target)
-        let center = GolfGeometry.interpolate(tee, target, fraction: 0.52)
+        let center = GolfGeometry.interpolate(tee, target, fraction: 0.5)
         position = .camera(
             MapCamera(
                 centerCoordinate: center.coordinate,
-            distance: min(max(length * 3, 400), maximumCameraDistance),
+                distance: min(max(length * 3.8, 500), maximumCameraDistance),
                 heading: GolfGeometry.bearing(from: tee, to: target),
                 pitch: 0
             )
