@@ -5,7 +5,6 @@ struct ContentView: View {
     @State private var locationManager = LocationManager()
     @State private var holeIndex = 0
     @State private var tapPoint: GeoPoint?
-    @State private var showSettings = false
     @AppStorage("distanceUnit") private var unit: DistanceUnit = .meters
 
     var body: some View {
@@ -14,16 +13,6 @@ struct ContentView: View {
                 .background(FairwayVectorColors.background)
                 .navigationTitle(store.reference.name)
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Settings", systemImage: "gearshape") { showSettings = true }
-                            .labelStyle(.iconOnly)
-                            .accessibilityLabel("Settings")
-                    }
-                }
-                .sheet(isPresented: $showSettings) {
-                    SettingsView(store: store)
-                }
         }
         .task {
             locationManager.start()
@@ -37,25 +26,32 @@ struct ContentView: View {
         if let holes = store.course?.holes, !holes.isEmpty {
             let hole = holes[min(holeIndex, holes.count - 1)]
             let origin = DistanceOrigin.resolve(location: locationManager.location, hole: hole)
-            VStack(spacing: 0) {
+            ZStack {
                 HoleMapView(
                     hole: hole,
                     origin: origin?.point,
                     usesGPS: origin?.usesGPS == true,
                     tapPoint: $tapPoint
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
 
-                VStack(spacing: 12) {
-                    if locationManager.isDenied {
-                        locationDeniedBanner
+                HStack(alignment: .center, spacing: 0) {
+                    VStack(spacing: 10) {
+                        holeInfoCard(hole: hole, origin: origin)
+                        Spacer(minLength: 0)
+                        holeNavigationButton(isPrevious: true, count: holes.count)
                     }
-                    DistanceCard(hole: hole, origin: origin, tapPoint: tapPoint, unit: unit) {
-                        tapPoint = nil
+                    Spacer(minLength: 0)
+                    VStack(spacing: 10) {
+                        DistanceCard(hole: hole, origin: origin, tapPoint: tapPoint, unit: unit) {
+                            tapPoint = nil
+                        }
+                        Spacer(minLength: 0)
+                        holeNavigationButton(isPrevious: false, count: holes.count)
                     }
-                    holeSelector(hole: hole, count: holes.count)
                 }
-                .padding()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 12)
             }
         } else if store.isLoading || store.errorMessage == nil {
             ProgressView("Loading course…")
@@ -72,46 +68,47 @@ struct ContentView: View {
         }
     }
 
-    private func holeSelector(hole: Hole, count: Int) -> some View {
-        HStack {
-            Button("Previous hole", systemImage: "chevron.left") { holeIndex -= 1 }
-                .labelStyle(.iconOnly)
-                .disabled(holeIndex == 0)
-            Spacer()
-            VStack(spacing: 2) {
-                Text("Hole \(hole.number)")
-                    .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.navy)
-                if let par = hole.par {
-                    Text("Par \(par)")
-                        .font(.caption)
-                        .foregroundStyle(FairwayVectorColors.slate)
-                }
+    private func holeInfoCard(hole: Hole, origin: DistanceOrigin?) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("HOLE")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(FairwayVectorColors.slate)
+            Text("\(hole.number)")
+                .font(.largeTitle.bold().monospacedDigit())
+                .foregroundStyle(FairwayVectorColors.navy)
+            if let par = hole.par {
+                Text("Par \(par)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(FairwayVectorColors.charcoal)
             }
-            Spacer()
-            Button("Next hole", systemImage: "chevron.right") { holeIndex += 1 }
-                .labelStyle(.iconOnly)
-                .disabled(holeIndex >= count - 1)
+            if case .gps(let accuracy) = origin?.source {
+                Text("±\(unit.format(accuracy))")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(FairwayVectorColors.slate)
+            }
         }
-        .font(.title3.weight(.semibold))
-        .buttonStyle(.bordered)
-        .padding(12)
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .padding(10)
+        .frame(width: 78, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(FairwayVectorColors.surface.opacity(0.75), lineWidth: 1)
+        }
     }
 
-    private var locationDeniedBanner: some View {
-        HStack {
-            Label("Location is off. Distances are from the tee.", systemImage: "location.slash")
-                .font(.footnote)
-                .foregroundStyle(FairwayVectorColors.charcoal)
-            Spacer()
-            if let url = URL(string: UIApplication.openSettingsURLString) {
-                Link("Settings", destination: url)
-                    .font(.footnote.bold())
-            }
+    private func holeNavigationButton(isPrevious: Bool, count: Int) -> some View {
+        let unavailable = isPrevious ? holeIndex == 0 : holeIndex >= count - 1
+        return Button {
+            holeIndex += isPrevious ? -1 : 1
+        } label: {
+            Image(systemName: isPrevious ? "chevron.left" : "chevron.right")
+                .font(.headline.weight(.bold))
+                .frame(width: 42, height: 42)
         }
-        .padding(12)
-        .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(.borderedProminent)
+        .tint(FairwayVectorColors.navy)
+        .disabled(unavailable)
+        .accessibilityLabel(isPrevious ? "Previous hole" : "Next hole")
     }
 }
 

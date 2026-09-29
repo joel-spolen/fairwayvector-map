@@ -22,25 +22,55 @@ enum CourseBuilder {
                 return GeoPoint(lat: lat, lon: lon)
             }
 
-        let holes: [Hole] = elements
+        let holeElements = elements
             .filter { $0.type == "way" && $0.tags?["golf"] == "hole" }
-            .compactMap { element in
+            .compactMap { element -> (hole: Hole, end: GeoPoint)? in
                 guard let number = element.tags?["ref"].flatMap({ Int($0) }),
                       let path = element.geometry, path.count >= 2,
                       let end = path.last else { return nil }
                 let green = matchGreen(for: end, in: greens) ?? []
                 let pin = pins.first { GolfGeometry.contains($0, in: green) }
-                return Hole(
-                    number: number,
-                    par: element.tags?["par"].flatMap { Int($0) },
-                    path: path,
-                    green: green,
-                    pin: pin
+                return (
+                    Hole(number: number, par: element.tags?["par"].flatMap { Int($0) }, path: path, green: green, pin: pin),
+                    end
                 )
             }
-            .sorted { $0.number < $1.number }
+            .sorted { $0.hole.number < $1.hole.number }
 
-        guard !holes.isEmpty else { throw CourseBuilderError.noHoles }
+        guard !holeElements.isEmpty else { throw CourseBuilderError.noHoles }
+
+        var holes = holeElements.map(\.hole)
+        for element in elements where element.type == "way" {
+            guard let feature = element.tags?["golf"], feature == "fairway" || feature == "rough",
+                  let polygon = element.geometry, polygon.count >= 3,
+                  let center = GolfGeometry.centroid(of: polygon) else { continue }
+            let nearestHole = holes.indices
+                .compactMap { index -> (index: Int, distance: Double)? in
+                    guard let distance = GolfGeometry.distance(center, toPath: holes[index].path) else { return nil }
+                    return (index, distance)
+                }
+                .min { $0.distance < $1.distance }
+            guard let nearestHole, nearestHole.distance <= 500 else { continue }
+            if feature == "fairway" {
+                holes[nearestHole.index].fairways.append(polygon)
+            } else {
+                holes[nearestHole.index].roughs.append(polygon)
+            }
+        }
+
+        for element in elements where element.type == "way" && element.tags?["golf"] == "tee" {
+            guard let polygon = element.geometry, polygon.count >= 3,
+                  let center = GolfGeometry.centroid(of: polygon) else { continue }
+            let nearestHole = holes.indices
+                .compactMap { index -> (index: Int, distance: Double)? in
+                    guard let tee = holes[index].tee else { return nil }
+                    return (index, GolfGeometry.distance(center, tee))
+                }
+                .min { $0.distance < $1.distance }
+            guard let nearestHole, nearestHole.distance <= 300 else { continue }
+            holes[nearestHole.index].tees.append(polygon)
+        }
+
         return Course(osmRelationID: reference.osmRelationID, name: reference.name, holes: holes, fetchedAt: fetchedAt)
     }
 

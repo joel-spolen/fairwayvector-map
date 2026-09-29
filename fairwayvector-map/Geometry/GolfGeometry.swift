@@ -25,6 +25,48 @@ enum GolfGeometry {
         return closest.isFinite ? closest : nil
     }
 
+    static func corridorBoundary(for path: [GeoPoint], halfWidth: Double = 28) -> [GeoPoint] {
+        guard path.count >= 2, let origin = path.first else { return [] }
+        let points = path.map { project($0, origin: origin) }
+        var left: [SIMD2<Double>] = []
+        var right: [SIMD2<Double>] = []
+
+        for index in points.indices {
+            let previous = points[max(0, index - 1)]
+            let next = points[min(points.count - 1, index + 1)]
+            let direction = next - previous
+            let length = (direction * direction).sum().squareRoot()
+            guard length > 0 else { continue }
+            let normal = SIMD2(-direction.y / length, direction.x / length)
+            left.append(points[index] + normal * halfWidth)
+            right.append(points[index] - normal * halfWidth)
+        }
+
+        return (left + right.reversed()).map { unproject($0, origin: origin) }
+    }
+
+    static func nearestPoint(onPath path: [GeoPoint], to point: GeoPoint) -> GeoPoint? {
+        guard path.count >= 2 else { return path.first }
+        let projected = path.map { project($0, origin: point) }
+        var nearestDistance = Double.infinity
+        var nearestPoint: SIMD2<Double>?
+        for index in 0..<(projected.count - 1) {
+            let start = projected[index]
+            let segment = projected[index + 1] - start
+            let lengthSquared = (segment * segment).sum()
+            let fraction = lengthSquared == 0
+                ? 0
+                : max(0, min(1, -(start * segment).sum() / lengthSquared))
+            let candidate = start + segment * fraction
+            let distance = (candidate * candidate).sum()
+            if distance < nearestDistance {
+                nearestDistance = distance
+                nearestPoint = candidate
+            }
+        }
+        return nearestPoint.map { unproject($0, origin: point) }
+    }
+
     /// Initial bearing in degrees clockwise from north.
     static func bearing(from a: GeoPoint, to b: GeoPoint) -> Double {
         let lat1 = a.lat * .pi / 180

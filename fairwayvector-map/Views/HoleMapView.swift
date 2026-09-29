@@ -8,6 +8,7 @@ struct HoleMapView: View {
     @Binding var tapPoint: GeoPoint?
 
     @State private var position: MapCameraPosition = .automatic
+    @State private var cameraRevision = 0
 
     var body: some View {
         MapReader { proxy in
@@ -17,9 +18,9 @@ struct HoleMapView: View {
                 }
 
                 if let tee = hole.tee {
-                    Annotation(usesGPS ? "Tee" : "You · Tee", coordinate: tee.coordinate, anchor: .bottom) {
+                    Annotation(usesGPS ? "Tee" : "You", coordinate: tee.coordinate, anchor: .bottom) {
                         VStack(spacing: 3) {
-                            Text(usesGPS ? "TEE" : "YOU · TEE")
+                            Text(usesGPS ? "TEE" : "YOU")
                                 .font(.caption2.bold())
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 4)
@@ -31,6 +32,30 @@ struct HoleMapView: View {
                         }
                     }
                     .annotationTitles(.hidden)
+                }
+
+                ForEach(Array(hole.roughs.enumerated()), id: \.offset) { _, polygon in
+                    MapPolygon(coordinates: polygon.map(\.coordinate))
+                        .foregroundStyle(FairwayVectorColors.flightBlue.opacity(0.10))
+                }
+
+                ForEach(Array(hole.fairways.enumerated()), id: \.offset) { _, polygon in
+                    MapPolygon(coordinates: polygon.map(\.coordinate))
+                        .foregroundStyle(FairwayVectorColors.gold.opacity(0.12))
+                }
+
+                ForEach(Array(boundaryPolygons.enumerated()), id: \.offset) { _, polygon in
+                    MapPolyline(coordinates: (polygon + [polygon[0]]).map(\.coordinate))
+                        .stroke(FairwayVectorColors.gold.opacity(0.42), style: StrokeStyle(lineWidth: 7, lineJoin: .round))
+                    MapPolyline(coordinates: (polygon + [polygon[0]]).map(\.coordinate))
+                        .stroke(FairwayVectorColors.surface.opacity(0.92), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
+                }
+
+                ForEach(Array(teeConnectors.enumerated()), id: \.offset) { _, connector in
+                    MapPolyline(coordinates: (connector + [connector[0]]).map(\.coordinate))
+                        .stroke(FairwayVectorColors.gold.opacity(0.42), style: StrokeStyle(lineWidth: 7, lineJoin: .round))
+                    MapPolyline(coordinates: (connector + [connector[0]]).map(\.coordinate))
+                        .stroke(FairwayVectorColors.surface.opacity(0.92), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
                 }
 
                 if hole.green.count >= 3 {
@@ -59,15 +84,59 @@ struct HoleMapView: View {
                             .stroke(FairwayVectorColors.flightBlue, lineWidth: 3)
                     }
                     Annotation("Target", coordinate: tapPoint.coordinate) {
-                        Circle()
-                            .fill(.white)
-                            .stroke(FairwayVectorColors.navy, lineWidth: 3)
-                            .frame(width: 18, height: 18)
+                        ZStack {
+                            Circle()
+                                .fill(FairwayVectorColors.navy.opacity(0.18))
+                                .frame(width: 48, height: 48)
+                            Circle()
+                                .fill(.white)
+                                .stroke(FairwayVectorColors.navy, lineWidth: 3)
+                                .frame(width: 22, height: 22)
+                            Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(FairwayVectorColors.navy)
+                        }
+                        .contentShape(Circle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0, coordinateSpace: .named("holeMap"))
+                                .onChanged { value in
+                                    if let coordinate = proxy.convert(value.location, from: .named("holeMap")) {
+                                        self.tapPoint = GeoPoint(coordinate)
+                                    }
+                                }
+                        )
                     }
                     .annotationTitles(.hidden)
                 }
             }
+            .coordinateSpace(name: "holeMap")
             .mapStyle(.imagery(elevation: .flat))
+            .onMapCameraChange(frequency: .continuous) { _ in
+                cameraRevision &+= 1
+            }
+            .overlay {
+                Canvas { context, size in
+                    guard !visibleAreaPolygons.isEmpty else { return }
+                    context.drawLayer { layer in
+                        layer.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black.opacity(0.45)))
+                        layer.blendMode = .destinationOut
+                        for polygon in visibleAreaPolygons {
+                            guard let first = polygon.first,
+                                  let firstPoint = proxy.convert(first.coordinate, to: .local) else { continue }
+                            var cutout = Path()
+                            cutout.move(to: firstPoint)
+                            for point in polygon.dropFirst() {
+                                guard let screenPoint = proxy.convert(point.coordinate, to: .local) else { continue }
+                                cutout.addLine(to: screenPoint)
+                            }
+                            cutout.closeSubpath()
+                            layer.fill(cutout, with: .color(.black))
+                        }
+                    }
+                }
+                .id(cameraRevision)
+                .allowsHitTesting(false)
+            }
             .onTapGesture { screenPoint in
                 if let coordinate = proxy.convert(screenPoint, from: .local) {
                     tapPoint = GeoPoint(coordinate)
@@ -80,6 +149,37 @@ struct HoleMapView: View {
 
     private var holeCoordinates: [CLLocationCoordinate2D] {
         (hole.path + hole.green).map(\.coordinate)
+    }
+
+    private var boundaryPolygons: [[GeoPoint]] {
+        if !hole.roughs.isEmpty { return hole.roughs }
+        if !hole.fairways.isEmpty { return hole.fairways }
+        let fallback = GolfGeometry.corridorBoundary(for: hole.path)
+        return fallback.isEmpty ? [] : [fallback]
+    }
+
+    private var visibleAreaPolygons: [[GeoPoint]] {
+        let mappedAreas = hole.roughs + hole.fairways + hole.tees + teeConnectors + (hole.green.count >= 3 ? [hole.green] : [])
+        if !mappedAreas.isEmpty { return mappedAreas }
+        return boundaryPolygons
+    }
+
+    private var teeConnectors: [[GeoPoint]] {
+        let playableAreas = hole.roughs + hole.fairways
+        guard !hole.tees.isEmpty, !playableAreas.isEmpty else { return [] }
+        return hole.tees.compactMap { teePolygon in
+            guard let teeCenter = GolfGeometry.centroid(of: teePolygon) else { return nil }
+            let nearestAreaPoint = playableAreas
+                .compactMap { polygon -> (point: GeoPoint, distance: Double)? in
+                    guard let nearest = GolfGeometry.nearestPoint(onPath: polygon + [polygon[0]], to: teeCenter) else { return nil }
+                    return (nearest, GolfGeometry.distance(teeCenter, nearest))
+                }
+                .min { $0.distance < $1.distance }?
+                .point
+            guard let nearestAreaPoint else { return nil }
+            let boundary = GolfGeometry.corridorBoundary(for: [teeCenter, nearestAreaPoint], halfWidth: 22)
+            return boundary.count >= 3 ? boundary : nil
+        }
     }
 
     private var holeRect: MKMapRect {
@@ -103,18 +203,18 @@ struct HoleMapView: View {
 
     private var maximumCameraDistance: Double {
         guard let tee = hole.tee, let target = hole.greenCenter else { return 500 }
-        return max(GolfGeometry.distance(tee, target) * 3.2, 400)
+        return max(GolfGeometry.distance(tee, target) * 3.5, 400)
     }
 
     /// Keeps the hole framed while preventing the camera from escaping the active hole bounds.
     private func frameHole() {
         guard let tee = hole.tee, let target = hole.greenCenter else { return }
         let length = GolfGeometry.distance(tee, target)
-        let center = GolfGeometry.interpolate(tee, target, fraction: 0.18)
+        let center = GolfGeometry.interpolate(tee, target, fraction: 0.52)
         position = .camera(
             MapCamera(
                 centerCoordinate: center.coordinate,
-            distance: min(max(length * 2.3, 300), maximumCameraDistance),
+            distance: min(max(length * 3, 400), maximumCameraDistance),
                 heading: GolfGeometry.bearing(from: tee, to: target),
                 pitch: 0
             )

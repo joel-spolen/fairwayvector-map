@@ -9,55 +9,59 @@ struct DistanceCard: View {
     let onClearTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             if let origin, let center = hole.greenCenter {
                 let frontBack = GolfGeometry.frontBack(from: origin.point, green: hole.green)
-                HStack(alignment: .lastTextBaseline) {
-                    metric("Front", frontBack?.front, color: FairwayVectorColors.gold, font: .title3.bold())
-                    Spacer()
-                    metric("Center", GolfGeometry.distance(origin.point, center), color: FairwayVectorColors.orange, font: .largeTitle.bold())
-                    Spacer()
-                    metric("Back", frontBack?.back, color: FairwayVectorColors.gold, font: .title3.bold())
-                }
+                metric("Front", frontBack?.front, color: FairwayVectorColors.gold)
+                metric("Center", GolfGeometry.distance(origin.point, center), color: FairwayVectorColors.orange, prominent: true)
+                metric("Back", frontBack?.back, color: FairwayVectorColors.gold)
 
                 if let tapPoint {
                     tapRow(from: origin.point, tap: tapPoint, flag: hole.flag, startLabel: origin.usesGPS ? "from you" : "from tee")
                 }
 
-                Text(origin.caption(unit: unit))
-                    .font(.caption)
-                    .foregroundStyle(FairwayVectorColors.slate)
             } else {
                 Text("No green is mapped for this hole yet.")
                     .font(.subheadline)
                     .foregroundStyle(FairwayVectorColors.slate)
             }
+            Text("© OpenStreetMap contributors")
+                .font(.system(size: 8))
+                .foregroundStyle(FairwayVectorColors.slate)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .padding(10)
+        .frame(width: 94, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(FairwayVectorColors.surface.opacity(0.75), lineWidth: 1)
+        }
     }
 
-    private func metric(_ title: String, _ meters: Double?, color: Color, font: Font) -> some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(.caption)
+    private func metric(_ title: String, _ meters: Double?, color: Color, prominent: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(FairwayVectorColors.slate)
-            Text(meters.map { "\(unit.value($0))" } ?? "–")
-                .font(font.monospacedDigit())
-                .foregroundStyle(color)
-            Text(unit.symbol)
-                .font(.caption2)
-                .foregroundStyle(FairwayVectorColors.slate)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(meters.map { "\(unit.value($0))" } ?? "–")
+                    .font((prominent ? Font.title2.bold() : Font.title3.bold()).monospacedDigit())
+                    .foregroundStyle(color)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                Text(unit.symbol)
+                    .font(.caption2)
+                    .foregroundStyle(FairwayVectorColors.slate)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title): \(meters.map(unit.format) ?? "unavailable")")
     }
 
     private func tapRow(from start: GeoPoint, tap: GeoPoint, flag: GeoPoint?, startLabel: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text("Selected point")
+                Text("TARGET")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(FairwayVectorColors.slate)
                 Spacer()
@@ -66,17 +70,17 @@ struct DistanceCard: View {
                     .foregroundStyle(FairwayVectorColors.slate)
                     .accessibilityLabel("Clear selected point")
             }
-            HStack(spacing: 8) {
-                Label("\(unit.format(GolfGeometry.distance(start, tap))) \(startLabel)", systemImage: "scope")
-                    .foregroundStyle(FairwayVectorColors.orange)
-                if let flag {
-                    Image(systemName: "arrow.right")
-                        .foregroundStyle(FairwayVectorColors.slate)
-                    Label(unit.format(GolfGeometry.distance(tap, flag)), systemImage: "flag")
-                        .foregroundStyle(FairwayVectorColors.flightBlue)
-                }
+            Text("\(unit.format(GolfGeometry.distance(start, tap))) \(startLabel)")
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(FairwayVectorColors.orange)
+            if let flag {
+                Text("\(unit.format(GolfGeometry.distance(tap, flag))) to flag")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(FairwayVectorColors.flightBlue)
             }
-            .font(.subheadline.weight(.semibold).monospacedDigit())
+            Text("Drag marker to adjust")
+                .font(.caption2)
+                .foregroundStyle(FairwayVectorColors.slate)
         }
         .padding(10)
         .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
@@ -113,14 +117,4 @@ struct DistanceOrigin {
         return DistanceOrigin(point: player, source: .gps(accuracy: location.horizontalAccuracy))
     }
 
-    func caption(unit: DistanceUnit) -> String {
-        switch source {
-        case .gps(let accuracy):
-            "From your position · GPS ±\(unit.format(accuracy)) · Map data © OpenStreetMap contributors"
-        case .teeNoFix:
-            "From the tee (waiting for GPS) · Map data © OpenStreetMap contributors"
-        case .teeFarAway(let distance):
-            "From the tee (you are \(String(format: "%.1f", distance / 1000)) km away) · Map data © OpenStreetMap contributors"
-        }
-    }
 }

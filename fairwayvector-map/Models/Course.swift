@@ -24,6 +24,9 @@ struct Hole: Codable, Hashable, Identifiable {
     /// Line of play from tee to green, as mapped in OpenStreetMap.
     var path: [GeoPoint]
     var green: [GeoPoint]
+    var fairways: [[GeoPoint]] = []
+    var roughs: [[GeoPoint]] = []
+    var tees: [[GeoPoint]] = []
     var pin: GeoPoint?
 
     var id: Int { number }
@@ -34,6 +37,42 @@ struct Hole: Codable, Hashable, Identifiable {
     }
 
     var flag: GeoPoint? { pin ?? greenCenter }
+
+    init(
+        number: Int,
+        par: Int?,
+        path: [GeoPoint],
+        green: [GeoPoint],
+        fairways: [[GeoPoint]] = [],
+        roughs: [[GeoPoint]] = [],
+        tees: [[GeoPoint]] = [],
+        pin: GeoPoint? = nil
+    ) {
+        self.number = number
+        self.par = par
+        self.path = path
+        self.green = green
+        self.fairways = fairways
+        self.roughs = roughs
+        self.tees = tees
+        self.pin = pin
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case number, par, path, green, fairways, roughs, tees, pin
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        number = try values.decode(Int.self, forKey: .number)
+        par = try values.decodeIfPresent(Int.self, forKey: .par)
+        path = try values.decode([GeoPoint].self, forKey: .path)
+        green = try values.decode([GeoPoint].self, forKey: .green)
+        fairways = try values.decodeIfPresent([[GeoPoint]].self, forKey: .fairways) ?? []
+        roughs = try values.decodeIfPresent([[GeoPoint]].self, forKey: .roughs) ?? []
+        tees = try values.decodeIfPresent([[GeoPoint]].self, forKey: .tees) ?? []
+        pin = try values.decodeIfPresent(GeoPoint.self, forKey: .pin)
+    }
 }
 
 struct CourseReference: Hashable {

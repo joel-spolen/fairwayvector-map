@@ -46,7 +46,7 @@ final class CourseStore {
         guard let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
         }
-        return dir.appending(path: "course-\(reference.osmRelationID).json")
+        return dir.appending(path: "course-\(reference.osmRelationID)-v4.json")
     }
 
     private func readCache() -> Course? {

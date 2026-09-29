@@ -15,16 +15,23 @@ private struct OverpassResponse: Decodable {
 
 enum OverpassError: LocalizedError {
     case badStatus(Int)
+    case allServersFailed([String])
 
     var errorDescription: String? {
         switch self {
         case .badStatus(let code): "OpenStreetMap returned status \(code). Try again shortly."
+        case .allServersFailed:
+            "OpenStreetMap course data is temporarily unavailable. Please retry when the network is stable."
         }
     }
 }
 
 struct OverpassClient {
-    static let endpoint = URL(string: "https://overpass-api.de/api/interpreter")!
+    private static let endpoints = [
+        URL(string: "https://overpass-api.de/api/interpreter")!,
+        URL(string: "https://overpass.private.coffee/api/interpreter")!,
+        URL(string: "https://overpass.nchc.org.tw/api/interpreter")!,
+    ]
 
     var session: URLSession = .shared
 
@@ -32,22 +39,33 @@ struct OverpassClient {
         // Overpass area IDs for relations are offset by 3.6 billion.
         let areaID = 3_600_000_000 + courseRelationID
         let query = """
-        [out:json][timeout:25];area(id:\(areaID))->.c;(way["golf"="hole"](area.c);way["golf"="green"](area.c);node["golf"="pin"](area.c););out geom;
+        [out:json][timeout:50];area(id:\(areaID))->.c;(way["golf"="hole"](area.c);way["golf"="green"](area.c);way["golf"="fairway"](area.c);way["golf"="rough"](area.c);way["golf"="tee"](area.c);node["golf"="pin"](area.c););out geom;
         """
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
 
-        var request = URLRequest(url: Self.endpoint)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 40
-        request.setValue("FairwayVectorMap/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = Data("data=\(encoded)".utf8)
+        var failures: [String] = []
+        for endpoint in Self.endpoints {
+            if Task.isCancelled { throw CancellationError() }
+            do {
+                var request = URLRequest(url: endpoint)
+                request.httpMethod = "POST"
+                request.timeoutInterval = 65
+                request.setValue("FairwayVectorMap/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
+                request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+                request.httpBody = Data("data=\(encoded)".utf8)
 
-        let (data, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw OverpassError.badStatus(http.statusCode)
+                let (data, response) = try await session.data(for: request)
+                if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                    throw OverpassError.badStatus(http.statusCode)
+                }
+                return try Self.decode(data)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                failures.append("\(endpoint.host ?? "Overpass"): \(error.localizedDescription)")
+            }
         }
-        return try Self.decode(data)
+        throw OverpassError.allServersFailed(failures)
     }
 
     static func decode(_ data: Data) throws -> [OverpassElement] {
