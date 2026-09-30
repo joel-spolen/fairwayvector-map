@@ -38,21 +38,15 @@ final class fairwayvector_mapUITests: XCTestCase {
             let app = XCUIApplication()
             app.launch()
 
-            let openTrajectory = app.buttons["Open Trajectory"]
+            let openTrajectory = app.buttons["Explore Trajectory"]
             XCTAssertTrue(openTrajectory.waitForExistence(timeout: 12))
             openTrajectory.tap()
 
-            let setupTitle = app.navigationBars["Profile Setup"]
             let trajectoryHome = app.staticTexts["Know which club to hit."]
-            XCTAssertTrue(setupTitle.waitForExistence(timeout: 5) || trajectoryHome.waitForExistence(timeout: 5))
+            XCTAssertTrue(trajectoryHome.waitForExistence(timeout: 5))
+            XCTAssertEqual(app.tabBars.count, 1)
             XCTAssertFalse(app.staticTexts["Know your flight"].exists)
-
-            if setupTitle.exists {
-                app.buttons["Close"].tap()
-            } else {
-                app.buttons["Done"].tap()
-            }
-
+            app.tabBars.buttons["Home"].tap()
             XCTAssertTrue(openTrajectory.waitForExistence(timeout: 5))
         }
 
@@ -61,15 +55,66 @@ final class fairwayvector_mapUITests: XCTestCase {
             let app = XCUIApplication()
             app.launch()
 
-            let openHCP = app.buttons["Open HCP Projection"]
+            let openHCP = app.buttons["View Handicap"]
             XCTAssertTrue(openHCP.waitForExistence(timeout: 12))
             openHCP.tap()
 
             XCTAssertTrue(app.staticTexts["Plan the score or stableford points that move your handicap."].waitForExistence(timeout: 8))
+            XCTAssertEqual(app.tabBars.count, 1)
             XCTAssertFalse(app.staticTexts["Know your place on the course"].exists)
-            app.buttons["Done"].tap()
+            app.tabBars.buttons["Home"].tap()
             XCTAssertTrue(openHCP.waitForExistence(timeout: 5))
         }
+
+    @MainActor
+    func testSharedProfileAndSettings() {
+        let app = XCUIApplication()
+        app.launch()
+        let profileTab = app.tabBars.buttons["Profile"]
+        XCTAssertTrue(profileTab.waitForExistence(timeout: 12))
+        profileTab.tap()
+        XCTAssertTrue(app.staticTexts["Clubs & launch profile"].waitForExistence(timeout: 5))
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.staticTexts["Distance units"].waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+    }
+
+    @MainActor
+    func testWedgeMatrixUsesPracticeSection() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let wedgeShortcut = app.buttons["Explore Wedge Matrix"]
+        XCTAssertTrue(wedgeShortcut.waitForExistence(timeout: 12))
+        wedgeShortcut.tap()
+        XCTAssertTrue(app.navigationBars["Wedge Matrix"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.tabBars.count, 1)
+        XCTAssertTrue(app.tabBars.buttons["Practice"].exists)
+
+        app.tabBars.buttons["Profile"].tap()
+        XCTAssertTrue(app.buttons["Wedge bag & matrix"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testDistanceUnitsAreSharedWithWedgeMatrix() {
+        let app = XCUIApplication()
+        app.launch()
+        let profileTab = app.tabBars.buttons["Profile"]
+        XCTAssertTrue(profileTab.waitForExistence(timeout: 12))
+        profileTab.tap()
+        let settings = app.buttons["Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+
+        let meters = app.buttons["Meters"]
+        XCTAssertTrue(meters.waitForExistence(timeout: 5))
+        meters.tap()
+        app.buttons["Done"].tap()
+        app.buttons["Wedge bag & matrix"].tap()
+        XCTAssertTrue(app.navigationBars["Wedge Matrix"].waitForExistence(timeout: 5))
+        app.buttons["Matrix"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH %@", " m")).firstMatch.waitForExistence(timeout: 5))
+    }
 
     @MainActor
     func testLaunchPerformance() throws {

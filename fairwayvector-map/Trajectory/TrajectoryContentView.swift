@@ -8,80 +8,59 @@
 import SwiftUI
 
 struct TrajectoryRootView: View {
-    private enum Tab {
+    private enum Tab: String, CaseIterable {
         case home
         case calculator
         case club
-        case profile
+
+        var title: String {
+            switch self {
+            case .home: "Overview"
+            case .calculator: "Trajectory"
+            case .club: "Club Selector"
+            }
+        }
     }
 
-    @StateObject private var viewModel = TrajectoryCalculatorViewModel()
+    @ObservedObject var viewModel: TrajectoryCalculatorViewModel
     @State private var selectedTab: Tab = .home
-    let onClose: () -> Void
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            TrajectoryHomeView(
-                viewModel: viewModel,
-                onClose: onClose,
-                onOpenLastCalculation: {
-                    viewModel.restoreLastCalculationInputs()
-                    selectedTab = .calculator
-                },
-                onExampleShot: {
-                    viewModel.randomizeExampleShot()
-                },
-                onOpenClub: {
-                    selectedTab = .club
-                },
-                onOpenTrajectory: {
-                    selectedTab = .calculator
+        VStack(spacing: 0) {
+            Picker("Trajectory tools", selection: $selectedTab) {
+                ForEach(Tab.allCases, id: \.self) { tab in
+                    Text(tab.title).tag(tab)
                 }
-            )
-            .tabItem { Label("Home", systemImage: "house") }
-            .tag(Tab.home)
-
-            TrajectoryCalculatorView(viewModel: viewModel)
-                .tabItem { Label("Trajectory", systemImage: "chart.xyaxis.line") }
-                .tag(Tab.calculator)
-
-            TrajectoryClubView(
-                viewModel: viewModel,
-                onOpenTrajectory: {
-                    selectedTab = .calculator
-                }
-            )
-                .tabItem { Label("Club Selector", systemImage: "target") }
-                .tag(Tab.club)
-
-            NavigationStack {
-                TrajectoryProfileSettingsView(
-                    profileStore: viewModel.playerProfileStore,
-                    unitPreferences: viewModel.unitPreferences,
-                    settingsViewModel: viewModel
-                )
             }
-            .tabItem { Label("Profile", systemImage: "person.crop.circle") }
-            .tag(Tab.profile)
+            .pickerStyle(.segmented)
+            .padding(12)
+            .background(FairwayVectorColors.background)
+
+            Group {
+                switch selectedTab {
+                case .home:
+                    TrajectoryHomeView(
+                        viewModel: viewModel,
+                        onClose: {},
+                        onOpenLastCalculation: {
+                            viewModel.restoreLastCalculationInputs()
+                            selectedTab = .calculator
+                        },
+                        onExampleShot: { viewModel.randomizeExampleShot() },
+                        onOpenClub: { selectedTab = .club },
+                        onOpenTrajectory: { selectedTab = .calculator }
+                    )
+                case .calculator:
+                    TrajectoryCalculatorView(viewModel: viewModel)
+                case .club:
+                    TrajectoryClubView(viewModel: viewModel, onOpenTrajectory: { selectedTab = .calculator })
+                }
+            }
         }
         .tint(FairwayVectorColors.navy)
-        .fullScreenCover(isPresented: setupBinding) {
-            TrajectoryProfileSetupWizardView(
-                profileStore: viewModel.playerProfileStore,
-                unitPreferences: viewModel.unitPreferences,
-                onClose: onClose
-            )
-        }
-    }
-
-    private var setupBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.playerProfileStore.needsSetup },
-            set: { _ in }
-        )
     }
 }
 
 #Preview {
-    TrajectoryRootView(onClose: {})
+    TrajectoryRootView(viewModel: TrajectoryCalculatorViewModel())
 }

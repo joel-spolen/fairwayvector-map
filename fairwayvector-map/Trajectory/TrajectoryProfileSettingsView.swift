@@ -45,9 +45,7 @@ struct TrajectoryProfileSettingsView: View {
         .sheet(isPresented: $showSettings, onDismiss: {
             unitRefreshID = UUID()
         }) {
-            if let settingsViewModel {
-                TrajectorySettingsSheet(viewModel: settingsViewModel)
-            }
+            UnifiedSettingsView()
         }
     }
 

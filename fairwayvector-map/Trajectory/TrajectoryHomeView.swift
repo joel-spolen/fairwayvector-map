@@ -43,9 +43,6 @@ struct TrajectoryHomeView: View {
             }
             .background(FairwayVectorColors.background)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Done", action: onClose)
-                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showSettings = true
@@ -59,7 +56,7 @@ struct TrajectoryHomeView: View {
                 HowItWorksView()
             }
             .sheet(isPresented: $showSettings) {
-                TrajectorySettingsSheet(viewModel: viewModel)
+                UnifiedSettingsView()
             }
         }
         .accessibilityIdentifier("home-screen")

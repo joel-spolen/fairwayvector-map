@@ -1,7 +1,20 @@
 import Testing
+import UIKit
 @testable import fairwayvector_map
 
 struct TrajectoryIntegrationTests {
+    @Test func trajectoryArtworkIsBundled() {
+        let imageNames = [
+            "ballspeed", "driver", "elevation", "fairwaywood", "homescreen", "humidity",
+            "hybrid", "iron", "launchangle", "launchdirection", "pressure", "spinaxis",
+            "spinrate", "temperature", "wedge", "wind"
+        ]
+
+        for name in imageNames {
+            #expect(UIImage(named: name) != nil, "Missing Trajectory image: \(name)")
+        }
+    }
+
     @Test func bundledModelsPredictShot() throws {
         let predictor = try HybridPredictor()
         let shot = ShotInputs(

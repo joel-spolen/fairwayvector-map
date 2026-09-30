@@ -158,7 +158,7 @@ struct TrajectoryClubView: View {
         .navigationTitle("Club")
         .accessibilityIdentifier("club-screen")
         .sheet(isPresented: $showSettings) {
-            TrajectorySettingsSheet(viewModel: viewModel)
+            UnifiedSettingsView()
         }
     }
 

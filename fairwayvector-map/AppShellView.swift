@@ -1,27 +1,59 @@
+import SwiftData
 import SwiftUI
 
 struct ContentView: View {
     private enum Tab: Hashable {
         case home
         case course
+        case handicap
+        case practice
+        case profile
     }
 
     @AppStorage("map.hasSeenSplash") private var hasSeenSplash = false
+    @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .meters
+    @AppStorage("wedgeMatrix.distanceUnit") private var wedgeDistanceUnit = WedgeDistanceUnit.yards.rawValue
     @State private var isShowingSplash = true
     @State private var selectedTab: Tab = .home
+    @State private var practiceDestination: PracticeDestination = .trajectory
+    @StateObject private var trajectoryModel = TrajectoryCalculatorViewModel()
 
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
-                HomeView {
-                    selectedTab = .course
-                }
+                HomeView(
+                    onOpenCourseMap: { selectedTab = .course },
+                    onOpenHandicap: { selectedTab = .handicap },
+                    onOpenWedge: {
+                        practiceDestination = .wedge
+                        selectedTab = .practice
+                    },
+                    onOpenTrajectory: {
+                        practiceDestination = .trajectory
+                        selectedTab = .practice
+                    }
+                )
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(Tab.home)
 
                 CourseMapTabView()
-                    .tabItem { Label("Course Map", systemImage: "map") }
+                    .tabItem { Label("Course", systemImage: "map") }
                     .tag(Tab.course)
+
+                HCPProjectionEntryView()
+                    .tabItem { Label("Handicap", systemImage: "chart.line.uptrend.xyaxis") }
+                    .tag(Tab.handicap)
+
+                PracticeView(destination: $practiceDestination, trajectoryModel: trajectoryModel)
+                    .tabItem { Label("Practice", systemImage: "target") }
+                    .tag(Tab.practice)
+
+                UnifiedProfileView(trajectoryModel: trajectoryModel, onOpenWedge: {
+                    practiceDestination = .wedge
+                    selectedTab = .practice
+                })
+                    .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                    .tag(Tab.profile)
             }
             .tint(FairwayVectorColors.navy)
 
@@ -37,6 +69,13 @@ struct ContentView: View {
             }
         }
         .environment(\.colorScheme, .light)
+        .overlay { SharedHandicapSync(trajectoryModel: trajectoryModel).allowsHitTesting(false) }
+        .environmentObject(trajectoryModel)
+        .modelContainer(HCPProjectionEntryView.sharedModelContainer)
+        .onChange(of: distanceUnit, initial: true) { _, unit in
+            wedgeDistanceUnit = unit == .meters ? WedgeDistanceUnit.meters.rawValue : WedgeDistanceUnit.yards.rawValue
+            trajectoryModel.unitPreferences.globalDefault = unit == .meters ? .metric : .imperial
+        }
     }
 }
 
@@ -56,10 +95,9 @@ private struct CourseMapTabView: View {
 
 private struct HomeView: View {
     let onOpenCourseMap: () -> Void
-
-    @State private var showWedgeMatrix = false
-    @State private var showHCPProjection = false
-    @State private var showTrajectory = false
+    let onOpenHandicap: () -> Void
+    let onOpenWedge: () -> Void
+    let onOpenTrajectory: () -> Void
 
     var body: some View {
         NavigationStack {
@@ -123,9 +161,9 @@ private struct HomeView: View {
                         }
 
                         Button {
-                            showHCPProjection = true
+                            onOpenHandicap()
                         } label: {
-                            Label("Open HCP Projection", systemImage: "chart.line.uptrend.xyaxis")
+                            Label("View Handicap", systemImage: "chart.line.uptrend.xyaxis")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 52)
@@ -159,9 +197,9 @@ private struct HomeView: View {
                         }
 
                         Button {
-                            showWedgeMatrix = true
+                            onOpenWedge()
                         } label: {
-                            Label("Open Wedge Matrix", systemImage: "target")
+                            Label("Explore Wedge Matrix", systemImage: "target")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 52)
@@ -195,9 +233,9 @@ private struct HomeView: View {
                         }
 
                         Button {
-                            showTrajectory = true
+                            onOpenTrajectory()
                         } label: {
-                            Label("Open Trajectory", systemImage: "chart.xyaxis.line")
+                            Label("Explore Trajectory", systemImage: "chart.xyaxis.line")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 52)
@@ -245,24 +283,6 @@ private struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
         }
         .accessibilityIdentifier("map-home-screen")
-        .fullScreenCover(isPresented: $showWedgeMatrix) {
-            WedgeMatrixView()
-        }
-        .fullScreenCover(isPresented: $showHCPProjection) {
-            HCPProjectionEntryView()
-                .overlay(alignment: .topLeading) {
-                    Button("Done") { showHCPProjection = false }
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(.regularMaterial, in: Capsule())
-                        .padding(.top, 8)
-                        .padding(.leading, 12)
-                }
-        }
-        .fullScreenCover(isPresented: $showTrajectory) {
-            TrajectoryEntryView { showTrajectory = false }
-        }
     }
 
     private var brandHeader: some View {
@@ -275,12 +295,12 @@ private struct HomeView: View {
                         .font(.caption.weight(.bold))
                         .tracking(1.2)
                         .foregroundStyle(FairwayVectorColors.slate)
-                    Text("Course Map")
+                    Text("Your golf companion")
                         .font(.title.bold())
                         .foregroundStyle(FairwayVectorColors.navy)
                 }
             }
-            Text("See the hole. Pick your target. Know the distance.")
+            Text("Your course, handicap, and practice in one place.")
                 .font(.title3.weight(.medium))
                 .foregroundStyle(FairwayVectorColors.charcoal)
                 .fixedSize(horizontal: false, vertical: true)

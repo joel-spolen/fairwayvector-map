@@ -25,6 +25,13 @@ struct CourseMapView: View {
                 .navigationTitle(store.reference.courseName)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Refresh course", systemImage: "arrow.clockwise") {
+                            Task { await store.refresh() }
+                        }
+                        .labelStyle(.iconOnly)
+                        .disabled(store.isLoading)
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Change course", systemImage: "arrow.left.arrow.right", action: onChangeCourse)
                             .labelStyle(.iconOnly)

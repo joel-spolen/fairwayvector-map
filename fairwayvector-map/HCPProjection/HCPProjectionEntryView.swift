@@ -1,11 +1,10 @@
 import SwiftData
 import SwiftUI
 
-/// Hosts the ported fairwayvector-hcp-projection app with its own SwiftData store.
 struct HCPProjectionEntryView: View {
     private let courseCatalog = CourseCatalogStore()
 
-    private var modelContainer: ModelContainer = {
+    static let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             PlayerProfile.self,
             GolfClub.self,
@@ -32,10 +31,10 @@ struct HCPProjectionEntryView: View {
 
     var body: some View {
         HCPProjectionRootView(courseCatalog: courseCatalog)
-            .modelContainer(modelContainer)
     }
 }
 
 #Preview {
     HCPProjectionEntryView()
+        .modelContainer(HCPProjectionEntryView.sharedModelContainer)
 }

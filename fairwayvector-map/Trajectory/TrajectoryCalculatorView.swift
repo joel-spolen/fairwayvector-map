@@ -93,7 +93,7 @@ struct TrajectoryCalculatorView: View {
                 }
             }
             .sheet(isPresented: $showSettings) {
-                TrajectorySettingsSheet(viewModel: viewModel)
+                UnifiedSettingsView()
             }
         }
         .onAppear {

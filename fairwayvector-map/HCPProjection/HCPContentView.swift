@@ -8,10 +8,18 @@ import SwiftData
 import SwiftUI
 
 struct HCPProjectionRootView: View {
-    private enum Tab {
+    private enum Tab: String, CaseIterable {
         case home
         case predict
         case round
+
+        var title: String {
+            switch self {
+            case .home: "Overview"
+            case .predict: "Predict"
+            case .round: "Add Round"
+            }
+        }
     }
 
     let courseCatalog: CourseCatalogStore
@@ -25,26 +33,26 @@ struct HCPProjectionRootView: View {
     @State private var selectedTab = Tab.home
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            HomeView(
-                courseCatalog: courseCatalog,
-                rounds: rounds,
-                profile: profiles.first,
-                clubs: clubs,
-                courses: courses,
-                tees: tees,
-                onAddRound: { selectedTab = .round }
-            )
-                .tabItem { Label("Home", systemImage: "house") }
-                .tag(Tab.home)
+        VStack(spacing: 0) {
+            Picker("Handicap tools", selection: $selectedTab) {
+                ForEach(Tab.allCases, id: \.self) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(12)
+            .background(FairwayVectorColors.background)
 
-            TargetCalculatorView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
-                .tabItem { Label("Predict HCP", systemImage: "flag.checkered") }
-                .tag(Tab.predict)
-
-            NewRoundView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
-                .tabItem { Label("Add Round", systemImage: "plus.circle") }
-                .tag(Tab.round)
+            Group {
+                switch selectedTab {
+                case .home:
+                    HomeView(courseCatalog: courseCatalog, rounds: rounds, profile: profiles.first, clubs: clubs, courses: courses, tees: tees, onAddRound: { selectedTab = .round })
+                case .predict:
+                    TargetCalculatorView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
+                case .round:
+                    NewRoundView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
+                }
+            }
         }
         .tint(FairwayVectorColors.navy)
         .onAppear {
@@ -158,7 +166,7 @@ private struct HomeView: View {
                 }
             }
             .sheet(isPresented: $showSettings) {
-                HCPSettingsView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees)
+                UnifiedSettingsView()
             }
         }
     }
@@ -1078,7 +1086,7 @@ private struct TargetCalculatorView: View {
                 }
             }
             .sheet(isPresented: $showSettings) {
-                HCPSettingsView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees)
+                UnifiedSettingsView()
             }
             .sheet(isPresented: $showingAddCourse) {
                 AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: activeCountry)
@@ -1607,7 +1615,7 @@ private struct NewRoundView: View {
             .toolbarBackground(FairwayVectorColors.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showSettings) {
-                HCPSettingsView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees)
+                UnifiedSettingsView()
             }
             .sheet(isPresented: $showingAddCourse) {
                 AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: activeCountry)
@@ -2862,6 +2870,17 @@ private struct InfoLabel: View {
                 }
             }
         }
+    }
+}
+
+struct HCPCustomCoursesEntryView: View {
+    @Query(filter: #Predicate<GolfClub> { $0.isCustom == true }, sort: \GolfClub.name) private var clubs: [GolfClub]
+    @Query(filter: #Predicate<GolfCourse> { $0.isCustom == true }, sort: \GolfCourse.name) private var courses: [GolfCourse]
+    @Query(filter: #Predicate<TeeSet> { $0.isCustom == true }, sort: \TeeSet.name) private var tees: [TeeSet]
+    @Query private var profiles: [PlayerProfile]
+
+    var body: some View {
+        CustomCoursesView(courseCatalog: CourseCatalogStore(), profile: profiles.first, clubs: clubs, courses: courses, tees: tees)
     }
 }
 

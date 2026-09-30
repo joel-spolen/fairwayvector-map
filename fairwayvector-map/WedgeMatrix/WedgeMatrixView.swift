@@ -1,10 +1,20 @@
 import SwiftUI
 import UIKit
 
-// Ported from fairwayvector-wedge-matrix, presented as a standalone feature from this app's Home tab.
-
 struct WedgeMatrixView: View {
-    @Environment(\.dismiss) private var dismiss
+    private enum Section: String, CaseIterable {
+        case overview, selector, matrix, bag
+
+        var title: String {
+            switch self {
+            case .overview: "Overview"
+            case .selector: "Selector"
+            case .matrix: "Matrix"
+            case .bag: "Bag"
+            }
+        }
+    }
+
     @AppStorage("wedgeMatrix.wedges") private var storedWedges = ""
     @AppStorage("wedgeMatrix.distanceUnit") private var selectedUnitRawValue = WedgeDistanceUnit.yards.rawValue
     @State private var wedges: [Wedge] = Wedge.defaults
@@ -13,6 +23,7 @@ struct WedgeMatrixView: View {
     @State private var selectorElevationMeters = 0.0
     @State private var selectorPinFraction = 0.5
     @State private var showAddClub = false
+    @State private var section: Section = .overview
 
     private var bagWedges: [Wedge] {
         wedges.filter(\.isInBag)
@@ -27,8 +38,19 @@ struct WedgeMatrixView: View {
     }
 
     var body: some View {
-        TabView {
-            NavigationStack {
+        VStack(spacing: 0) {
+            Picker("Wedge tools", selection: $section) {
+                ForEach(Section.allCases, id: \.self) { item in
+                    Text(item.title).tag(item)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(12)
+            .background(FairwayVectorColors.background)
+
+            switch section {
+            case .overview:
+                NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         WedgeHomeOverviewCard(wedges: wedges, bagWedges: bagWedges)
@@ -40,15 +62,10 @@ struct WedgeMatrixView: View {
                 .background(FairwayVectorColors.background)
                 .navigationTitle("Wedge Matrix")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { dismiss() }
-                    }
                 }
-            }
-            .tabItem { Label("Home", systemImage: "house") }
 
-            NavigationStack {
+            case .selector:
+                NavigationStack {
                 WedgeClubSelectorView(
                     wedges: bagWedges,
                     unit: selectedUnit,
@@ -58,10 +75,10 @@ struct WedgeMatrixView: View {
                 )
                 .navigationTitle("Club Selector")
                 .navigationBarTitleDisplayMode(.inline)
-            }
-            .tabItem { Label("Club Selector", systemImage: "target") }
+                }
 
-            NavigationStack {
+            case .matrix:
+                NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         WedgeTrajectoryPicker(selectedTrajectory: $selectedTrajectory)
@@ -72,10 +89,10 @@ struct WedgeMatrixView: View {
                 .background(FairwayVectorColors.background)
                 .navigationTitle("Matrix")
                 .navigationBarTitleDisplayMode(.inline)
-            }
-            .tabItem { Label("Matrix", systemImage: "square.grid.3x3") }
+                }
 
-            NavigationStack {
+            case .bag:
+                NavigationStack {
                 WedgeBagManagementList(wedges: $wedges, unit: selectedUnit)
                     .navigationTitle("Bag")
                     .navigationBarTitleDisplayMode(.inline)
@@ -89,8 +106,8 @@ struct WedgeMatrixView: View {
                     .sheet(isPresented: $showAddClub) {
                         WedgeAddClubView(wedges: $wedges, unit: selectedUnit)
                     }
+                }
             }
-            .tabItem { Label("Bag", systemImage: "figure.golf") }
         }
         .tint(FairwayVectorColors.navy)
         .onAppear(perform: loadStoredWedges)
@@ -689,7 +706,7 @@ private struct WedgeDoneAccessoryNumberField: UIViewRepresentable {
         toolbar.sizeToFit()
         toolbar.items = [
             UIBarButtonItem(systemItem: .flexibleSpace),
-            UIBarButtonItem(title: "Done", style: .done, target: textField, action: #selector(UITextField.resignFirstResponder))
+            UIBarButtonItem(title: "Done", style: .prominent, target: textField, action: #selector(UITextField.resignFirstResponder))
         ]
         textField.inputAccessoryView = toolbar
         return textField
