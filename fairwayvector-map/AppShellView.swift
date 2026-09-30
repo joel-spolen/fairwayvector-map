@@ -57,6 +57,9 @@ private struct CourseMapTabView: View {
 private struct HomeView: View {
     let onOpenCourseMap: () -> Void
 
+    @State private var showWedgeMatrix = false
+    @State private var showHCPProjection = false
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -86,6 +89,78 @@ private struct HomeView: View {
 
                         Button(action: onOpenCourseMap) {
                             Label("Choose Club & Course", systemImage: "map.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 52)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(FairwayVectorColors.navy)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .top, spacing: 14) {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(FairwayVectorColors.orange)
+                                .frame(width: 48, height: 48)
+                                .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("HANDICAP")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(FairwayVectorColors.slate)
+                                Text("HCP Projection")
+                                    .font(.headline)
+                                    .foregroundStyle(FairwayVectorColors.navy)
+                                Text("Log rounds and see how a score would change your index")
+                                    .font(.subheadline)
+                                    .foregroundStyle(FairwayVectorColors.slate)
+                            }
+                        }
+
+                        Button {
+                            showHCPProjection = true
+                        } label: {
+                            Label("Open HCP Projection", systemImage: "chart.line.uptrend.xyaxis")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 52)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(FairwayVectorColors.navy)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .top, spacing: 14) {
+                            Image(systemName: "target")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(FairwayVectorColors.flightBlue)
+                                .frame(width: 48, height: 48)
+                                .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("WEDGE PLAY")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(FairwayVectorColors.slate)
+                                Text("Wedge Matrix")
+                                    .font(.headline)
+                                    .foregroundStyle(FairwayVectorColors.navy)
+                                Text("Club recommendations for partial wedge shots")
+                                    .font(.subheadline)
+                                    .foregroundStyle(FairwayVectorColors.slate)
+                            }
+                        }
+
+                        Button {
+                            showWedgeMatrix = true
+                        } label: {
+                            Label("Open Wedge Matrix", systemImage: "target")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 52)
@@ -133,6 +208,21 @@ private struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
         }
         .accessibilityIdentifier("map-home-screen")
+        .fullScreenCover(isPresented: $showWedgeMatrix) {
+            WedgeMatrixView()
+        }
+        .fullScreenCover(isPresented: $showHCPProjection) {
+            HCPProjectionEntryView()
+                .overlay(alignment: .topLeading) {
+                    Button("Done") { showHCPProjection = false }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.top, 8)
+                        .padding(.leading, 12)
+                }
+        }
     }
 
     private var brandHeader: some View {
