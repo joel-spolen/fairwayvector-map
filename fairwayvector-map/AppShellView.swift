@@ -59,6 +59,7 @@ private struct HomeView: View {
 
     @State private var showWedgeMatrix = false
     @State private var showHCPProjection = false
+    @State private var showTrajectory = false
 
     var body: some View {
         NavigationStack {
@@ -172,6 +173,42 @@ private struct HomeView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
 
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .top, spacing: 14) {
+                            Image(systemName: "chart.xyaxis.line")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(FairwayVectorColors.flightBlue)
+                                .frame(width: 48, height: 48)
+                                .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("SHOT TRAJECTORY")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(FairwayVectorColors.slate)
+                                Text("Trajectory")
+                                    .font(.headline)
+                                    .foregroundStyle(FairwayVectorColors.navy)
+                                Text("Simulate ball flight and get club recommendations")
+                                    .font(.subheadline)
+                                    .foregroundStyle(FairwayVectorColors.slate)
+                            }
+                        }
+
+                        Button {
+                            showTrajectory = true
+                        } label: {
+                            Label("Open Trajectory", systemImage: "chart.xyaxis.line")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 52)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(FairwayVectorColors.navy)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+
                     VStack(alignment: .leading, spacing: 14) {
                         Text("On the course")
                             .font(.headline)
@@ -222,6 +259,9 @@ private struct HomeView: View {
                         .padding(.top, 8)
                         .padding(.leading, 12)
                 }
+        }
+        .fullScreenCover(isPresented: $showTrajectory) {
+            TrajectoryEntryView { showTrajectory = false }
         }
     }
 

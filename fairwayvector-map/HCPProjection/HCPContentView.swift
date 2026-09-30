@@ -17,51 +17,36 @@ struct HCPProjectionRootView: View {
     let courseCatalog: CourseCatalogStore
 
     @Environment(\.modelContext) private var modelContext
-    @AppStorage("hcp.hasSeenSplash") private var hasSeenSplash = false
     @Query(filter: #Predicate<GolfClub> { $0.isCustom == true }, sort: \GolfClub.name) private var clubs: [GolfClub]
     @Query(filter: #Predicate<GolfCourse> { $0.isCustom == true }, sort: \GolfCourse.name) private var courses: [GolfCourse]
     @Query(filter: #Predicate<TeeSet> { $0.isCustom == true }, sort: \TeeSet.name) private var tees: [TeeSet]
     @Query(sort: \GolfRound.date, order: .reverse) private var rounds: [GolfRound]
     @Query private var profiles: [PlayerProfile]
-    @State private var showingSplash = true
     @State private var selectedTab = Tab.home
 
     var body: some View {
-        ZStack {
-            TabView(selection: $selectedTab) {
-                HomeView(
-                    courseCatalog: courseCatalog,
-                    rounds: rounds,
-                    profile: profiles.first,
-                    clubs: clubs,
-                    courses: courses,
-                    tees: tees,
-                    onAddRound: { selectedTab = .round }
-                )
-                    .tabItem { Label("Home", systemImage: "house") }
-                    .tag(Tab.home)
+        TabView(selection: $selectedTab) {
+            HomeView(
+                courseCatalog: courseCatalog,
+                rounds: rounds,
+                profile: profiles.first,
+                clubs: clubs,
+                courses: courses,
+                tees: tees,
+                onAddRound: { selectedTab = .round }
+            )
+                .tabItem { Label("Home", systemImage: "house") }
+                .tag(Tab.home)
 
-                TargetCalculatorView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
-                    .tabItem { Label("Predict HCP", systemImage: "flag.checkered") }
-                    .tag(Tab.predict)
+            TargetCalculatorView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
+                .tabItem { Label("Predict HCP", systemImage: "flag.checkered") }
+                .tag(Tab.predict)
 
-                NewRoundView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
-                    .tabItem { Label("Add Round", systemImage: "plus.circle") }
-                    .tag(Tab.round)
-            }
-            .tint(FairwayVectorColors.navy)
-
-            if showingSplash {
-                SplashView(isReturningUser: hasSeenSplash) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showingSplash = false
-                        hasSeenSplash = true
-                    }
-                }
-                .transition(.opacity)
-                .zIndex(1)
-            }
+            NewRoundView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
+                .tabItem { Label("Add Round", systemImage: "plus.circle") }
+                .tag(Tab.round)
         }
+        .tint(FairwayVectorColors.navy)
         .onAppear {
             SeedData.loadIfNeeded(modelContext: modelContext)
         }
@@ -583,8 +568,6 @@ private struct AllRoundsView: View {
         }
     }
 }
-
-// SplashView and FairwayVectorMark are shared app-level types (see SplashView.swift, FairwayVectorMark.swift).
 
 private struct TargetModePicker: View {
     @Binding var inputMode: RoundInputMode

@@ -33,6 +33,44 @@ final class fairwayvector_mapUITests: XCTestCase {
         // https://developer.apple.com/documentation/xcuiautomation
     }
 
+        @MainActor
+        func testTrajectoryOpensWithoutSplashAndCanClose() {
+            let app = XCUIApplication()
+            app.launch()
+
+            let openTrajectory = app.buttons["Open Trajectory"]
+            XCTAssertTrue(openTrajectory.waitForExistence(timeout: 12))
+            openTrajectory.tap()
+
+            let setupTitle = app.navigationBars["Profile Setup"]
+            let trajectoryHome = app.staticTexts["Know which club to hit."]
+            XCTAssertTrue(setupTitle.waitForExistence(timeout: 5) || trajectoryHome.waitForExistence(timeout: 5))
+            XCTAssertFalse(app.staticTexts["Know your flight"].exists)
+
+            if setupTitle.exists {
+                app.buttons["Close"].tap()
+            } else {
+                app.buttons["Done"].tap()
+            }
+
+            XCTAssertTrue(openTrajectory.waitForExistence(timeout: 5))
+        }
+
+        @MainActor
+        func testHCPProjectionOpensWithoutSplash() {
+            let app = XCUIApplication()
+            app.launch()
+
+            let openHCP = app.buttons["Open HCP Projection"]
+            XCTAssertTrue(openHCP.waitForExistence(timeout: 12))
+            openHCP.tap()
+
+            XCTAssertTrue(app.staticTexts["Plan the score or stableford points that move your handicap."].waitForExistence(timeout: 8))
+            XCTAssertFalse(app.staticTexts["Know your place on the course"].exists)
+            app.buttons["Done"].tap()
+            XCTAssertTrue(openHCP.waitForExistence(timeout: 5))
+        }
+
     @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.

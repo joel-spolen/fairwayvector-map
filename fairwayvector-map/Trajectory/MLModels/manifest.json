@@ -1,0 +1,45 @@
+{
+  "hybridModelVersion": "Physics V1.1 + HGB residual v1",
+  "physicsVersion": "Physics V1.1",
+  "mlModelType": "HistGradientBoostingRegressor",
+  "featureList": [
+    "ball_speed_mps",
+    "launch_angle_deg",
+    "launch_direction_deg",
+    "spin_rate_rpm",
+    "spin_axis_deg",
+    "initial_spin_factor",
+    "initial_reynolds",
+    "temperature_c",
+    "pressure_hpa",
+    "humidity_pct",
+    "wind_x_mps",
+    "wind_y_mps",
+    "wind_z_mps",
+    "v11_sim_carry_m",
+    "v11_sim_apex_m",
+    "v11_sim_flight_time_s",
+    "v11_sim_landing_angle_deg",
+    "v11_sim_landing_speed_mps"
+  ],
+  "targetExportNames": {
+    "ml_target_carry_m": "carry",
+    "ml_target_apex_m": "apex",
+    "ml_target_flight_time_s": "flight_time",
+    "ml_target_landing_angle_deg": "landing_angle",
+    "ml_target_landing_speed_mps": "landing_speed"
+  },
+  "hgbHyperparameters": {
+    "loss": "squared_error",
+    "learning_rate": 0.1,
+    "max_iter": 200,
+    "max_leaf_nodes": 31,
+    "l2_regularization": 0.0,
+    "early_stopping": true,
+    "validation_fraction": 0.1,
+    "n_iter_no_change": 10,
+    "random_state": 20260816
+  },
+  "residualTargetConvention": "observed - physics",
+  "finalPredictionConvention": "physics + predicted correction"
+}
