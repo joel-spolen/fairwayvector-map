@@ -76,6 +76,19 @@ struct CourseMapView: View {
 
                 VStack(spacing: 0) {
                     topDistanceMenu(hole: hole, origin: origin, flag: flagPosition(for: hole))
+                    if store.errorMessage != nil {
+                        HStack(spacing: 10) {
+                            Label("Showing saved map · update unavailable", systemImage: "wifi.slash")
+                                .font(.caption)
+                                .lineLimit(2)
+                            Spacer(minLength: 0)
+                            Button("Retry") { Task { await store.refresh() } }
+                                .font(.caption.weight(.semibold))
+                        }
+                        .padding(10)
+                        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 10))
+                        .padding(.horizontal, 12)
+                    }
                     Spacer(minLength: 0)
                     bottomHoleMenu(hole: hole, holeCount: holes.count)
                 }

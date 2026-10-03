@@ -10,6 +10,7 @@ final class CourseStore {
 
     private let client: OverpassClient
     private let maxCacheAge: TimeInterval = 24 * 60 * 60
+    private var resolvedRelationID: Int?
 
     init(reference: CourseReference, client: OverpassClient = OverpassClient()) {
         self.reference = reference
@@ -38,8 +39,11 @@ final class CourseStore {
                 relationID = cachedID
             } else if let knownID = reference.osmRelationID {
                 relationID = knownID
+            } else if let resolvedRelationID {
+                relationID = resolvedRelationID
             } else {
                 relationID = try await client.findCourseRelationID(for: reference)
+                resolvedRelationID = relationID
             }
             let elements = try await client.fetchGolfFeatures(courseRelationID: relationID)
             let built = try CourseBuilder.build(reference: reference, elements: elements, osmRelationID: relationID)
