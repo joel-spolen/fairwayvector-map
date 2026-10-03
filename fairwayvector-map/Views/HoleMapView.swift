@@ -61,6 +61,14 @@ struct HoleMapView: View {
                         .stroke(FairwayVectorColors.gold, lineWidth: 2)
                 }
 
+                if hole.usesPointOnlyGeometry {
+                    pointMarker(hole.greenFront, title: "Front", symbol: "F", color: FairwayVectorColors.gold)
+                    pointMarker(hole.greenCenterPoint, title: "Green center", symbol: "C", color: FairwayVectorColors.orange)
+                    pointMarker(hole.greenBack, title: "Back", symbol: "B", color: FairwayVectorColors.gold)
+                    pointMarker(hole.teeFront, title: "Front tee", symbol: "T", color: FairwayVectorColors.navy)
+                    pointMarker(hole.teeBack, title: "Back tee", symbol: "T", color: FairwayVectorColors.navy)
+                }
+
                 if let flag {
                     Annotation("Flag", coordinate: flag.coordinate, anchor: .bottomLeading) {
                         Image(systemName: "flag.fill")
@@ -168,10 +176,11 @@ struct HoleMapView: View {
     }
 
     private var holeCoordinates: [CLLocationCoordinate2D] {
-        (hole.path + hole.green).map(\.coordinate)
+        (hole.path + hole.green + [hole.greenFront, hole.greenCenterPoint, hole.greenBack, hole.teeFront, hole.teeBack].compactMap { $0 }).map(\.coordinate)
     }
 
     private var boundaryPolygons: [[GeoPoint]] {
+        if hole.usesPointOnlyGeometry { return [] }
         if !hole.roughs.isEmpty { return hole.roughs }
         if !hole.fairways.isEmpty { return hole.fairways }
         let fallback = GolfGeometry.corridorBoundary(for: hole.path)
@@ -258,5 +267,21 @@ struct HoleMapView: View {
         guard hole.tee != nil, hole.greenCenter != nil else { return }
         isZoomedIn = false
         position = .camera(initialCamera)
+    }
+
+    @MapContentBuilder
+    private func pointMarker(_ point: GeoPoint?, title: String, symbol: String, color: Color) -> some MapContent {
+        if let point {
+            Annotation(title, coordinate: point.coordinate) {
+                Text(symbol)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(color, in: Circle())
+                    .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                    .shadow(color: .black.opacity(0.3), radius: 2)
+            }
+            .annotationTitles(.hidden)
+        }
     }
 }

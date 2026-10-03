@@ -9,17 +9,26 @@ final class CourseStore {
     private(set) var errorMessage: String?
 
     private let client: OverpassClient
+    private let golfAPIClient: GolfAPIClient
     private let maxCacheAge: TimeInterval = 24 * 60 * 60
     private var resolvedRelationID: Int?
 
-    init(reference: CourseReference, client: OverpassClient = OverpassClient()) {
+    init(
+        reference: CourseReference,
+        client: OverpassClient = OverpassClient(),
+        golfAPIClient: GolfAPIClient = GolfAPIClient()
+    ) {
         self.reference = reference
         self.client = client
+        self.golfAPIClient = golfAPIClient
     }
 
     func load() async {
         if course == nil {
             course = readCache()
+        }
+        if reference.golfAPICourseID != nil, course != nil {
+            return
         }
         if let course, Date.now.timeIntervalSince(course.fetchedAt) < maxCacheAge {
             return
@@ -34,6 +43,16 @@ final class CourseStore {
         defer { isLoading = false }
 
         do {
+            if let courseID = reference.golfAPICourseID {
+                let payload = try await (course == nil
+                    ? golfAPIClient.loadCourse(id: courseID)
+                    : golfAPIClient.refreshCourse(id: courseID))
+                let built = try GolfAPICourseBuilder.build(reference: reference, payload: payload)
+                course = built
+                writeCache(built)
+                return
+            }
+
             let relationID: Int
             if let cachedID = course?.osmRelationID {
                 relationID = cachedID
@@ -58,7 +77,8 @@ final class CourseStore {
         guard let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
         }
-        return dir.appending(path: "course-\(reference.cacheKey)-v5.json")
+        let version = reference.golfAPICourseID == nil ? "v5" : "golfapi-v1"
+        return dir.appending(path: "course-\(reference.cacheKey)-\(version).json")
     }
 
     private func readCache() -> Course? {

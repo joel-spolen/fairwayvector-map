@@ -79,7 +79,7 @@ struct UnifiedSettingsView: View {
                     Link("Handicap privacy", destination: URL(string: "https://fairwayvector.com/hcp-projection/privacy-policy")!)
                     Link("Trajectory privacy", destination: URL(string: "https://fairwayvector.com/trajectory/privacy-policy")!)
                     Link("Wedge Matrix privacy", destination: URL(string: "https://fairwayvector.com/wedge-matrix/privacy-policy")!)
-                    Text("Course and hole data © OpenStreetMap contributors.")
+                    Text("Course and GPS data provided by Golf API. Satellite imagery provided by Apple Maps.")
                         .font(.footnote)
                 }
                 .listRowBackground(FairwayVectorColors.surface)

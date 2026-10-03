@@ -9,13 +9,16 @@ struct DistanceCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let origin, let center = hole.greenCenter {
-                let frontBack = GolfGeometry.frontBack(from: origin.point, green: hole.green)
+                let front = hole.greenFront.map { GolfGeometry.distance(origin.point, $0) }
+                    ?? GolfGeometry.frontBack(from: origin.point, green: hole.green)?.front
+                let back = hole.greenBack.map { GolfGeometry.distance(origin.point, $0) }
+                    ?? GolfGeometry.frontBack(from: origin.point, green: hole.green)?.back
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    metric("Front", frontBack?.front, color: FairwayVectorColors.gold)
+                    metric("Front", front, color: FairwayVectorColors.gold)
                     Spacer(minLength: 4)
                     metric("Center", GolfGeometry.distance(origin.point, center), color: FairwayVectorColors.orange, prominent: true)
                     Spacer(minLength: 4)
-                    metric("Back", frontBack?.back, color: FairwayVectorColors.gold)
+                    metric("Back", back, color: FairwayVectorColors.gold)
                 }
 
             } else {

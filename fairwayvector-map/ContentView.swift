@@ -26,7 +26,7 @@ struct CourseMapView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Refresh course", systemImage: "arrow.clockwise") {
+                        Button(store.reference.golfAPICourseID == nil ? "Refresh course" : "Check for course updates", systemImage: "arrow.clockwise") {
                             Task { await store.refresh() }
                         }
                         .labelStyle(.iconOnly)
@@ -76,6 +76,15 @@ struct CourseMapView: View {
 
                 VStack(spacing: 0) {
                     topDistanceMenu(hole: hole, origin: origin, flag: flagPosition(for: hole))
+                    if hole.usesPointOnlyGeometry {
+                        Label("GPS tee and green points are available; detailed fairway and green outlines are not.", systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(FairwayVectorColors.navy)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(FairwayVectorColors.surface.opacity(0.95))
+                            .padding(.horizontal, 12)
+                    }
                     if store.errorMessage != nil {
                         HStack(spacing: 10) {
                             Label("Showing saved map · update unavailable", systemImage: "wifi.slash")
@@ -95,7 +104,7 @@ struct CourseMapView: View {
                 VStack {
                     Spacer(minLength: 0)
                     HStack {
-                        Text("© OpenStreetMap contributors")
+                        Text("Course data © Golf API · Imagery © Apple Maps")
                             .font(.system(size: 7))
                             .foregroundStyle(.white.opacity(0.85))
                         Spacer()

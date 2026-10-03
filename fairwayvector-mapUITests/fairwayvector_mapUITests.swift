@@ -80,6 +80,23 @@ final class fairwayvector_mapUITests: XCTestCase {
     }
 
     @MainActor
+    func testCourseSelectorExplainsMissingGolfAPIKey() {
+        let app = XCUIApplication()
+        app.launch()
+        let courseTab = app.tabBars.buttons["Course"]
+        XCTAssertTrue(courseTab.waitForExistence(timeout: 12))
+        courseTab.tap()
+
+        XCTAssertTrue(app.staticTexts["Golf API key not configured. Add GOLF_API_KEY in the app target’s build settings."].waitForExistence(timeout: 5))
+        let searchField = app.textFields["golf-club-search-field"]
+        XCTAssertTrue(searchField.exists)
+        searchField.tap()
+        searchField.typeText("Åre")
+        app.buttons["Search Swedish clubs"].tap()
+        XCTAssertTrue(app.staticTexts["Golf API is not configured. Add GOLF_API_KEY to the app target's build settings."].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testWedgeMatrixUsesPracticeSection() {
         let app = XCUIApplication()
         app.launch()

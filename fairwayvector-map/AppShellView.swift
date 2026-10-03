@@ -80,11 +80,11 @@ struct ContentView: View {
 }
 
 private struct CourseMapTabView: View {
-    @State private var selection: SelectedCourse?
+    @State private var selection: CourseReference?
 
     var body: some View {
         if let selection {
-            CourseMapView(reference: selection.reference) {
+            CourseMapView(reference: selection) {
                 self.selection = nil
             }
         } else {

@@ -22,20 +22,28 @@ struct Hole: Codable, Hashable, Identifiable {
     var number: Int
     var par: Int?
     var handicapIndex: Int?
-    /// Line of play from tee to green, as mapped in OpenStreetMap.
+    /// Line of play derived from the selected course data source.
     var path: [GeoPoint]
     var green: [GeoPoint]
     var fairways: [[GeoPoint]] = []
     var roughs: [[GeoPoint]] = []
     var tees: [[GeoPoint]] = []
     var pin: GeoPoint?
+    var greenFront: GeoPoint?
+    var greenBack: GeoPoint?
+    var teeFront: GeoPoint?
+    var teeBack: GeoPoint?
+    var measuredLengthMeters: Double?
+    var usesPointOnlyGeometry = false
 
     var id: Int { number }
     var tee: GeoPoint? { path.first }
 
     var greenCenter: GeoPoint? {
-        green.count >= 3 ? GolfGeometry.centroid(of: green) : path.last
+        green.count >= 3 ? GolfGeometry.centroid(of: green) : greenCenterPoint ?? path.last
     }
+
+    var greenCenterPoint: GeoPoint?
 
     var flag: GeoPoint? { pin ?? greenCenter }
 
@@ -48,7 +56,14 @@ struct Hole: Codable, Hashable, Identifiable {
         fairways: [[GeoPoint]] = [],
         roughs: [[GeoPoint]] = [],
         tees: [[GeoPoint]] = [],
-        pin: GeoPoint? = nil
+        pin: GeoPoint? = nil,
+        greenFront: GeoPoint? = nil,
+        greenBack: GeoPoint? = nil,
+        teeFront: GeoPoint? = nil,
+        teeBack: GeoPoint? = nil,
+        measuredLengthMeters: Double? = nil,
+        greenCenterPoint: GeoPoint? = nil,
+        usesPointOnlyGeometry: Bool = false
     ) {
         self.number = number
         self.par = par
@@ -59,10 +74,18 @@ struct Hole: Codable, Hashable, Identifiable {
         self.roughs = roughs
         self.tees = tees
         self.pin = pin
+        self.greenFront = greenFront
+        self.greenBack = greenBack
+        self.teeFront = teeFront
+        self.teeBack = teeBack
+        self.measuredLengthMeters = measuredLengthMeters
+        self.greenCenterPoint = greenCenterPoint
+        self.usesPointOnlyGeometry = usesPointOnlyGeometry
     }
 
     private enum CodingKeys: String, CodingKey {
         case number, par, handicapIndex, path, green, fairways, roughs, tees, pin
+        case greenFront, greenBack, teeFront, teeBack, measuredLengthMeters, greenCenterPoint, usesPointOnlyGeometry
     }
 
     init(from decoder: Decoder) throws {
@@ -76,9 +99,17 @@ struct Hole: Codable, Hashable, Identifiable {
         roughs = try values.decodeIfPresent([[GeoPoint]].self, forKey: .roughs) ?? []
         tees = try values.decodeIfPresent([[GeoPoint]].self, forKey: .tees) ?? []
         pin = try values.decodeIfPresent(GeoPoint.self, forKey: .pin)
+        greenFront = try values.decodeIfPresent(GeoPoint.self, forKey: .greenFront)
+        greenBack = try values.decodeIfPresent(GeoPoint.self, forKey: .greenBack)
+        teeFront = try values.decodeIfPresent(GeoPoint.self, forKey: .teeFront)
+        teeBack = try values.decodeIfPresent(GeoPoint.self, forKey: .teeBack)
+        measuredLengthMeters = try values.decodeIfPresent(Double.self, forKey: .measuredLengthMeters)
+        greenCenterPoint = try values.decodeIfPresent(GeoPoint.self, forKey: .greenCenterPoint)
+        usesPointOnlyGeometry = try values.decodeIfPresent(Bool.self, forKey: .usesPointOnlyGeometry) ?? false
     }
 
     var length: Double {
+        if let measuredLengthMeters { return measuredLengthMeters }
         guard path.count > 1 else { return 0 }
         return zip(path, path.dropFirst()).reduce(0) { total, segment in
             total + GolfGeometry.distance(segment.0, segment.1)
@@ -88,6 +119,8 @@ struct Hole: Codable, Hashable, Identifiable {
 
 struct CourseReference: Hashable {
     var osmRelationID: Int?
+    var golfAPICourseID: String?
+    var golfAPITeeID: String?
     var clubName: String
     var courseName: String
     var city: String
@@ -102,7 +135,7 @@ struct CourseReference: Hashable {
     var name: String { courseName }
 
     var cacheKey: String {
-        [clubName, courseName, teeName, teeSex]
+        [golfAPICourseID ?? "", clubName, courseName, teeName, teeSex]
             .joined(separator: "-")
             .unicodeScalars
             .map { CharacterSet.alphanumerics.contains($0) ? String($0) : "-" }
@@ -112,6 +145,8 @@ struct CourseReference: Hashable {
 
     init(selection: SelectedCourse) {
         osmRelationID = nil
+        golfAPICourseID = selection.course.golfAPICourseID
+        golfAPITeeID = selection.tee.golfAPITeeID
         clubName = selection.club.name
         courseName = selection.course.name
         city = selection.club.city ?? ""
@@ -126,6 +161,8 @@ struct CourseReference: Hashable {
 
     init(osmRelationID: Int, name: String) {
         self.osmRelationID = osmRelationID
+        golfAPICourseID = nil
+        golfAPITeeID = nil
         clubName = name
         courseName = name
         city = ""
@@ -138,14 +175,41 @@ struct CourseReference: Hashable {
         slopeRating = 0
     }
 
+    init(golfAPISelection: GolfAPICourseSelection) {
+        osmRelationID = nil
+        golfAPICourseID = golfAPISelection.course.courseID
+        golfAPITeeID = golfAPISelection.tee.teeID
+        clubName = golfAPISelection.club.clubName
+        courseName = golfAPISelection.details.courseName
+        city = golfAPISelection.details.city ?? golfAPISelection.club.city ?? ""
+        region = golfAPISelection.details.state ?? golfAPISelection.club.state ?? ""
+        let coursePars = golfAPISelection.sex == "female" ? golfAPISelection.details.parsWomen : golfAPISelection.details.parsMen
+        let pars = golfAPISelection.tee.pars(for: golfAPISelection.sex, fallback: coursePars)
+        holeCount = golfAPISelection.details.numHoles
+        totalPar = pars.reduce(0, +)
+        teeName = golfAPISelection.tee.teeName
+        teeSex = golfAPISelection.sex
+        courseRating = golfAPISelection.tee.rating(for: golfAPISelection.sex) ?? 0
+        slopeRating = golfAPISelection.tee.slope(for: golfAPISelection.sex) ?? 0
+    }
+
     static let hills = CourseReference(osmRelationID: 10480238, name: "Hills Golf & Country Club")
 }
 
 struct Course: Codable {
-    var osmRelationID: Int
+    var osmRelationID: Int?
+    var golfAPICourseID: String?
     var name: String
     var holes: [Hole]
     var fetchedAt: Date
+
+    init(osmRelationID: Int? = nil, golfAPICourseID: String? = nil, name: String, holes: [Hole], fetchedAt: Date) {
+        self.osmRelationID = osmRelationID
+        self.golfAPICourseID = golfAPICourseID
+        self.name = name
+        self.holes = holes
+        self.fetchedAt = fetchedAt
+    }
 }
 
 enum DistanceUnit: String, CaseIterable, Identifiable {
