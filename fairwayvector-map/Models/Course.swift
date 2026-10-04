@@ -125,6 +125,7 @@ struct CourseReference: Hashable {
     var courseName: String
     var city: String
     var region: String
+    var location: GeoPoint?
     var holeCount: Int
     var totalPar: Int
     var teeName: String
@@ -151,6 +152,7 @@ struct CourseReference: Hashable {
         courseName = selection.course.name
         city = selection.club.city ?? ""
         region = selection.club.region ?? ""
+        location = nil
         holeCount = selection.course.holes
         totalPar = selection.course.par
         teeName = selection.tee.tee
@@ -167,6 +169,7 @@ struct CourseReference: Hashable {
         courseName = name
         city = ""
         region = ""
+        location = nil
         holeCount = 18
         totalPar = 72
         teeName = ""
@@ -183,6 +186,11 @@ struct CourseReference: Hashable {
         courseName = golfAPISelection.details.courseName
         city = golfAPISelection.details.city ?? golfAPISelection.club.city ?? ""
         region = golfAPISelection.details.state ?? golfAPISelection.club.state ?? ""
+        if let latitude = golfAPISelection.details.latitude, let longitude = golfAPISelection.details.longitude {
+            location = GeoPoint(lat: latitude, lon: longitude)
+        } else {
+            location = nil
+        }
         let coursePars = golfAPISelection.sex == "female" ? golfAPISelection.details.parsWomen : golfAPISelection.details.parsMen
         let pars = golfAPISelection.tee.pars(for: golfAPISelection.sex, fallback: coursePars)
         holeCount = golfAPISelection.details.numHoles

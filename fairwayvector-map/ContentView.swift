@@ -5,6 +5,8 @@ struct CourseMapView: View {
     let onChangeCourse: () -> Void
 
     @State private var store: CourseStore
+    @State private var weatherStore = CourseWeatherStore()
+    @State private var mapHeading = 0.0
     @State private var locationManager = LocationManager()
     @State private var holeIndex = 0
     @State private var tapPoint: GeoPoint?
@@ -70,12 +72,18 @@ struct CourseMapView: View {
                     origin: origin?.point,
                     usesGPS: origin?.usesGPS == true,
                     tapPoint: $tapPoint,
-                    onDoubleTapGreen: { isShowingFlagEditor = true }
+                    onDoubleTapGreen: { isShowingFlagEditor = true },
+                    onHeadingChange: { mapHeading = $0 }
                 )
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     topDistanceMenu(hole: hole, origin: origin, flag: flagPosition(for: hole))
+                    if let location = courseWeatherLocation {
+                        CourseWeatherCard(location: location, store: weatherStore)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 4)
+                    }
                     if hole.usesPointOnlyGeometry {
                         Label("GPS tee and green points are available; detailed fairway and green outlines are not.", systemImage: "info.circle")
                             .font(.caption)
@@ -98,13 +106,21 @@ struct CourseMapView: View {
                         .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 10))
                         .padding(.horizontal, 12)
                     }
+                    if let weather = weatherStore.weather, courseWeatherLocation != nil {
+                        HStack {
+                            Spacer(minLength: 0)
+                            CourseWindIndicator(weather: weather, mapHeading: mapHeading)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.top, 10)
+                    }
                     Spacer(minLength: 0)
                     bottomHoleMenu(hole: hole, holeCount: holes.count)
                 }
                 VStack {
                     Spacer(minLength: 0)
                     HStack {
-                        Text("Course data © Golf API · Imagery © Apple Maps")
+                        Text("Course data © Golf API · Imagery © Apple Maps · Weather © Open-Meteo")
                             .font(.system(size: 7))
                             .foregroundStyle(.white.opacity(0.85))
                         Spacer()
@@ -126,6 +142,26 @@ struct CourseMapView: View {
                     .buttonStyle(.borderedProminent)
             }
         }
+    }
+
+    private var courseWeatherLocation: GeoPoint? {
+        if let location = store.reference.location { return location }
+        var points: [GeoPoint] = []
+        for hole in store.course?.holes ?? [] {
+            points.append(contentsOf: hole.path)
+            points.append(contentsOf: hole.green)
+            for polygon in hole.fairways { points.append(contentsOf: polygon) }
+            for polygon in hole.roughs { points.append(contentsOf: polygon) }
+            for polygon in hole.tees { points.append(contentsOf: polygon) }
+        }
+        guard !points.isEmpty else { return nil }
+        let count = Double(points.count)
+        let latitudeTotal = points.reduce(0.0) { total, point in total + point.lat }
+        let longitudeTotal = points.reduce(0.0) { total, point in total + point.lon }
+        return GeoPoint(
+            lat: latitudeTotal / count,
+            lon: longitudeTotal / count
+        )
     }
 
     private func bottomHoleMenu(hole: Hole, holeCount: Int) -> some View {

@@ -29,6 +29,8 @@ struct GolfAPICourseDetail: Decodable, Hashable {
     let city: String?
     let state: String?
     let country: String
+    let latitude: Double?
+    let longitude: Double?
     let numHoles: Int
     let measure: String
     let timestampUpdated: String?
@@ -51,6 +53,8 @@ struct GolfAPICourseDetail: Decodable, Hashable {
         city = Self.string(json["city"])
         state = Self.string(json["state"])
         country = Self.string(json["country"]) ?? ""
+        latitude = Self.double(json["latitude"])
+        longitude = Self.double(json["longitude"])
         numHoles = Self.int(json["numHoles"]) ?? 0
         let measureUnit = Self.string(json["measure"]) ?? "y"
         measure = measureUnit
@@ -85,6 +89,12 @@ struct GolfAPICourseDetail: Decodable, Hashable {
         if let number = value as? NSNumber { return number.intValue != 0 }
         if let string = value as? String { return string == "1" || string.lowercased() == "true" }
         return nil
+    }
+
+    private static func double(_ value: Any?) -> Double? {
+        if let number = value as? NSNumber { return number.doubleValue }
+        guard let string = value as? String else { return nil }
+        return Double(string)
     }
 
     private static func intArray(_ value: Any?) -> [Int] {

@@ -8,6 +8,7 @@ struct HoleMapView: View {
     let usesGPS: Bool
     @Binding var tapPoint: GeoPoint?
     let onDoubleTapGreen: () -> Void
+    var onHeadingChange: (Double) -> Void = { _ in }
 
     @State private var position: MapCameraPosition = .automatic
     @State private var cameraRevision = 0
@@ -108,6 +109,7 @@ struct HoleMapView: View {
             }
             .mapStyle(.imagery(elevation: .flat))
             .onMapCameraChange(frequency: .continuous) { context in
+                onHeadingChange(context.camera.heading)
                 cameraRevision &+= 1
                 isZoomedIn = context.camera.distance < initialCameraDistance * 0.98
                 if !isZoomedIn,
@@ -266,6 +268,7 @@ struct HoleMapView: View {
     private func frameHole() {
         guard hole.tee != nil, hole.greenCenter != nil else { return }
         isZoomedIn = false
+        onHeadingChange(initialCamera.heading)
         position = .camera(initialCamera)
     }
 

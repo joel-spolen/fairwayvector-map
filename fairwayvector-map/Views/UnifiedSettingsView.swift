@@ -81,6 +81,7 @@ struct UnifiedSettingsView: View {
                     Link("Wedge Matrix privacy", destination: URL(string: "https://fairwayvector.com/wedge-matrix/privacy-policy")!)
                     Text("Course and GPS data provided by Golf API. Satellite imagery provided by Apple Maps.")
                         .font(.footnote)
+                    Link("Weather data by Open-Meteo", destination: URL(string: "https://open-meteo.com/")!)
                 }
                 .listRowBackground(FairwayVectorColors.surface)
             }

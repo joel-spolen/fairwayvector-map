@@ -1,0 +1,65 @@
+import SwiftUI
+
+/// The provider reports where wind comes from; the arrow shows where it blows to.
+struct CourseWindIndicator: View {
+    let weather: CourseWeather
+    let mapHeading: Double
+
+    private var isCalm: Bool {
+        weather.windSpeedMps.map { $0 < 0.5 } ?? false
+    }
+
+    private var windToBearing: Double? {
+        guard let direction = weather.windDirectionDegrees, direction.isFinite else { return nil }
+        return (direction + 540).truncatingRemainder(dividingBy: 360)
+    }
+
+    private var destination: String {
+        guard let bearing = windToBearing else { return "Unknown" }
+        let points = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        return points[Int((bearing / 45).rounded()) % points.count]
+    }
+
+    private var speedText: String {
+        guard let speed = weather.windSpeedMps, speed.isFinite else { return "– m/s" }
+        return String(format: "%.1f m/s", speed)
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("WIND")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(FairwayVectorColors.slate)
+
+            ZStack {
+                Circle()
+                    .fill(FairwayVectorColors.conditionsSurface)
+                if !isCalm, let bearing = windToBearing {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(FairwayVectorColors.orange)
+                        // Up represents the camera heading, not geographic north.
+                        .rotationEffect(.degrees(bearing - mapHeading))
+                } else {
+                    Image(systemName: isCalm ? "wind" : "questionmark")
+                        .font(.title2)
+                        .foregroundStyle(FairwayVectorColors.slate)
+                }
+            }
+            .frame(width: 54, height: 54)
+
+            Text(isCalm ? "Calm" : "To \(destination)")
+                .font(.caption.weight(.semibold))
+            Text(speedText)
+                .font(.caption2.monospacedDigit())
+        }
+        .foregroundStyle(FairwayVectorColors.navy)
+        .padding(10)
+        .frame(minWidth: 84)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Course wind")
+        .accessibilityValue(isCalm ? "Calm, \(speedText)" : "Blowing toward \(destination), \(speedText)")
+    }
+}
