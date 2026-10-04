@@ -117,7 +117,7 @@ struct Hole: Codable, Hashable, Identifiable {
     }
 }
 
-struct CourseReference: Hashable {
+struct CourseReference: Codable, Hashable {
     var osmRelationID: Int?
     var golfAPICourseID: String?
     var golfAPITeeID: String?

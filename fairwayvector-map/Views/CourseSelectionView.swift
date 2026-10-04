@@ -4,6 +4,7 @@ struct CourseSelectionView: View {
     let onStartCourse: (CourseReference) -> Void
 
     @State private var model = GolfAPICourseSelectionModel()
+    @AppStorage("map.recentCourseReference") private var recentCourseData = Data()
 
     var body: some View {
         NavigationStack {
@@ -11,6 +12,10 @@ struct CourseSelectionView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     header
                     searchField
+
+                    if let recentCourse {
+                        recentCourseShortcut(recentCourse)
+                    }
 
                     if !model.isConfigured {
                         Label("Golf API key not configured. Add GOLF_API_KEY in the app target’s build settings.", systemImage: "key.horizontal")
@@ -47,7 +52,7 @@ struct CourseSelectionView: View {
                     if let selection = model.selection {
                         selectionSummary(selection)
                         Button {
-                            onStartCourse(selection.reference)
+                            startCourse(selection.reference)
                         } label: {
                             Label("View Course", systemImage: "map.fill")
                                 .font(.headline)
@@ -71,6 +76,58 @@ struct CourseSelectionView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .tint(FairwayVectorColors.navy)
+    }
+
+    private var recentCourse: CourseReference? {
+        try? JSONDecoder().decode(CourseReference.self, from: recentCourseData)
+    }
+
+    private func startCourse(_ reference: CourseReference) {
+        if let data = try? JSONEncoder().encode(reference) {
+            recentCourseData = data
+        }
+        onStartCourse(reference)
+    }
+
+    private func recentCourseShortcut(_ reference: CourseReference) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("RECENTLY SELECTED")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(FairwayVectorColors.slate)
+
+            Button {
+                startCourse(reference)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.title3)
+                        .foregroundStyle(FairwayVectorColors.orange)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(reference.courseName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(FairwayVectorColors.navy)
+                        if reference.clubName != reference.courseName {
+                            Text(reference.clubName)
+                                .font(.caption)
+                                .foregroundStyle(FairwayVectorColors.slate)
+                        }
+                        Text("\(reference.teeName) tee · \(reference.teeSex == "female" ? "Women" : "Men") · \(reference.holeCount) holes")
+                            .font(.caption)
+                            .foregroundStyle(FairwayVectorColors.slate)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(FairwayVectorColors.navy)
+                }
+                .padding(14)
+                .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("recent-course-button")
+            .accessibilityHint("Opens this course with your previously selected tee set")
+        }
     }
 
     private var header: some View {
