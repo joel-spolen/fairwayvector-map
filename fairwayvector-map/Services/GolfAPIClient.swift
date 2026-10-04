@@ -24,20 +24,27 @@ struct GolfAPIClient {
 
     var isConfigured: Bool { !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    func searchClubs(named query: String, forceRefresh: Bool = false) async throws -> [GolfAPIClub] {
+    func searchClubs(
+        named query: String = "",
+        country: String,
+        region: String = "",
+        forceRefresh: Bool = false
+    ) async throws -> [GolfAPIClub] {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedQuery.isEmpty else { return [] }
-        if !forceRefresh, let cached = cache.readSearch(query: normalizedQuery) {
+        let normalizedCountry = country.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedRegion = region.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedQuery.isEmpty || !normalizedCountry.isEmpty || !normalizedRegion.isEmpty else { return [] }
+        if !forceRefresh, let cached = cache.readSearch(query: normalizedQuery, country: normalizedCountry, region: normalizedRegion) {
             return try Self.decodeClubs(from: cached)
         }
 
-        let data = try await get("/clubs", queryItems: [
-            URLQueryItem(name: "country", value: "Sweden"),
-            URLQueryItem(name: "name", value: normalizedQuery),
-            URLQueryItem(name: "page", value: "1")
-        ])
+        var queryItems = [URLQueryItem(name: "page", value: "1")]
+        if !normalizedCountry.isEmpty { queryItems.append(URLQueryItem(name: "country", value: normalizedCountry)) }
+        if !normalizedRegion.isEmpty { queryItems.append(URLQueryItem(name: "state", value: normalizedRegion)) }
+        if !normalizedQuery.isEmpty { queryItems.append(URLQueryItem(name: "name", value: normalizedQuery)) }
+        let data = try await get("/clubs", queryItems: queryItems)
         _ = try Self.decodeClubs(from: data)
-        cache.writeSearch(data, query: normalizedQuery)
+        cache.writeSearch(data, query: normalizedQuery, country: normalizedCountry, region: normalizedRegion)
         return try Self.decodeClubs(from: data)
     }
 
@@ -200,8 +207,12 @@ struct GolfAPICache {
             .appending(path: "GolfAPI", directoryHint: .isDirectory)
     }
 
-    func readSearch(query: String) -> Data? { read(named: "search-\(safeKey(query)).json") }
-    func writeSearch(_ data: Data, query: String) { write(data, named: "search-\(safeKey(query)).json") }
+    func readSearch(query: String, country: String, region: String) -> Data? {
+        read(named: "search-\(safeKey(country))-\(safeKey(region))-\(safeKey(query)).json")
+    }
+    func writeSearch(_ data: Data, query: String, country: String, region: String) {
+        write(data, named: "search-\(safeKey(country))-\(safeKey(region))-\(safeKey(query)).json")
+    }
     func readCourseDetail(id: String) -> Data? { read(named: "course-\(safeKey(id))-detail.json") }
     func writeCourseDetail(_ data: Data, id: String) { write(data, named: "course-\(safeKey(id))-detail.json") }
     func readCoordinates(id: String) -> Data? { read(named: "course-\(safeKey(id))-coordinates.json") }

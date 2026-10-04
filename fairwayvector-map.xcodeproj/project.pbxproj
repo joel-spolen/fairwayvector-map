@@ -32,7 +32,7 @@
 		1C6738A5306A3B6400309840 /* fairwayvector-mapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "fairwayvector-mapTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C6738AF306A3B6400309840 /* fairwayvector-mapUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "fairwayvector-mapUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D4B1C0A2306A3B6400309840 /* fairwayvector-map/ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "fairwayvector-map/ContentView.swift"; sourceTree = SOURCE_ROOT; };
-		D4B1C0C2306A3B6400309840 /* GolfAPI.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "fairwayvector-map/GolfAPI.xcconfig"; sourceTree = SOURCE_ROOT; };
+		D4B1C0C2306A3B6400309840 /* fairwayvector-map/GolfAPI.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "fairwayvector-map/GolfAPI.xcconfig"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -97,7 +97,7 @@
 			children = (
 				1C673898306A3B6200309840 /* fairwayvector-map */,
 				D4B1C0A2306A3B6400309840 /* fairwayvector-map/ContentView.swift */,
-				D4B1C0C2306A3B6400309840 /* GolfAPI.xcconfig */,
+				D4B1C0C2306A3B6400309840 /* fairwayvector-map/GolfAPI.xcconfig */,
 				1C6738A8306A3B6400309840 /* fairwayvector-mapTests */,
 				1C6738B2306A3B6400309840 /* fairwayvector-mapUITests */,
 				1C673897306A3B6200309840 /* Products */,
@@ -415,7 +415,7 @@
 		};
 		1C6738BA306A3B6400309840 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D4B1C0C2306A3B6400309840 /* GolfAPI.xcconfig */;
+			baseConfigurationReference = D4B1C0C2306A3B6400309840 /* fairwayvector-map/GolfAPI.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -444,7 +444,7 @@
 		};
 		1C6738BB306A3B6400309840 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D4B1C0C2306A3B6400309840 /* GolfAPI.xcconfig */;
+			baseConfigurationReference = D4B1C0C2306A3B6400309840 /* fairwayvector-map/GolfAPI.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

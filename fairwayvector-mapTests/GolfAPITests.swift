@@ -25,6 +25,18 @@ private final class GolfAPIStubProtocol: URLProtocol, @unchecked Sendable {
 @MainActor
 @Suite(.serialized)
 struct GolfAPITests {
+    @Test func coverageRegionCountryCountsMatchPublishedCoverageList() {
+        let counts = Dictionary(uniqueKeysWithValues: GolfAPICoverage.regions.map { ($0.name, $0.countries.count) })
+        #expect(counts["North America"] == 24)
+        #expect(counts["USA + Canada"] == 2)
+        #expect(counts["Europe"] == 40)
+        #expect(counts["Asia"] == 41)
+        #expect(counts["Australia/Oceania"] == 8)
+        #expect(counts["Latin America and the Caribbean"] == 35)
+        #expect(counts["Africa"] == 36)
+        #expect(GolfAPICoverage.regions.first { $0.name == "Europe" }?.countries.contains("Sweden") == true)
+    }
+
     private let courseDetailJSON = #"""
     {
       "courseID":"course-123",
@@ -164,10 +176,27 @@ struct GolfAPITests {
             return (200, response)
         }
 
-        let first = try await client.searchClubs(named: "Åre")
-        let second = try await client.searchClubs(named: "Åre")
+        let first = try await client.searchClubs(named: "Åre", country: "Sweden", region: "Jämtland")
+        let second = try await client.searchClubs(named: "Åre", country: "Sweden", region: "Jämtland")
         #expect(first == second)
         #expect(first.first?.clubName == "Åre Golfklubb")
+        #expect(GolfAPIStubProtocol.requestCount == 1)
+        GolfAPIStubProtocol.handler = nil
+    }
+
+    @Test func courseSearchSendsCountryAndRegionFilters() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = makeClient(directory: directory) { request in
+            let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
+            let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+            #expect(query["country"] == "Sweden")
+            #expect(query["state"] == "Jämtland")
+            #expect(query["name"] == "Åre")
+            return (200, Data(#"{"apiRequestsLeft":"99.9","numClubs":0,"clubs":[]}"#.utf8))
+        }
+
+        _ = try await client.searchClubs(named: "Åre", country: "Sweden", region: "Jämtland")
         #expect(GolfAPIStubProtocol.requestCount == 1)
         GolfAPIStubProtocol.handler = nil
     }
@@ -186,7 +215,7 @@ struct GolfAPITests {
         )
 
         do {
-            _ = try await noKeyClient.searchClubs(named: "Åre")
+            _ = try await noKeyClient.searchClubs(named: "Åre", country: "Sweden")
             Issue.record("Expected a missing Golf API key error")
         } catch let error as GolfAPIError {
             #expect(error == .missingAPIKey)

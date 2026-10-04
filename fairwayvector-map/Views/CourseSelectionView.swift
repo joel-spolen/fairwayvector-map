@@ -80,7 +80,7 @@ struct CourseSelectionView: View {
             Text("Where are you playing?")
                 .font(.title2.bold())
                 .foregroundStyle(FairwayVectorColors.navy)
-            Text("Search Swedish clubs, choose a course and tee, then download its map.")
+                    Text("Choose a coverage region and country, then optionally narrow results by club name.")
                 .font(.subheadline)
                 .foregroundStyle(FairwayVectorColors.slate)
         }
@@ -89,6 +89,41 @@ struct CourseSelectionView: View {
 
     private var searchField: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Menu {
+                    ForEach(model.coverageRegions) { region in
+                        Button(region.name) { model.selectRegion(region.name) }
+                    }
+                } label: {
+                    Label(model.selectedRegion.isEmpty ? "Region" : model.selectedRegion, systemImage: "globe")
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel(model.selectedRegion.isEmpty ? "Region" : model.selectedRegion)
+                        .accessibilityAddTraits(.isButton)
+                }
+                .accessibilityIdentifier("golf-coverage-region-picker")
+
+                Menu {
+                    ForEach(model.availableCountries, id: \.self) { country in
+                        Button(country) { model.selectedCountry = country }
+                    }
+                } label: {
+                    Label(model.selectedCountry.isEmpty ? "Country" : model.selectedCountry, systemImage: "mappin.and.ellipse")
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel(model.selectedCountry.isEmpty ? "Country" : model.selectedCountry)
+                        .accessibilityAddTraits(.isButton)
+                }
+                .disabled(model.selectedRegion.isEmpty)
+                .accessibilityIdentifier("golf-country-picker")
+            }
+            .padding(.horizontal, 10)
+            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+
             HStack(spacing: 8) {
                 TextField("Search club name", text: $model.searchText)
                     .textContentType(.organizationName)
@@ -110,8 +145,8 @@ struct CourseSelectionView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.isSearching || model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .accessibilityLabel("Search Swedish clubs")
+                .disabled(model.isSearching || model.selectedCountry.isEmpty)
+                .accessibilityLabel("Search golf clubs")
             }
             .padding(.horizontal, 12)
             .background(.white, in: RoundedRectangle(cornerRadius: 12))
@@ -120,7 +155,7 @@ struct CourseSelectionView: View {
                 Task { await model.search(forceRefresh: true) }
             }
             .font(.caption.weight(.medium))
-            .disabled(model.isSearching || model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(model.isSearching || model.selectedCountry.isEmpty)
         }
     }
 

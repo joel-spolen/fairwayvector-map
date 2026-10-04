@@ -6,6 +6,8 @@ import Observation
 final class GolfAPICourseSelectionModel {
     private let client: GolfAPIClient
 
+    var selectedRegion = "Europe"
+    var selectedCountry = "Sweden"
     var searchText = ""
     private(set) var clubs: [GolfAPIClub] = []
     private(set) var selectedClubID: String?
@@ -23,6 +25,12 @@ final class GolfAPICourseSelectionModel {
     }
 
     var isConfigured: Bool { client.isConfigured }
+
+    var coverageRegions: [GolfAPICoverageRegion] { GolfAPICoverage.regions }
+
+    var availableCountries: [String] {
+        coverageRegions.first { $0.name == selectedRegion }?.countries ?? []
+    }
 
     var selectedClub: GolfAPIClub? {
         clubs.first { $0.clubID == selectedClubID }
@@ -54,21 +62,24 @@ final class GolfAPICourseSelectionModel {
 
     func search(forceRefresh: Bool = false) async {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else {
-            errorMessage = "Enter a golf club name to search."
+        guard !selectedCountry.isEmpty || !query.isEmpty else {
+            errorMessage = "Select a region and country, or enter a club name to search."
             return
         }
         isSearching = true
         errorMessage = nil
         defer { isSearching = false }
         do {
-            clubs = try await client.searchClubs(named: query, forceRefresh: forceRefresh)
+            clubs = try await client.searchClubs(named: query, country: selectedCountry, forceRefresh: forceRefresh)
             apiRequestsLeft = nil
             selectedClubID = nil
             selectedCourseID = nil
             courseDetail = nil
             selectedTeeID = nil
-            if clubs.isEmpty { errorMessage = "No Swedish golf clubs matched \"\(query)\"." }
+            if clubs.isEmpty {
+                let terms = [selectedCountry, query].filter { !$0.isEmpty }.joined(separator: " · ")
+                errorMessage = "No golf clubs matched \"\(terms)\"."
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -76,6 +87,17 @@ final class GolfAPICourseSelectionModel {
 
     func selectClub(_ club: GolfAPIClub) {
         selectedClubID = club.clubID
+        selectedCourseID = nil
+        courseDetail = nil
+        selectedTeeID = nil
+        errorMessage = nil
+    }
+
+    func selectRegion(_ region: String) {
+        selectedRegion = region
+        selectedCountry = ""
+        clubs = []
+        selectedClubID = nil
         selectedCourseID = nil
         courseDetail = nil
         selectedTeeID = nil

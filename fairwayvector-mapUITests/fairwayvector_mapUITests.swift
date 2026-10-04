@@ -88,11 +88,15 @@ final class fairwayvector_mapUITests: XCTestCase {
         courseTab.tap()
 
         XCTAssertFalse(app.staticTexts["Golf API key not configured. Add GOLF_API_KEY in the app target’s build settings."].exists)
+        let countryPicker = app.buttons.matching(identifier: "golf-country-picker").firstMatch
+        XCTAssertTrue(countryPicker.waitForExistence(timeout: 5))
+        countryPicker.tap()
+        app.buttons.matching(identifier: "Sweden").firstMatch.tap()
         let searchField = app.textFields["golf-club-search-field"]
         XCTAssertTrue(searchField.exists)
         searchField.tap()
         searchField.typeText("Åre")
-        app.buttons["Search Swedish clubs"].tap()
+        app.buttons["Search golf clubs"].tap()
         XCTAssertTrue(app.staticTexts["Åre Golf"].waitForExistence(timeout: 30))
     }
 

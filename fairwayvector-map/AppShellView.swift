@@ -117,10 +117,7 @@ private struct HomeView: View {
                                 Text("SWEDEN COURSE CATALOG")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(FairwayVectorColors.slate)
-                                Text("394 golf clubs")
-                                    .font(.headline)
-                                    .foregroundStyle(FairwayVectorColors.navy)
-                                Text("Select a club, course, and tee")
+                                Text("Search available Swedish clubs and courses")
                                     .font(.subheadline)
                                     .foregroundStyle(FairwayVectorColors.slate)
                             }
