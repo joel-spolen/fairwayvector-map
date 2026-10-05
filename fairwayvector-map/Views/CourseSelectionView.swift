@@ -90,6 +90,7 @@ struct CourseSelectionView: View {
             .background(FairwayVectorColors.background)
             .navigationTitle("Choose Course")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .tabBar)
         }
         .tint(FairwayVectorColors.navy)
     }

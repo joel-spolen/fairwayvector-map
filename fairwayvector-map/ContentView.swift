@@ -31,6 +31,7 @@ struct CourseMapView: View {
                 .background(FairwayVectorColors.background)
                 .navigationTitle(store.reference.courseName)
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .tabBar)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button(store.reference.golfAPICourseID == nil ? "Refresh course" : "Check for course updates", systemImage: "arrow.clockwise") {
