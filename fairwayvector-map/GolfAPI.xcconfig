@@ -1,2 +1,3 @@
 GOLF_API_KEY =
 #include? "GolfAPI.local.xcconfig"
+#include "GPXZ.xcconfig"

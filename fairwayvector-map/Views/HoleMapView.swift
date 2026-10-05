@@ -9,10 +9,14 @@ struct HoleMapView: View {
     @Binding var tapPoint: GeoPoint?
     let onDoubleTapGreen: () -> Void
     var onHeadingChange: (Double) -> Void = { _ in }
+    var terrainInspectionPoint: GeoPoint? = nil
+    var onTargetInteractionBegan: () -> Void = {}
+    var onTargetCommitted: (GeoPoint) -> Void = { _ in }
 
     @State private var position: MapCameraPosition = .automatic
     @State private var cameraRevision = 0
     @State private var isDraggingTarget = false
+    @GestureState private var targetGestureActive = false
     @State private var isZoomedIn = false
 
     var body: some View {
@@ -80,6 +84,17 @@ struct HoleMapView: View {
                     .annotationTitles(.hidden)
                 }
 
+                if let terrainInspectionPoint {
+                    Annotation("Terrain profile position", coordinate: terrainInspectionPoint.coordinate) {
+                        Image(systemName: "mountain.2.fill")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white)
+                            .padding(7)
+                            .background(FairwayVectorColors.flightBlue, in: Circle())
+                    }
+                    .annotationTitles(.hidden)
+                }
+
                 if let tapPoint {
                     if let origin {
                         MapPolyline(coordinates: [origin.coordinate, tapPoint.coordinate])
@@ -119,6 +134,7 @@ struct HoleMapView: View {
             }
             .simultaneousGesture(
                 DragGesture(minimumDistance: 8, coordinateSpace: .local)
+                    .updating($targetGestureActive) { _, active, _ in active = true }
                     .onChanged { value in
                         guard let currentTarget = tapPoint else { return }
                         if !isDraggingTarget {
@@ -127,21 +143,37 @@ struct HoleMapView: View {
                             let dy = value.startLocation.y - markerPoint.y
                             guard hypot(dx, dy) <= 40 else { return }
                             isDraggingTarget = true
+                            onTargetInteractionBegan()
                         }
                         if let coordinate = proxy.convert(value.location, from: .local) {
                             tapPoint = GeoPoint(coordinate)
                         }
                     }
-                    .onEnded { _ in
+                    .onEnded { value in
+                        let genuineTargetDrag = isDraggingTarget
                         isDraggingTarget = false
+                        if genuineTargetDrag {
+                            if let coordinate = proxy.convert(value.location, from: .local) { tapPoint = GeoPoint(coordinate) }
+                            if let tapPoint { onTargetCommitted(tapPoint) }
+                        }
                     }
             )
             .simultaneousGesture(
                 SpatialTapGesture(count: 2, coordinateSpace: .local)
+                    .exclusively(before: SpatialTapGesture(count: 1, coordinateSpace: .local))
                     .onEnded { value in
-                        guard let coordinate = proxy.convert(value.location, from: .local),
-                              GolfGeometry.contains(GeoPoint(coordinate), in: hole.green) else { return }
-                        onDoubleTapGreen()
+                        switch value {
+                        case .first(let tap):
+                            guard let coordinate = proxy.convert(tap.location, from: .local),
+                                  GolfGeometry.contains(GeoPoint(coordinate), in: hole.green) else { return }
+                            onDoubleTapGreen()
+                        case .second(let tap):
+                            guard !isDraggingTarget, let coordinate = proxy.convert(tap.location, from: .local) else { return }
+                            let point = GeoPoint(coordinate)
+                            onTargetInteractionBegan()
+                            tapPoint = point
+                            onTargetCommitted(point)
+                        }
                     }
             )
             .overlay {
@@ -167,14 +199,13 @@ struct HoleMapView: View {
                 .id(cameraRevision)
                 .allowsHitTesting(false)
             }
-            .onTapGesture { screenPoint in
-                if !isDraggingTarget, let coordinate = proxy.convert(screenPoint, from: .local) {
-                    tapPoint = GeoPoint(coordinate)
-                }
-            }
         }
         .onAppear(perform: frameHole)
         .onChange(of: hole.number) { frameHole() }
+        .onChange(of: targetGestureActive) { _, active in
+            // A cancelled recognizer resets gesture state without a release commit.
+            if !active { isDraggingTarget = false }
+        }
     }
 
     private var holeCoordinates: [CLLocationCoordinate2D] {

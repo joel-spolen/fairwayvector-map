@@ -1,0 +1,4 @@
+# ARCHIVED offline Hills preparer only; no dependency of GPXZ or the iOS runtime.
+numpy>=1.24,<3
+rasterio>=1.4,<2
+pyproj>=3.6,<4

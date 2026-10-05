@@ -1,0 +1,67 @@
+{
+    "archived": true,
+    "runtimeUse": "none; GPXZ worldwide is the only runtime terrain provider",
+    "status": "blocked-authentication-no-terrain-installed",
+    "courseName": "Hills Golf & Country Club",
+    "boundsSource": "https://www.openstreetmap.org/api/0.6/relation/10480238/full.json",
+    "boundaryType": "OSM multipolygon outer member nodes",
+    "boundaryNodeCount": 164,
+    "courseBoundsLonLat": [
+        11.983088,
+        57.616891,
+        12.0170528,
+        57.6303488
+    ],
+    "bufferMeters": 200,
+    "bufferedBoundsLonLat": [
+        11.979729055413056,
+        57.61509235678816,
+        12.020411744586944,
+        57.63214744321184
+    ],
+    "collectionURL": "https://api.lantmateriet.se/stac-hojd/v1/collections/mhm-63_3",
+    "source": "Lantmäteriet Markhöjdmodell Nedladdning",
+    "license": "CC-BY-4.0",
+    "declaredSourceResolutionMeters": 1,
+    "declaredCRS": "EPSG:5845",
+    "candidateItems": [
+        "639_32_0000",
+        "639_31_0075",
+        "638_32_7500",
+        "638_31_7575"
+    ],
+    "declaredSourceSurveyDateRange": "2019-11-29/2024-05-18",
+    "sourceDateScope": "STAC intervals across complete candidate tiles; not verified crop survey dates",
+    "assetAccessProbe": {
+        "url": "https://dl1.lantmateriet.se/hojd/data/grid1m/63_3/50/63900_3200_25.tif",
+        "method": "HEAD",
+        "httpStatus": 401,
+        "authentication": "Basic realm=Authorization Server",
+        "contentType": "text/html",
+        "responseBytes": 172
+    },
+    "rasterBytesDownloaded": 0,
+    "packageGenerated": false,
+    "verifiedGridPlan": {
+        "projectionOrigin": {
+            "lat": 57.6236199,
+            "lon": 12.0000704
+        },
+        "topLeftCellCenter": {
+            "x": -1212,
+            "y": 949
+        },
+        "width": 2425,
+        "height": 1899,
+        "expectedBinaryBytesNotGenerated": 18420300,
+        "projectionMaxErrorMeters": 8.518554750480689e-10,
+        "inverseMaxErrorDegrees": 7.105427357601002e-15
+    },
+    "unresolved": [
+        "Authorized access to genuine source COGs",
+        "Actual raster CRS, 1m resolution, units, NoData and elevation values",
+        "Explicit provider documentation confirming RH2000 vertical datum",
+        "Complete per-tile observed survey metadata and crop height equivalence",
+        "Independent verification of every hole path within mapped course polygon"
+    ]
+}

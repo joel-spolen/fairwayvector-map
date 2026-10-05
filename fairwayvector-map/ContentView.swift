@@ -6,6 +6,10 @@ struct CourseMapView: View {
 
     @State private var store: CourseStore
     @State private var weatherStore = CourseWeatherStore()
+    @State private var terrainStore = TerrainElevationStore()
+    @State private var isShowingTerrainProfile = false
+    @State private var isConfirmingTerrainRetry = false
+    @State private var terrainInspectionPoint: GeoPoint?
     @State private var mapHeading = 0.0
     @State private var locationManager = LocationManager()
     @State private var holeIndex = 0
@@ -45,7 +49,20 @@ struct CourseMapView: View {
             locationManager.start()
             await store.load()
         }
-        .onChange(of: holeIndex) { tapPoint = nil }
+        .onChange(of: holeIndex) { tapPoint = nil; terrainStore.invalidateShot() }
+        .onDisappear { terrainStore.deactivate() }
+        .sheet(isPresented: $isShowingTerrainProfile, onDismiss: { terrainInspectionPoint = nil }) {
+            if let holes = store.course?.holes, !holes.isEmpty {
+                let hole = holes[min(holeIndex, holes.count - 1)]
+                HoleElevationProfileView(
+                    store: terrainStore, holeNumber: hole.number, unit: unit,
+                    usesGPS: terrainStore.usesGPS,
+                    inspectionPoint: $terrainInspectionPoint
+                )
+                .presentationDetents([.medium, .large])
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+            }
+        }
         .sheet(isPresented: $isShowingFlagEditor) {
             if let holes = store.course?.holes, !holes.isEmpty {
                 let hole = holes[min(holeIndex, holes.count - 1)]
@@ -65,6 +82,7 @@ struct CourseMapView: View {
         if let holes = store.course?.holes, !holes.isEmpty {
             let hole = holes[min(holeIndex, holes.count - 1)]
             let origin = DistanceOrigin.resolve(location: locationManager.location, hole: hole)
+            let holeRequest = terrainRequest(for: hole, origin: nil, target: nil)
             ZStack {
                 HoleMapView(
                     hole: hole,
@@ -73,7 +91,14 @@ struct CourseMapView: View {
                     usesGPS: origin?.usesGPS == true,
                     tapPoint: $tapPoint,
                     onDoubleTapGreen: { isShowingFlagEditor = true },
-                    onHeadingChange: { mapHeading = $0 }
+                    onHeadingChange: { mapHeading = $0 },
+                    terrainInspectionPoint: terrainInspectionPoint,
+                    onTargetInteractionBegan: { terrainStore.beginTargetInteraction() },
+                    onTargetCommitted: { point in
+                        terrainInspectionPoint = nil
+                        terrainStore.commitShot(terrainRequest(for: hole,
+                            origin: DistanceOrigin.resolve(location: locationManager.location, hole: hole), target: point))
+                    }
                 )
                 .ignoresSafeArea()
 
@@ -115,6 +140,7 @@ struct CourseMapView: View {
                         .padding(.top, 10)
                     }
                     Spacer(minLength: 0)
+                    terrainPanel(hole: hole)
                     bottomHoleMenu(hole: hole, holeCount: holes.count)
                 }
                 VStack {
@@ -128,6 +154,13 @@ struct CourseMapView: View {
                     .padding(.leading, 8)
                     .padding(.bottom, 66)
                 }
+            }
+            .task(id: holeRequest) {
+                // Opening geometry/tee/hole/saved flag reads terrain cache ONLY.
+                tapPoint = nil
+                terrainInspectionPoint = nil
+                terrainStore.open(terrainRequest(for: hole,
+                    origin: DistanceOrigin.resolve(location: locationManager.location, hole: hole), target: nil))
             }
         } else if store.isLoading || store.errorMessage == nil {
             ProgressView("Loading course…")
@@ -162,6 +195,90 @@ struct CourseMapView: View {
             lat: latitudeTotal / count,
             lon: longitudeTotal / count
         )
+    }
+
+    private func terrainRequest(for hole: Hole, origin: DistanceOrigin?, target: GeoPoint?) -> TerrainRequest {
+        let flag = flagPosition(for: hole)
+        var path = hole.path
+        if let flag {
+            if path.count >= 2 { path[path.count - 1] = flag }
+            else if let tee = hole.tee { path = [tee, flag] }
+        }
+        return TerrainRequest(
+            courseID: store.terrainCourseID ?? "",
+            holeNumber: hole.number, path: path, flag: flag,
+            origin: origin?.point, target: target ?? flag,
+            usesPointOnlyGeometry: hole.usesPointOnlyGeometry || path.count <= 2,
+            usesGPS: origin?.usesGPS == true
+        )
+    }
+
+    private func terrainPanel(hole: Hole) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 10) {
+                Image(systemName: "mountain.2.fill")
+                    .foregroundStyle(FairwayVectorColors.orange)
+                Picker("Terrain profile", selection: $terrainStore.mode) {
+                    ForEach(TerrainProfileMode.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                if terrainStore.isLoading { ProgressView().controlSize(.small) }
+                Button("Refresh terrain", systemImage: "arrow.clockwise") {
+                    terrainInspectionPoint = nil
+                    isConfirmingTerrainRetry = true
+                }
+                .labelStyle(.iconOnly)
+                .disabled(terrainStore.isHoleLoading || terrainStore.isShotLoading)
+                .accessibilityHint("Asks before retrying failed terrain requests. Existing call reservations are retained.")
+                Button("Expand terrain profile", systemImage: "arrow.up.left.and.arrow.down.right") { isShowingTerrainProfile = true }
+                    .labelStyle(.iconOnly)
+            }
+            if let profile = terrainStore.selectedProfile, profile.samples.contains(where: { $0.elevationMeters != nil }) {
+                TerrainProfileChart(profile: profile, unit: unit, selectedDistance: .constant(nil), height: 74)
+                Text("\(terrainStore.mode == .hole ? "Tee → flag" : terrainStore.usesGPS ? "Committed GPS → target" : "Tee fallback → target") · \(profile.elevationChangeMeters.map(terrainDeltaText) ?? "Partial coverage")")
+                    .font(.caption2)
+                if terrainStore.mode == .shot, let next = terrainStore.snapshot.targetToFlagElevationChangeMeters {
+                    Text("Target → flag: \(terrainDeltaText(next))").font(.caption2)
+                }
+            } else if terrainStore.isLoading {
+                Text("Loading terrain…").font(.caption2)
+            }
+            if terrainStore.shotPending { Text("Shot pending · release target to commit").font(.caption2) }
+            if let message = terrainStore.statusMessage { Text(message).font(.caption2).fixedSize(horizontal: false, vertical: true) }
+            HStack {
+                Link("Terrain by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
+                Link("Source credit / licence catalogue", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
+            }
+            .font(.system(size: 8))
+            if let quota = terrainStore.quota {
+                Text("GPXZ · \(quota.used)/100 calls used · \(quota.remaining) remaining · \(terrainStore.plannedCalls) uncovered spans planned · local UTC month")
+                    .font(.system(size: 8))
+            } else {
+                Text("GPXZ · local quota unavailable; no paid request without a valid ledger").font(.system(size: 8))
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(FairwayVectorColors.navy)
+        .padding(10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
+        .accessibilityIdentifier("terrain-profile-button")
+        .confirmationDialog("Retry terrain requests?", isPresented: $isConfirmingTerrainRetry, titleVisibility: .visible) {
+            Button("Retry terrain") {
+                terrainStore.retryFailedRequests(terrainRequest(for: hole,
+                    origin: DistanceOrigin.resolve(location: locationManager.location, hole: hole), target: tapPoint))
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Correct the reported cause first. Saved terrain is reused, but uncovered paths may spend additional calls. This clears failed-request locks only; used calls are not reset or refunded, and provider backoff still applies.")
+        }
+    }
+
+    private func terrainDeltaText(_ meters: Double) -> String {
+        let value = unit == .meters ? meters : meters / 0.9144
+        let amount = String(format: "%+.1f %@", value, unit.symbol)
+        return "\(amount) \(meters > 0.1 ? "uphill" : meters < -0.1 ? "downhill" : "level")"
     }
 
     private func bottomHoleMenu(hole: Hole, holeCount: Int) -> some View {

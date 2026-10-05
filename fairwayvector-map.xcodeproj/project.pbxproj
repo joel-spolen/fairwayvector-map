@@ -40,7 +40,12 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				ContentView.swift,
+				GolfAPI.local.xcconfig,
+				GolfAPI.xcconfig,
+				GPXZ.local.xcconfig,
+				GPXZ.xcconfig,
 				Info.plist,
+				"Resources/Terrain/hills-acquisition-status.json",
 			);
 			target = 1C673895306A3B6200309840 /* fairwayvector-map */;
 		};

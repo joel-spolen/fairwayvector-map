@@ -82,6 +82,12 @@ struct UnifiedSettingsView: View {
                     Text("Course and GPS data provided by Golf API. Satellite imagery provided by Apple Maps.")
                         .font(.footnote)
                     Link("Weather data by Open-Meteo", destination: URL(string: "https://open-meteo.com/")!)
+                    Link("Terrain profiles by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
+                    Link("Terrain source credits and licences", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
+                    Text("The profile shows returned source identifiers for both origin→target and target→flag. Source-specific attribution records and full licence texts have not been downloaded or bundled; the link opens the GPXZ catalogue for review.")
+                        .font(.footnote)
+                    Text("Committed terrain profiles can send path coordinates, including your captured GPS position, to GPXZ. Source resolution and survey dates vary; sample spacing is not guaranteed accuracy. Saved data has no automatic expiry, prefetch, or retries. The local 100-call UTC monthly ledger is a device safeguard, not cross-device account enforcement.")
+                        .font(.footnote)
                 }
                 .listRowBackground(FairwayVectorColors.surface)
             }

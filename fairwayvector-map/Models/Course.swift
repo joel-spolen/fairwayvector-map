@@ -1,6 +1,6 @@
 import CoreLocation
 
-struct GeoPoint: Codable, Hashable, Sendable {
+nonisolated struct GeoPoint: Codable, Hashable, Sendable {
     var lat: Double
     var lon: Double
 

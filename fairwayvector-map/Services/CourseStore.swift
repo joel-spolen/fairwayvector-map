@@ -74,6 +74,18 @@ final class CourseStore {
     }
 
     private var cacheURL: URL? {
+        guard let id = terrainCourseID else { return legacyCacheURL }
+        let version = reference.golfAPICourseID == nil ? "v5" : "golfapi-v1"
+        return CourseDataStore.directory(courseID: id).appendingPathComponent("course-\(reference.cacheKey)-\(version).json")
+    }
+
+    var terrainCourseID: String? {
+        if let id = reference.golfAPICourseID { return "golfapi:\(id)" }
+        if let id = course?.osmRelationID ?? reference.osmRelationID ?? resolvedRelationID { return "osm:\(id)" }
+        return nil
+    }
+
+    private var legacyCacheURL: URL? {
         guard let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
         }
@@ -82,8 +94,14 @@ final class CourseStore {
     }
 
     private func readCache() -> Course? {
-        guard let url = cacheURL, let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(Course.self, from: data)
+        for url in [cacheURL, legacyCacheURL].compactMap({ $0 }) {
+            if let data = try? Data(contentsOf: url), let saved = try? JSONDecoder().decode(Course.self, from: data) {
+                resolvedRelationID = saved.osmRelationID
+                writeCache(saved) // migrate flat legacy course cache; leave original intact
+                return saved
+            }
+        }
+        return nil
     }
 
     private func writeCache(_ course: Course) {
