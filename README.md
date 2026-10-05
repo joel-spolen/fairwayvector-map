@@ -10,15 +10,27 @@ values are mock. Existing ignored credential files were not read or edited.
 Settings displays each provider's read-only mode. There is no persisted runtime
 toggle and no automatic activation when a key exists.
 
-- Golf API search/detail/coordinates/refresh run locally. Search **Sweden** and
-  **Hills** (or leave the name blank) for **Demo Hills**, an invented 18-hole
-  layout near 57.62° N, 12.00° E. Tee lengths, par, indexes, GPS tee/green
-  markers and two rated tee sets are illustrative, **not factual Hills data**.
-  Other countries/clubs return no matches; this is not worldwide coverage.
-- Old live recent selections reopen as Demo Hills, explicitly labelled, without
-  replacing the live recent reference. Demo recent selection has separate storage.
-  CourseStore remaps before cache lookup, including legacy OSM references; mock
-  geometry is reconstructed, never read/written/migrated in live geometry caches.
+- Golf API search/detail/coordinates/refresh run locally. Complete downloaded
+  real provider courses appear **before** demo results, using read-only detail
+  and coordinate caches under Application Support / GolfAPI, with reviewed
+  bundled real Hills as a read-only fallback on fresh devices. Existing search
+  metadata supplies club/country names when detail omits them, but search-only
+  records cannot masquerade as available offline geometry. Search filters
+  use their cached country, region and club/course names. Force refresh is still
+  read-only: no update check, write, migration or network. Saved-course shortcuts
+  retain the actual provider course ID, tee ID, ratings, sex and detail location.
+- A usable live recent selection takes precedence over an old demo shortcut.
+  The live recent preference is not changed in paused mode; paused selections
+  use the existing separate development preference. CourseStore first reads
+  exact tee-specific durable CourseData or flat legacy geometry, even for real
+  Golf API/OSM references, without migration/writes. If necessary it rebuilds
+  geometry in memory from cached real provider detail/coordinates. Missing or
+  invalid real data reports **APIs paused / downloaded data unavailable**;
+  it never remaps that reference or returns invented geometry under a real ID.
+- **Demo Hills** remains a separate, clearly labelled invented 18-hole fallback
+  for Sweden / Hills searches. Layout near 57.62° N, 12.00° E, tee lengths,
+  par/indexes and ratings are **not factual Hills data**. Demo payloads are
+  restricted to the explicit demo ID. This is not worldwide offline coverage.
 - Synthetic elevations form a smooth coordinate-based rolling surface, with
   coherent shared endpoints, no survey dates and no surveyed height datum.
   Charts/source metadata and recommendations say **Synthetic development terrain**
@@ -32,7 +44,7 @@ toggle and no automatic activation when a key exists.
   (including the existing five), locks and initialization markers stay intact.
 - Both clients hard-gate at their final transport method **before URLSession**.
   Mock mode does not load bundle keys; explicit injected keys cannot enable it.
-  Golf API mock bypasses all provider caches, including force refresh.
+  Golf API mock reads valid saved provider caches, but never writes them.
   Demo IDs are blocked from live provider requests after switching modes.
 - **Open-Meteo weather and Apple Maps remain live/cache-backed and unchanged.**
   Recommendations still require complete matching weather and the existing
@@ -50,7 +62,8 @@ only the intended provider before using it. Keys alone never activate a provider
 To pause again, remove the local mode override or set it to `mock`, rebuild and
 verify Settings. No UI action can flip a mock build to live.
 
-For full real-course activation enable Golf API, select a real provider course
+Already-downloaded real courses need **no activation** to reopen in paused mode.
+For new real-course downloads enable Golf API, select a real provider course
 instead of a demo reference, and enable GPXZ separately when authorized. Live
 mode retains the existing cache-first release-only acquisition, 100-call ledger,
 failure-lock and backoff rules described below. Live course searches/update
@@ -58,11 +71,87 @@ checks and explicit missing shot terrain acquisition can spend provider calls.
 This does not validate provider acceptance, account credentials or billing.
 
 Offline regression **source** covers fail-safe mode parsing, existing-key mock
-gates, country/club filters, cache bypass, 18-hole geometry, synthetic endpoints,
+gates, saved-before-demo filters, read-only detail/coordinates/flat/durable caches,
+real-ID/tee/location preservation, corrupt/missing data without impersonation,
+18-hole demo geometry, synthetic endpoints,
 reversal/relaunch coverage, untouched five-call ledger/locks/markers/live cache,
 and absence of new ledger initialization. Transport-evaluation tests now opt in
 to `.live` explicitly **only with intercepted offline URLSessions**. Compilation
 is permitted; test execution/app launch/live API calls are not part of this work.
+
+### Portable saved real Hills (2026-10-05)
+
+Earlier simulator inspection found no complete Hills download. The subsequently
+authorized connected-iPhone export recovered exactly five already-downloaded JSON
+files for real Golf API course **0121161534832877**, club **141519520190750993**.
+No new provider download was needed. No keys, ledger, preferences, player profile,
+score store or unrelated app files were copied or inspected.
+
+`fairwayvector-map/Resources/SavedCourses/Hills/` contains five portable resources:
+
+- `course-0121161534832877-detail.json`: six original tees and original ratings.
+- `course-0121161534832877-coordinates.json`: 121 original public provider points.
+- `hills-club.json`: original matching Hills club metadata with **only Hills**;
+  the undownloaded Valley course is removed.
+- `course-0121161534832877-hills-golf---sports-club-hills-62-male-golfapi-v1.json`:
+  byte-exact downloaded 18-hole geometry for tee **62 / Men**, tee ID **185072**,
+  rating **74.7**, slope **140**. Paths verified against the original provider
+  tee midpoint/green-center coordinates and all 18 original measured lengths.
+- `hills-manifest.json`: original/resource SHA256 digests, counts and review limits.
+
+Provider detail/coordinates retain all course fields; account `apiRequestsLeft`
+metadata is omitted from portable copies. Club search counters are not bundled.
+`BundledSavedCourseStore` reads resources only; paused searches show **Saved Hills
+offline · APIs paused** before the separate invented Demo Hills. Complete local
+downloads take precedence. CourseStore reads exact local saved geometry first,
+then the exact bundled 62/Men export. Other rated tee/sex references rebuild in
+memory from original provider payloads (five men's and six women's rated sets).
+No tee coordinate is invented or moved to match measured lengths; provider GPS
+is point-only and does not supply distinct tee-set positions or fairway polygons.
+No live cache is rewritten, migrated or populated by paused bundle reuse.
+Missing/malformed resources never trigger paid calls in mock mode.
+
+The five byte-exact originals are retained in ignored
+`exports/hills-iphone-2026-10-05/{CourseData,GolfAPI}/` outside the app source root.
+In particular `CourseData/terrain-gpxz-v1.json` is a **local-only private backup**:
+schema 1, stable identity `golfapi:0121161534832877`, directory identity SHA256
+`6916666b421f2b3d096d83384e1e00cf84b22653557eed017a4c22ed27ee091a`,
+16 original responses / 3,509 exact samples. Returned provenance says
+`gpxz_terrain_30m`, 30 m source resolution, dataset `2025.1`, EGM2008/bilinear,
+capture dates 2014–2021. Roughly metre-spaced samples do **not** imply 1 m terrain.
+
+**No real terrain is bundled or used by the app.** No source flags distinguish
+clicked map targets from captured golfer origins. The conservative review requires
+every original path vertex to coincide with public hole endpoints within the
+existing 2 cm tolerance and the entire path to follow that hole segment. None of
+the 16 records qualified. No private path/sample coordinates are promoted to public
+resources, no records clipped, and no elevations fabricated/interpolated as real.
+The ignored backup may be privately transferred for later authorized import, but
+there is no new in-app importer. Existing GPXZ mock remains explicitly synthetic
+in its separate namespace; it does not read/mix/overwrite this real backup or the
+live sidecar, budget, history, locks or markers. Weather and imagery remain
+live/cache-backed; only course selection/geometry is portable offline data.
+
+The offline `tools/save_hills_export.mjs` packages only the five staged filenames,
+checks identity/public geometry, strips account counters, filters Valley, records
+checksums and refuses overwrites. **Internal development only**: retain Golf API
+course/GPS credits and GPXZ/source provenance in the local backup. This export is
+not a claim of redistribution rights or complete attribution compliance. Review
+Golf API, GPXZ and underlying source licence terms before any public distribution;
+full source credit/licence records have not been downloaded or bundled.
+
+Regression source covers fresh empty provider caches, saved-before-demo ordering,
+Hills-only metadata, read-only force refresh, original tee IDs/ratings/coordinates,
+exact bundled geometry/fetched date and other tee reconstruction. Build validation
+does not execute tests or launch the app; runtime UI/playback remains unverified.
+Fresh generic simulator `build-for-testing` succeeded in
+`/tmp/fairwayvector-bundled-hills.0E74uX`; regression source compiled for arm64 and
+x86_64, never executed. The actual app contains all five reviewed resources,
+verified against SHA256 digests; no private terrain, raw search, local config or
+ledger resources. Both compiled modes are `mock` and both compiled keys blank.
+Original backup checksums, diff whitespace and editor diagnostics passed. No
+provider/network requests or app launch occurred; only the existing Xcode
+supported-platform diagnostic appeared.
 
 ## Local evaluation configuration
 

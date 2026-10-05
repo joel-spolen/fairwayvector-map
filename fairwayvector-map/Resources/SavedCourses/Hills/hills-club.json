@@ -1,0 +1,28 @@
+{
+  "clubs": [
+    {
+      "clubID": "141519520190750993",
+      "clubName": "Hills Golf & Sports Club",
+      "city": "Mölndal",
+      "state": "Västra Götalands län",
+      "country": "Sweden",
+      "country2": "",
+      "address": "Hills väg",
+      "timestampUpdated": "1730061744",
+      "distance": "",
+      "courses": [
+        {
+          "courseID": "0121161534832877",
+          "courseName": "Hills",
+          "numHoles": 18,
+          "numTees": 6,
+          "numTeesWithRatings": 6,
+          "numTeesWithYardages": 6,
+          "numCoordinates": 121,
+          "timestampUpdated": "1727118137",
+          "hasGPS": 1
+        }
+      ]
+    }
+  ]
+}

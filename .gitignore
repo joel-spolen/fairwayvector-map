@@ -1,3 +1,4 @@
 fairwayvector-map/GolfAPI.local.xcconfig
 fairwayvector-map/GPXZ.local.xcconfig
 .DS_Store
+exports/

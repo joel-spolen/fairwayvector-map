@@ -21,7 +21,7 @@ struct UnifiedSettingsView: View {
                 Section("Development API mode (build-time)") {
                     LabeledContent("Golf API", value: DevelopmentAPIConfiguration.current.golfAPI.status)
                     LabeledContent("GPXZ", value: DevelopmentAPIConfiguration.current.gpxz.status)
-                    Text("Mock modes ignore existing keys. Demo Hills and synthetic terrain are not real course data. Live caches and GPXZ budget/history remain untouched. Activation requires an explicit per-provider build setting and rebuild; there is no runtime toggle.")
+                    Text("Mock modes ignore existing keys. Saved real Hills is bundled read-only for fresh devices, alongside complete downloaded courses. Real IDs and tee ratings are retained; Demo Hills is separate invented data. Terrain remains synthetic in a separate mock namespace. The full real Hills terrain export is a private ignored local backup, not an app resource. Live caches and GPXZ budget/history remain unchanged. Activation requires an explicit per-provider build setting and rebuild; there is no runtime toggle.")
                         .font(.footnote)
                     Text("Weather remains Open-Meteo (live/cache); Apple Maps imagery is unchanged. This is not an entirely offline app.")
                         .font(.footnote)
@@ -89,7 +89,7 @@ struct UnifiedSettingsView: View {
                     Link("Trajectory privacy", destination: URL(string: "https://fairwayvector.com/trajectory/privacy-policy")!)
                     Link("Wedge Matrix privacy", destination: URL(string: "https://fairwayvector.com/wedge-matrix/privacy-policy")!)
                     Text(DevelopmentAPIConfiguration.current.golfAPI == .mock
-                        ? "Course/GPS: local invented Demo Hills fixtures, not Golf API data. Satellite imagery provided by Apple Maps."
+                        ? "Course/GPS: saved downloaded Golf API/OpenStreetMap data when available, otherwise separately labelled invented Demo Hills. Satellite imagery provided by Apple Maps."
                         : "Course and GPS data provided by Golf API. Satellite imagery provided by Apple Maps.")
                         .font(.footnote)
                     Link("Weather data by Open-Meteo", destination: URL(string: "https://open-meteo.com/")!)

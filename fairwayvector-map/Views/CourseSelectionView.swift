@@ -14,13 +14,22 @@ struct CourseSelectionView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     header
                     if isMock {
-                        Label("DEMO DATA · Golf API paused · 0 paid requests. Search Sweden / Hills. Only one invented 18-hole course is included; ratings and GPS layout are not real Hills data. A saved live course reopens as Demo Hills without changing its live reference or cache.", systemImage: "testtube.2")
+                        Label("APIs paused · 0 paid requests. Saved real Hills is bundled for offline course access on fresh devices. Demo Hills is a separate invented fallback. Terrain remains explicitly synthetic; the private real terrain backup is not used by this app.", systemImage: "externaldrive")
                             .font(.footnote).foregroundStyle(FairwayVectorColors.orange)
                     }
                     searchField
 
                     if let recentCourse {
                         recentCourseShortcut(recentCourse)
+                    }
+
+                    if isMock, !model.savedCourses.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("SAVED COURSES").font(.caption2.weight(.semibold))
+                            ForEach(model.savedCourses, id: \.cacheKey) { reference in
+                                recentCourseShortcut(reference, title: pausedLabel(for: reference.golfAPICourseID))
+                            }
+                        }
                     }
 
                     if !model.isConfigured {
@@ -70,7 +79,7 @@ struct CourseSelectionView: View {
                         .accessibilityIdentifier("view-course-button")
                     }
 
-                    Text(isMock ? "Development fixtures run locally. Other country/club filters return no demo matches; this is not a worldwide dataset. Refresh never contacts Golf API."
+                    Text(isMock ? "Saved Hills offline and other complete saved courses appear before demo results. Real Hills provider detail, coordinates and 62/Men geometry are bundled read-only; other rated tees use the original provider payload. Valley is not bundled. Refresh never contacts Golf API. Weather and imagery are still live/cache-backed."
                         : "Golf API search is low-cost. Opening a course downloads its detail and coordinate data once; both are cached on this device. Use the course refresh button to check for provider updates.")
                         .font(.footnote)
                         .foregroundStyle(FairwayVectorColors.slate)
@@ -87,25 +96,31 @@ struct CourseSelectionView: View {
 
     private var recentCourse: CourseReference? {
         if isMock {
-            let saved = try? JSONDecoder().decode(CourseReference.self,
-                from: demoRecentCourseData.isEmpty ? recentCourseData : demoRecentCourseData)
-            return saved.map { DevelopmentGolfAPIFixtures.reference(teeID: $0.golfAPITeeID, sex: $0.teeSex) }
+            let live = try? JSONDecoder().decode(CourseReference.self, from: recentCourseData)
+            // A usable live recent takes precedence over any previous demo shortcut.
+            if let live, model.hasSavedCourse(live) { return live }
+            let paused = try? JSONDecoder().decode(CourseReference.self, from: demoRecentCourseData)
+            if let paused, model.hasSavedCourse(paused) { return paused }
+            return live ?? paused
         }
         let saved = try? JSONDecoder().decode(CourseReference.self, from: recentCourseData)
         return saved.flatMap { DevelopmentAPIConfiguration.isDemoCourse($0.golfAPICourseID ?? "") ? nil : $0 }
     }
 
     private func startCourse(_ reference: CourseReference) {
-        let effective = isMock ? DevelopmentGolfAPIFixtures.reference(teeID: reference.golfAPITeeID, sex: reference.teeSex) : reference
-        if let data = try? JSONEncoder().encode(effective) {
+        if let data = try? JSONEncoder().encode(reference) {
             if isMock { demoRecentCourseData = data } else { recentCourseData = data }
         }
-        onStartCourse(effective)
+        onStartCourse(reference)
     }
 
-    private func recentCourseShortcut(_ reference: CourseReference) -> some View {
+    private func pausedLabel(for id: String?) -> String {
+        id == BundledSavedCourseStore.hillsCourseID ? "Saved Hills offline · APIs paused" : "Saved course · APIs paused"
+    }
+
+    private func recentCourseShortcut(_ reference: CourseReference, title: String = "RECENTLY SELECTED") -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("RECENTLY SELECTED")
+            Text(title)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(FairwayVectorColors.slate)
 
@@ -128,6 +143,10 @@ struct CourseSelectionView: View {
                         Text("\(reference.teeName) tee · \(reference.teeSex == "female" ? "Women" : "Men") · \(reference.holeCount) holes")
                             .font(.caption)
                             .foregroundStyle(FairwayVectorColors.slate)
+                        if isMock, !DevelopmentAPIConfiguration.isDemoCourse(reference.golfAPICourseID ?? "") {
+                            Text(model.hasSavedCourse(reference) ? pausedLabel(for: reference.golfAPICourseID) : "Downloaded data unavailable in this installation · selection preserved")
+                                .font(.caption).foregroundStyle(FairwayVectorColors.orange)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Image(systemName: "chevron.right")
@@ -222,7 +241,7 @@ struct CourseSelectionView: View {
             .padding(.horizontal, 12)
             .background(.white, in: RoundedRectangle(cornerRadius: 12))
 
-            Button(isMock ? "Refresh demo search (local)" : "Refresh search from Golf API") {
+            Button(isMock ? "Refresh saved / demo search (local)" : "Refresh search from Golf API") {
                 Task { await model.search(forceRefresh: true) }
             }
             .font(.caption.weight(.medium))
@@ -282,6 +301,11 @@ struct CourseSelectionView: View {
                             Text(course.courseName)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(FairwayVectorColors.navy)
+                            if isMock {
+                                Text(DevelopmentAPIConfiguration.isDemoCourse(course.courseID)
+                                     ? "DEMO · invented course" : pausedLabel(for: course.courseID))
+                                    .font(.caption).foregroundStyle(FairwayVectorColors.orange)
+                            }
                             Text("\(course.numHoles) holes · \(course.hasGPS ? "GPS available" : "No GPS data")")
                                 .font(.caption)
                                 .foregroundStyle(FairwayVectorColors.slate)

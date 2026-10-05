@@ -50,9 +50,12 @@ enum DevelopmentGolfAPIFixtures {
         } else if path == "/courses" {
             object = ["courses": []] // No update probes or pretend provider timestamps.
         } else if path.hasPrefix("/courses/") {
-            object = detailJSON(id: String(path.dropFirst("/courses/".count)))
+            let id = String(path.dropFirst("/courses/".count))
+            guard id == courseID else { throw GolfAPIError.savedCourseUnavailable(id) }
+            object = detailJSON(id: id)
         } else if path.hasPrefix("/coordinates/") {
             let id = String(path.dropFirst("/coordinates/".count))
+            guard id == courseID else { throw GolfAPIError.savedCourseUnavailable(id) }
             var coordinates: [[String: Any]] = []
             for hole in 1...18 {
                 let column = (hole - 1) % 3, row = (hole - 1) / 3

@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class GolfAPICourseSelectionModel {
     private let client: GolfAPIClient
+    let savedCourses: [CourseReference]
 
     var selectedRegion = "Europe"
     var selectedCountry = "Sweden"
@@ -21,10 +22,18 @@ final class GolfAPICourseSelectionModel {
     private(set) var apiRequestsLeft: String?
 
     init(client: GolfAPIClient? = nil) {
-        self.client = client ?? GolfAPIClient()
+        let resolved = client ?? GolfAPIClient()
+        self.client = resolved
+        savedCourses = resolved.mode == .mock ? resolved.savedReferences : []
     }
 
     var isConfigured: Bool { client.isConfigured }
+
+    func hasSavedCourse(_ reference: CourseReference) -> Bool {
+        if CourseDataStore.readCourse(reference: reference) != nil { return true }
+        guard let id = reference.golfAPICourseID, let payload = client.cachedPayload(id: id) else { return false }
+        return (try? GolfAPICourseBuilder.build(reference: reference, payload: payload)) != nil
+    }
 
     var coverageRegions: [GolfAPICoverageRegion] { GolfAPICoverage.regions }
 

@@ -18,16 +18,18 @@ final class CourseStore {
         client: OverpassClient = OverpassClient(),
         golfAPIClient: GolfAPIClient = GolfAPIClient()
     ) {
-        self.reference = golfAPIClient.mode == .mock
-            ? DevelopmentGolfAPIFixtures.reference(teeID: reference.golfAPITeeID, sex: reference.teeSex) : reference
+        self.reference = reference
         self.client = client
         self.golfAPIClient = golfAPIClient
     }
 
     func load() async {
-        if golfAPIClient.mode == .mock { await refresh(); return }
         if course == nil {
             course = readCache()
+        }
+        if golfAPIClient.mode == .mock {
+            if course == nil { await refresh() }
+            return
         }
         if reference.golfAPICourseID != nil, course != nil {
             return
@@ -45,6 +47,12 @@ final class CourseStore {
         defer { isLoading = false }
 
         do {
+            if golfAPIClient.mode == .mock {
+                if let saved = readCache() { course = saved; return }
+                if reference.golfAPICourseID == nil {
+                    throw GolfAPIError.savedCourseUnavailable(reference.courseName)
+                }
+            }
             if let courseID = reference.golfAPICourseID {
                 let payload = try await (course == nil
                     ? golfAPIClient.loadCourse(id: courseID)
@@ -96,14 +104,11 @@ final class CourseStore {
     }
 
     private func readCache() -> Course? {
-        for url in [cacheURL, legacyCacheURL].compactMap({ $0 }) {
-            if let data = try? Data(contentsOf: url), let saved = try? JSONDecoder().decode(Course.self, from: data) {
-                resolvedRelationID = saved.osmRelationID
-                writeCache(saved) // migrate flat legacy course cache; leave original intact
-                return saved
-            }
-        }
-        return nil
+        guard let saved = CourseDataStore.readCourse(reference: reference)
+            ?? (golfAPIClient.mode == .mock ? golfAPIClient.bundledCourse(reference: reference) : nil) else { return nil }
+        resolvedRelationID = saved.osmRelationID
+        writeCache(saved) // Migration is permitted ONLY in live mode; paused reads are read-only.
+        return saved
     }
 
     private func writeCache(_ course: Course) {

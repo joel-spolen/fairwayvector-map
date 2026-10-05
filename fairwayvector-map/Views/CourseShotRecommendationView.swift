@@ -34,8 +34,8 @@ struct CourseShotRecommendationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            if DevelopmentAPIConfiguration.current.golfAPI == .mock || terrainStore.metadata.contains(where: \.isSynthetic) {
-                Text("DEMO DATA · recommendations use synthetic course/terrain, not for play")
+            if DevelopmentAPIConfiguration.current.gpxz == .mock || terrainStore.metadata.contains(where: \.isSynthetic) {
+                Text("Synthetic development terrain · course geometry may be saved real data · estimates not for play")
                     .font(.caption2.bold())
             }
             if let currentResult, let best = currentResult.recommendations.first {
@@ -180,7 +180,7 @@ private struct CourseShotRecommendationDetail: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if DevelopmentAPIConfiguration.isDemoCourse(input.request.courseID) || input.originSample.provenance.contains(where: \.isSynthetic) {
-                        Text("DEMO DATA · Synthetic development course/terrain · real Open-Meteo weather · not for play")
+                        Text("Synthetic development terrain or demo course · real Open-Meteo weather at selected course · not for play")
                             .font(.caption.bold())
                     }
                     Text("\(unit.format(input.distanceM)) horizontal target · \(input.request.usesGPS ? "Captured GPS origin" : "Tee fallback origin")")

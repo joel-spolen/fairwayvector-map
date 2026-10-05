@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "courseID": "0121161534832877",
+  "clubID": "141519520190750993",
+  "defaultTeeID": "185072",
+  "defaultTeeName": "62",
+  "defaultSex": "male",
+  "holes": 18,
+  "coordinates": 121,
+  "use": "Internal development only; verify Golf API, GPXZ and source licences before any public distribution.",
+  "terrain": {
+    "bundledResponses": 0,
+    "localResponses": 16,
+    "localSamples": 3509,
+    "reason": "No whole original path verifiable as public hole endpoints; captured origins/targets remain ignored locally."
+  },
+  "resources": [
+    {
+      "name": "course-0121161534832877-hills-golf---sports-club-hills-62-male-golfapi-v1.json",
+      "bytes": 9362,
+      "sha256": "db00c0b21eea3300f0977850bf5dee99da2f97c108c4c942a8c59eaf98a722b7"
+    },
+    {
+      "name": "course-0121161534832877-detail.json",
+      "bytes": 6472,
+      "sha256": "ab44b4fdb0d9ff523f3f82ba42ac6929381835b7285cd292b3b4fe492826bf0c"
+    },
+    {
+      "name": "course-0121161534832877-coordinates.json",
+      "bytes": 17827,
+      "sha256": "aedb199280a92c51ce2879874e3252f57c97bb956f6ca4fffc791154b085c430"
+    },
+    {
+      "name": "hills-club.json",
+      "bytes": 669,
+      "sha256": "41aa80c32888c7a2a7e5350ff11351982c5d1a9e283ccb595e559f6ebc7ba647"
+    }
+  ],
+  "originals": [
+    {
+      "name": "CourseData/course-0121161534832877-hills-golf---sports-club-hills-62-male-golfapi-v1.json",
+      "bytes": 9362,
+      "sha256": "db00c0b21eea3300f0977850bf5dee99da2f97c108c4c942a8c59eaf98a722b7"
+    },
+    {
+      "name": "CourseData/terrain-gpxz-v1.json",
+      "bytes": 1549713,
+      "sha256": "982c7ae5871317ea1f05d336b4b5c1dbf6df655f7192b4b1dd021d10f00a5042"
+    },
+    {
+      "name": "GolfAPI/course-0121161534832877-detail.json",
+      "bytes": 4382,
+      "sha256": "a6c76f4493839ebaadc1068317df8b8c271f6f6a5093958e6207fc59a3a6f9a6"
+    },
+    {
+      "name": "GolfAPI/course-0121161534832877-coordinates.json",
+      "bytes": 10817,
+      "sha256": "2876008d8e8f8c52735ec5682f5557e52a855fd4f8428ba2ca3042410cd692db"
+    },
+    {
+      "name": "GolfAPI/search-sweden--hills.json",
+      "bytes": 704,
+      "sha256": "aecf34405918608d89ce8c8954974c90ebd7c1403e10bb9ecd9292d30690f2f2"
+    }
+  ]
+}

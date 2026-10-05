@@ -110,6 +110,12 @@ struct CourseMapView: View {
                             .font(.caption2.bold()).padding(6)
                             .frame(maxWidth: .infinity)
                             .background(FairwayVectorColors.conditionsSurface)
+                    } else if DevelopmentAPIConfiguration.current.golfAPI == .mock {
+                            Text(store.reference.golfAPICourseID == BundledSavedCourseStore.hillsCourseID
+                                ? "Saved Hills offline · APIs paused" : "Saved course · APIs paused")
+                            .font(.caption2.bold()).padding(6)
+                            .frame(maxWidth: .infinity)
+                            .background(FairwayVectorColors.conditionsSurface)
                     }
                     if let location = courseWeatherLocation {
                         CourseWeatherCard(location: location, store: weatherStore)
@@ -156,9 +162,9 @@ struct CourseMapView: View {
                 VStack {
                     Spacer(minLength: 0)
                     HStack {
-                        Text(DevelopmentAPIConfiguration.current.golfAPI == .mock
+                            Text(DevelopmentAPIConfiguration.isDemoCourse(store.reference.golfAPICourseID ?? "")
                              ? "Demo course data · Imagery © Apple Maps · Weather © Open-Meteo (live)"
-                             : "Course data © Golf API · Imagery © Apple Maps · Weather © Open-Meteo")
+                                : "Saved course data © \(store.reference.golfAPICourseID == nil ? "OpenStreetMap contributors" : "Golf API") · Imagery © Apple Maps · Weather © Open-Meteo")
                             .font(.system(size: 7))
                             .foregroundStyle(.white.opacity(0.85))
                         Spacer()
