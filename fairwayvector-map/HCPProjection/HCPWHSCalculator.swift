@@ -17,8 +17,10 @@ enum WHSCalculator {
     }
 
     static func courseHandicap(handicapIndex: Double, tee: TeeSnapshot) -> Int {
-        let raw = handicapIndex * Double(tee.slopeRating) / 113 + (tee.courseRating - Double(tee.par))
-        return Int(raw.rounded())
+        let indexContribution = handicapIndex * Double(tee.slopeRating) / 113 * (tee.holes == 9 ? 0.5 : 1)
+        let raw = indexContribution + (tee.courseRating - Double(tee.par))
+        // WHS rounds half values upward, including negative / plus handicaps.
+        return Int(floor(raw + 0.5))
     }
 
     static func calculateHoleByHole(
@@ -39,6 +41,10 @@ enum WHSCalculator {
             let gross = holeScores[i]
             let par = holePars[i]
             let hcpIndex = holeHandicapIndices[i]
+            // Rank actual indexes within the played set (nine-hole sides may use
+            // odd/even indexes from the full 18). Plus handicaps give back strokes
+            // on the easiest / highest-index holes, not the hardest ones.
+            let rank = holeHandicapIndices.prefix(holeCount).filter { $0 < hcpIndex }.count + 1
 
             // Calculate handicap strokes allocated to this hole
             // Standard WHS allocation: base strokes + extra stroke if remainder covers this hole index
@@ -46,13 +52,12 @@ enum WHSCalculator {
             if courseHandicap >= 0 {
                 let base = courseHandicap / holeCount
                 let remainder = courseHandicap % holeCount
-                strokesReceived = base + (hcpIndex <= remainder ? 1 : 0)
+                strokesReceived = base + (rank <= remainder ? 1 : 0)
             } else {
-                // Plus handicap receives minus strokes on hardest holes (lowest handicap index)
                 let absHcp = abs(courseHandicap)
                 let base = absHcp / holeCount
                 let remainder = absHcp % holeCount
-                let minusStrokes = base + (hcpIndex <= remainder ? 1 : 0)
+                let minusStrokes = base + (rank > holeCount - remainder ? 1 : 0)
                 strokesReceived = -minusStrokes
             }
 

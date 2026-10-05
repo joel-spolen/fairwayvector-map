@@ -187,6 +187,8 @@ final class GolfRound {
     var holeScoresData: [Int]?
     var holeParsData: [Int]?
     var holeHandicapIndicesData: [Int]?
+    /// Optional additive field for existing SwiftData stores; nil for manual/legacy rounds.
+    var sourceSavedRoundID: String? = nil
 
     init(
         date: Date = .now,

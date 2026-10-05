@@ -17,15 +17,8 @@ struct HCPProjectionEntryView: View {
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
-            if let url = configuration.url as URL? {
-                try? FileManager.default.removeItem(at: url)
-                try? FileManager.default.removeItem(at: url.deletingPathExtension().appendingPathExtension("sqlite-shm"))
-                try? FileManager.default.removeItem(at: url.deletingPathExtension().appendingPathExtension("sqlite-wal"))
-            }
-            guard let recovered = try? ModelContainer(for: schema, configurations: [configuration]) else {
-                fatalError("Could not create HCP Projection ModelContainer: \(error)")
-            }
-            return recovered
+            // Never erase a user's handicap history to recover from a migration/storage error.
+            fatalError("Could not open preserved HCP Projection store: \(error)")
         }
     }()
 

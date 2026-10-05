@@ -16,11 +16,13 @@ final class CourseStore {
     init(
         reference: CourseReference,
         client: OverpassClient = OverpassClient(),
-        golfAPIClient: GolfAPIClient = GolfAPIClient()
+        golfAPIClient: GolfAPIClient = GolfAPIClient(),
+        initialCourse: Course? = nil
     ) {
         self.reference = reference
         self.client = client
         self.golfAPIClient = golfAPIClient
+        self.course = initialCourse
     }
 
     func load() async {

@@ -2,6 +2,18 @@ import SwiftUI
 
 struct CourseSelectionView: View {
     let onStartCourse: (CourseReference) -> Void
+    let onStartRound: ((CourseReference) -> Void)?
+    let onResumeRound: ((PlayedRound) -> Void)?
+    @Environment(PlayedRoundStore.self) private var roundStore
+    @State private var confirmDiscardRound = false
+
+    init(onStartRound: ((CourseReference) -> Void)? = nil,
+         onResumeRound: ((PlayedRound) -> Void)? = nil,
+         onStartCourse: @escaping (CourseReference) -> Void) {
+        self.onStartRound = onStartRound
+        self.onResumeRound = onResumeRound
+        self.onStartCourse = onStartCourse
+    }
 
     @State private var model = GolfAPICourseSelectionModel()
     @AppStorage("map.recentCourseReference") private var recentCourseData = Data()
@@ -13,6 +25,23 @@ struct CourseSelectionView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
+                    if let round = roundStore.active {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Round in progress", systemImage: "flag.checkered").font(.headline)
+                            Text("\(round.reference.courseName) · \(round.reference.teeName) · hole \(round.holes[round.currentHole].number)")
+                            Button("Resume scorecard & map") { onResumeRound?(round) }
+                                .buttonStyle(.borderedProminent)
+                            Button("Discard unsaved round", role: .destructive) { confirmDiscardRound = true }
+                        }.padding().background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    if let message = roundStore.errorMessage {
+                        Text(message).font(.footnote).foregroundStyle(.red)
+                        if roundStore.draftNeedsRetry {
+                            Button("Retry saving draft") {
+                                do { try roundStore.retryDraft() } catch { roundStore.errorMessage = error.localizedDescription }
+                            }
+                        } else { Button("Retry loading round storage") { roundStore.load() } }
+                    }
                     if isMock {
                         Label("APIs paused · 0 paid requests. Saved real Hills is bundled for offline course access on fresh devices. Demo Hills is a separate invented fallback. Terrain remains explicitly synthetic; the private real terrain backup is not used by this app.", systemImage: "externaldrive")
                             .font(.footnote).foregroundStyle(FairwayVectorColors.orange)
@@ -77,6 +106,10 @@ struct CourseSelectionView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(FairwayVectorColors.navy)
                         .accessibilityIdentifier("view-course-button")
+                        if let onStartRound {
+                            Button("Start round", systemImage: "flag.checkered") { onStartRound(selection.reference) }
+                                .buttonStyle(.borderedProminent).disabled(roundStore.active != nil)
+                        }
                     }
 
                     Text(isMock ? "Saved Hills offline and other complete saved courses appear before demo results. Real Hills provider detail, coordinates and 62/Men geometry are bundled read-only; other rated tees use the original provider payload. Valley is not bundled. Refresh never contacts Golf API. Weather and imagery are still live/cache-backed."
@@ -93,6 +126,11 @@ struct CourseSelectionView: View {
             .toolbar(.visible, for: .tabBar)
         }
         .tint(FairwayVectorColors.navy)
+        .confirmationDialog("Discard the unsaved round?", isPresented: $confirmDiscardRound, titleVisibility: .visible) {
+            Button("Discard round", role: .destructive) {
+                do { try roundStore.discardDraft() } catch { roundStore.errorMessage = error.localizedDescription }
+            }
+        } message: { Text("All unsaved player scores will be removed. Saved Statistics and Handicap history remain.") }
     }
 
     private var recentCourse: CourseReference? {
@@ -161,6 +199,10 @@ struct CourseSelectionView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("recent-course-button")
             .accessibilityHint("Opens this course with your previously selected tee set")
+            if let onStartRound {
+                Button("Start round on this tee", systemImage: "flag.checkered") { onStartRound(reference) }
+                    .buttonStyle(.bordered).disabled(roundStore.active != nil)
+            }
         }
     }
 

@@ -1,5 +1,111 @@
 # FairwayVector Map — development API pause + GPXZ terrain
 
+## Played rounds, scorecards & Statistics
+
+**Start round** is available from Home, the normal course/tee selector (including
+saved-course shortcuts), and the current map's **Round** menu. Selection uses the
+existing cached/provider flow; round setup itself adds no fetch. Confirm the loaded
+course and tee, choose **Stroke play / Stableford**, **Detailed / Strokes only**,
+and add up to seven other named players alongside **You**. Handicap Index defaults
+from the shared calculated HCP history, otherwise an explicitly saved exact index
+in the shared Profile. Unknown index remains unknown; scratch 0 must be explicit.
+Indexes accept −10…54 (plus 2 is −2). Individual casual playing allowance defaults
+to 100%, with an explicit 0…100% setting; no event/competition policy is assumed.
+All players use the selected rated tee and the chosen global detail mode.
+
+Only an explicitly started/resumed round changes map navigation. **Next hole**
+opens a multi-player hole scorecard; its last-hole counterpart scores and reviews
+the round. Every player must confirm strokes before advancement. Previously scored
+holes are editable from **Scorecard → Review / finish round**; review can select
+any hole, and advancement seeks remaining unscored holes rather than silently
+finishing a partial card. Casual map browsing never opens score sheets. Current
+geometry, tee, actual hole numbers/par/SI and player IDs are snapshotted; changing
+course pauses rather than discards the draft. **Resume scorecard & map** appears
+in Choose Course after restart and uses the saved geometry without a new course
+load. Existing weather/imagery and committed terrain behavior are unchanged.
+
+Strokes are integer **total strokes, including putts and penalties**, 1…30. Counts
+never add strokes twice. Detailed mode has optional putts, bunker-shot counts and
+penalty counts, bounded by total strokes; putts + penalties cannot exceed strokes.
+Fairway is Yes / No / N/A / Not recorded; par 3 is N/A. Unrecorded details remain
+nullable, never fabricated zero. **Estimated GIR** is `strokes − putts ≤ par − 2`
+when putts and actual par exist, not a measured green-arrival statistic; penalties,
+recovery play and unusual sequences affect the estimate. Strokes-only has no GIR
+or invented detail statistics. No pickup/zero-stroke convention is introduced.
+
+Summary shows gross, net, Stableford, optional detail tallies, **Course Handicap**,
+**Playing Handicap**, **net-double-bogey adjusted gross** and **HCP score / score
+differential (PCC 0)** as distinct values. Valid applicable tee rating/slope, actual
+par and unique real SI are required for handicap-dependent results. Missing data
+gets guidance and gross-only scoring, not fabricated pars/indexes/ratings. Full
+18-hole Course Handicap is `HI × slope/113 + CR − par`, rounding halves upward;
+the shared WHS calculator now uses that rounding and corrected plus-handicap
+allocation. Nine-hole Course Handicap uses half the HI contribution with the
+applicable nine-hole rating/par. Actual odd/even full-course SI on nine-hole sides
+is ranked within those nine holes. Positive handicaps receive remainder strokes
+on lowest SI; plus handicaps give them back on highest SI. Net and Stableford
+use Playing Handicap; points are `max(0, 2 + par − net strokes)`. WHS adjusted gross
+uses full Course Handicap independently of the playing allowance.
+
+**Nine-hole limit:** the existing HCP calculator has no current-WHS expected-score
+method. Nine-hole gross/net/points/statistics are supported, but official differential
+and HCP import are deliberately unavailable. Scores are never doubled/extrapolated.
+18-hole differential is `(adjusted gross − CR − PCC) × 113/slope`, using shared
+rounding and PCC 0. These are local estimates, not an official submission. Demo
+course results remain visibly synthetic and cannot enter HCP history. A projected
+local index is shown only for eligible rounds with at least three existing shared
+scoring entries, using the existing chronological exceptional-score/cap rules;
+it is not claimed to be an exact official new index.
+
+**Save round to Statistics** is explicit; a durable draft is not a saved round.
+One root-injected `PlayedRoundStore` owns versioned Codable storage in Application
+Support/FairwayVectorRounds, with atomic protected writes, stable round/player/
+hole identities, separate saved records and active draft. Each confirmed hole and
+map-hole change persists the draft. Write failures retain the latest memory draft,
+show recovery guidance and permit retry; the prior disk archive remains intact.
+If writing fails, latest edits cannot survive process termination until retry
+succeeds. Corrupt/unsupported storage blocks overwrite and preserves existing
+bytes. Discard/delete require confirmation and only publish success after writing.
+Saved scorecards are read-only; active draft holes can be edited.
+
+The dedicated **Statistics** tab provides owner-only averages and dated saved
+rounds with player-switchable full scorecards. Gross/net per-hole averages use
+matched holes, putts use only recorded holes, fairways exclude par 3/N/A/unanswered,
+GIR requires putts/par, bunker-hole rates use recorded bunker holes, and penalties
+are normalized per 18 **recorded** holes. All denominators are shown. Round total
+averages are separated into nine/eighteen-hole groups; putts per round includes
+only fully recorded cards. Other players are saved with the card but never included
+in your personal aggregates or automatically copied to HCP history.
+
+After saving, **Add your score to Handicap rounds** is a separate owner-only opt-in.
+It inserts a real `GolfRound` in the existing SwiftData container, preserving date,
+tee rating/slope, total hole scores, actual par/SI, adjusted gross and differential.
+An optional additive `sourceSavedRoundID` links the copy, checked directly in the
+shared history to prevent repeated imports across restart. Existing
+`SharedHandicapSync` observes that history as before. No parallel incompatible HCP
+history is introduced. Deleting Statistics retains any explicit Handicap copy,
+as explained in the confirmation; manage that copy in Handicap. Existing container
+recovery no longer deletes the user's HCP database on opening/migration failure;
+it fails closed with the original store preserved. Migration/runtime behavior is
+not validated by a compile-only build.
+
+Offline regression **source** covers allocation/plus rounding, nine-hole ranking,
+gross/net/WHS separation, nullable denominators and multi-player exclusion,
+validation, draft resume/explicit save/delete, corrupt storage preservation,
+write-failure retention/retry, shared-HCP idempotence and projection eligibility.
+Validation compiles app + unit/UI test bundles only, using generic Debug simulator,
+blank keys, both provider modes mock and package resolution disabled. Tests are
+**not executed**; no app is launched, APIs called or secrets inspected. Small-screen,
+sheet transitions, restart, disk errors and existing-store migration still need
+authorized runtime checks. No scheme/package changes are required.
+
+Final fresh Debug `build-for-testing` and Release app compilation succeeded in
+`/tmp/fairwayvector-rounds-final-debug-20261005` and
+`/tmp/fairwayvector-rounds-final-release-20261005`. The new regression source has
+arm64 and x86_64 objects; unit/UI bundles and the xctestrun artifact exist, but were
+not executed. Both compiled Info plists were checked: Golf API / GPXZ modes are
+`mock`, keys are blank. Editor diagnostics and `git diff --check` are clean.
+
 ## Compact Course Map controls
 
 The map uses independent top/bottom safe-area insets rather than an oversized

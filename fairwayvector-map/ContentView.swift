@@ -4,6 +4,18 @@ struct CourseMapView: View {
     let reference: CourseReference
     let onChangeCourse: () -> Void
     @EnvironmentObject private var trajectoryModel: TrajectoryCalculatorViewModel
+    @Environment(PlayedRoundStore.self) private var roundStore
+    @Binding private var requestStartRound: Bool
+    private let resumesSnapshot: Bool
+    @State private var roundModeEnabled: Bool
+    @State private var showingRoundSetup = false
+    @State private var showingRoundReview = false
+    @State private var scoringHole: Int?
+    @State private var advanceAfterScore = false
+    @State private var showSummaryAfterEntry = false
+    @State private var roundError: String?
+    @State private var reviewingRound: PlayedRound?
+    @State private var pendingReviewHole: Int?
 
     @State private var store: CourseStore
     @State private var weatherStore = CourseWeatherStore()
@@ -27,10 +39,20 @@ struct CourseMapView: View {
     @AppStorage("distanceUnit") private var unit: DistanceUnit = .meters
     @AppStorage("customFlagPositions") private var customFlagPositions = ""
 
-    init(reference: CourseReference, onChangeCourse: @escaping () -> Void = {}) {
+    init(reference: CourseReference, requestStartRound: Binding<Bool> = .constant(false),
+         resumedRound: PlayedRound? = nil, onChangeCourse: @escaping () -> Void = {}) {
         self.reference = reference
         self.onChangeCourse = onChangeCourse
-        _store = State(initialValue: CourseStore(reference: reference))
+        _requestStartRound = requestStartRound
+        resumesSnapshot = resumedRound != nil
+        _roundModeEnabled = State(initialValue: resumedRound != nil)
+        _holeIndex = State(initialValue: resumedRound?.currentHole ?? 0)
+        _store = State(initialValue: CourseStore(reference: reference, initialCourse: resumedRound?.course))
+    }
+
+    private var activeRound: PlayedRound? {
+        guard roundModeEnabled, let round = roundStore.active, round.reference == reference else { return nil }
+        return round
     }
 
     var body: some View {
@@ -42,12 +64,7 @@ struct CourseMapView: View {
                 .toolbar(.hidden, for: .tabBar)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button(store.reference.golfAPICourseID == nil ? "Refresh course" : "Check for course updates", systemImage: "arrow.clockwise") {
-                            Task { await store.refresh() }
-                        }
-                        .labelStyle(.iconOnly)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .disabled(store.isLoading)
+                        roundMenu
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         #if DEBUG
@@ -67,14 +84,74 @@ struct CourseMapView: View {
         }
         .task {
             locationManager.start()
-            await store.load()
+            if !resumesSnapshot { await store.load() }
+            handleStartRequest()
         }
+        .onChange(of: requestStartRound) { handleStartRequest() }
         .onChange(of: holeIndex) {
             clearSimulation()
             tapPoint = nil
             terrainStore.invalidateShot()
+            if var round = activeRound, round.currentHole != holeIndex {
+                round.currentHole = holeIndex
+                do { try roundStore.updateDraft(round) } catch { roundError = error.localizedDescription }
+            }
         }
         .onDisappear { clearSimulation(); terrainStore.deactivate() }
+        .sheet(isPresented: $showingRoundSetup) {
+            if let course = store.course {
+                RoundSetupView(selectedCourseReference: reference, course: course) {
+                    roundModeEnabled = true
+                    holeIndex = 0
+                }
+            }
+        }
+        .sheet(isPresented: Binding(get: { scoringHole != nil }, set: { if !$0 { scoringHole = nil } }), onDismiss: {
+            if showSummaryAfterEntry { showSummaryAfterEntry = false; openRoundReview() }
+        }) {
+            if let round = activeRound, let number = scoringHole {
+                RoundHoleEntryView(round: round, holeNumber: number,
+                    buttonTitle: advanceAfterScore ? (holeIndex == round.holes.count - 1 ? "Save hole & review round" : "Save hole & next hole") : "Save hole") { entries in
+                    guard var updated = activeRound else { throw RoundStorageError.incomplete }
+                    for (playerID, score) in entries { updated.setScore(score, player: playerID, hole: number) }
+                    if advanceAfterScore {
+                        // Seek the next unscored hole, including holes before this one.
+                        let next = updated.holes.indices.first { index in
+                            index > holeIndex && updated.players.contains { updated.score(player: $0.id, hole: updated.holes[index].number) == nil }
+                        } ?? updated.holes.indices.first { index in
+                            updated.players.contains { updated.score(player: $0.id, hole: updated.holes[index].number) == nil }
+                        }
+                        updated.currentHole = next ?? holeIndex
+                        try roundStore.updateDraft(updated)
+                        if let next { holeIndex = next } else { showSummaryAfterEntry = true }
+                    } else { try roundStore.updateDraft(updated) }
+                }
+            }
+        }
+        .sheet(isPresented: $showingRoundReview, onDismiss: {
+            if roundStore.active == nil { roundModeEnabled = false }
+            if let number = pendingReviewHole, activeRound != nil {
+                pendingReviewHole = nil
+                advanceAfterScore = false
+                scoringHole = number
+            }
+        }) {
+            // Keep presentation stable when Save moves the draft to saved history.
+            if let round = reviewingRound {
+                RoundReviewView(initialRound: round, onEditHole: { number in
+                    // Switch the map after review dismisses; do not stack scoring sheets.
+                    if let index = round.holes.firstIndex(where: { $0.number == number }) { holeIndex = index }
+                    scoringHole = nil
+                    pendingReviewHole = number
+                })
+            }
+        }
+        .alert("Round could not be stored", isPresented: Binding(get: { roundError != nil }, set: { if !$0 { roundError = nil } })) {
+            Button("Retry draft save") {
+                do { try roundStore.retryDraft(); roundError = nil } catch { roundError = error.localizedDescription }
+            }
+            Button("Keep draft", role: .cancel) { roundError = nil }
+        } message: { Text(roundError ?? "") }
         .sheet(isPresented: $isShowingTerrainProfile, onDismiss: { terrainInspectionPoint = nil }) {
             if let holes = store.course?.holes, !holes.isEmpty {
                 let hole = holes[min(holeIndex, holes.count - 1)]
@@ -123,6 +200,41 @@ struct CourseMapView: View {
             }
         }
         #endif
+    }
+
+    private func openRoundReview() {
+        reviewingRound = activeRound
+        showingRoundReview = reviewingRound != nil
+    }
+
+    private func handleStartRequest() {
+        guard requestStartRound, store.course != nil else { return }
+        requestStartRound = false
+        if let draft = roundStore.active {
+            roundError = "A draft already exists for \(draft.reference.courseName). Return to Choose Course and resume it or discard it before starting another."
+        } else { showingRoundSetup = true }
+    }
+
+    private var roundMenu: some View {
+        Menu {
+            if activeRound != nil {
+                Button("Score current hole", systemImage: "square.and.pencil") {
+                    advanceAfterScore = false
+                    scoringHole = activeRound?.holes[holeIndex].number
+                }
+                Button("Review / finish round", systemImage: "list.bullet.rectangle") { openRoundReview() }
+                Button("Pause round & choose course", systemImage: "pause.circle", action: onChangeCourse)
+            } else {
+                Button("Start round", systemImage: "flag.checkered") { showingRoundSetup = true }
+                    .disabled(store.course == nil || store.isLoading || roundStore.active != nil)
+            }
+            Button(store.reference.golfAPICourseID == nil ? "Refresh course" : "Check for course updates", systemImage: "arrow.clockwise") {
+                Task { await store.refresh() }
+            }.disabled(store.isLoading || activeRound != nil)
+        } label: {
+            Label(activeRound == nil ? "Round" : "Scorecard", systemImage: activeRound == nil ? "flag.checkered" : "list.bullet.rectangle")
+                .font(.caption.weight(.semibold)).frame(minHeight: 44)
+        }.accessibilityIdentifier("course-round-menu")
     }
 
     @ViewBuilder
@@ -616,18 +728,21 @@ struct CourseMapView: View {
     }
 
     private func holeNavigationButton(isPrevious: Bool, count: Int) -> some View {
-        let unavailable = isPrevious ? holeIndex == 0 : holeIndex >= count - 1
+        let unavailable = isPrevious ? holeIndex == 0 : (activeRound == nil && holeIndex >= count - 1)
         return Button {
-            holeIndex += isPrevious ? -1 : 1
+            if !isPrevious, let round = activeRound {
+                advanceAfterScore = true
+                scoringHole = round.holes[holeIndex].number
+            } else { holeIndex += isPrevious ? -1 : 1 }
         } label: {
-            Image(systemName: isPrevious ? "chevron.left" : "chevron.right")
+            Image(systemName: isPrevious ? "chevron.left" : activeRound != nil && holeIndex == count - 1 ? "flag.checkered" : "chevron.right")
                 .font(.headline.weight(.bold))
                 .frame(minWidth: 44, minHeight: 44)
         }
         .buttonStyle(.borderedProminent)
         .tint(FairwayVectorColors.navy)
         .disabled(unavailable)
-        .accessibilityLabel(isPrevious ? "Previous hole" : "Next hole")
+        .accessibilityLabel(isPrevious ? "Previous hole" : activeRound == nil ? "Next hole" : holeIndex == count - 1 ? "Score hole and finish round" : "Score hole and next hole")
     }
 }
 
@@ -639,4 +754,5 @@ private struct MapAdviceHeightKey: PreferenceKey {
 #Preview {
     CourseMapView(reference: .hills)
         .environmentObject(TrajectoryCalculatorViewModel())
+        .environment(PlayedRoundStore())
 }

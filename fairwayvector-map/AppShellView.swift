@@ -8,6 +8,7 @@ struct ContentView: View {
         case handicap
         case practice
         case profile
+        case statistics
     }
 
     @AppStorage("map.hasSeenSplash") private var hasSeenSplash = false
@@ -17,12 +18,15 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .home
     @State private var practiceDestination: PracticeDestination = .trajectory
     @StateObject private var trajectoryModel = TrajectoryCalculatorViewModel()
+    @State private var roundStore = PlayedRoundStore()
+    @State private var requestStartRound = false
 
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
                 HomeView(
                     onOpenCourseMap: { selectedTab = .course },
+                    onStartRound: { requestStartRound = true; selectedTab = .course },
                     onOpenHandicap: { selectedTab = .handicap },
                     onOpenWedge: {
                         practiceDestination = .wedge
@@ -36,13 +40,17 @@ struct ContentView: View {
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(Tab.home)
 
-                CourseMapTabView()
+                CourseMapTabView(requestStartRound: $requestStartRound)
                     .tabItem { Label("Course", systemImage: "map") }
                     .tag(Tab.course)
 
                 HCPProjectionEntryView()
                     .tabItem { Label("Handicap", systemImage: "chart.line.uptrend.xyaxis") }
                     .tag(Tab.handicap)
+
+                RoundStatisticsView()
+                    .tabItem { Label("Statistics", systemImage: "chart.xyaxis.line") }
+                    .tag(Tab.statistics)
 
                 PracticeView(destination: $practiceDestination, trajectoryModel: trajectoryModel)
                     .tabItem { Label("Practice", systemImage: "target") }
@@ -71,6 +79,7 @@ struct ContentView: View {
         .environment(\.colorScheme, .light)
         .overlay { SharedHandicapSync(trajectoryModel: trajectoryModel).allowsHitTesting(false) }
         .environmentObject(trajectoryModel)
+        .environment(roundStore)
         .modelContainer(HCPProjectionEntryView.sharedModelContainer)
         .onChange(of: distanceUnit, initial: true) { _, unit in
             wedgeDistanceUnit = unit == .meters ? WedgeDistanceUnit.meters.rawValue : WedgeDistanceUnit.yards.rawValue
@@ -81,20 +90,29 @@ struct ContentView: View {
 
 private struct CourseMapTabView: View {
     @State private var selection: CourseReference?
+    @State private var resumedRound: PlayedRound?
+    @Binding var requestStartRound: Bool
+    @Environment(PlayedRoundStore.self) private var roundStore
 
     var body: some View {
         if let selection {
-            CourseMapView(reference: selection) {
+            CourseMapView(reference: selection, requestStartRound: $requestStartRound, resumedRound: resumedRound) {
                 self.selection = nil
+                resumedRound = nil
             }
         } else {
-            CourseSelectionView { selection = $0 }
+            CourseSelectionView(onStartRound: { reference in
+                requestStartRound = true; selection = reference
+            }, onResumeRound: { round in
+                requestStartRound = false; resumedRound = round; selection = round.reference
+            }, onStartCourse: { selection = $0 })
         }
     }
 }
 
 private struct HomeView: View {
     let onOpenCourseMap: () -> Void
+    let onStartRound: () -> Void
     let onOpenHandicap: () -> Void
     let onOpenWedge: () -> Void
     let onOpenTrajectory: () -> Void
@@ -131,6 +149,10 @@ private struct HomeView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(FairwayVectorColors.navy)
+                        Button(action: onStartRound) {
+                            Label("Start round", systemImage: "flag.checkered")
+                                .font(.headline).frame(maxWidth: .infinity, minHeight: 52)
+                        }.buttonStyle(.bordered).tint(FairwayVectorColors.navy)
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
