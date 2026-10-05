@@ -11,7 +11,11 @@ struct HoleMapView: View {
     var onHeadingChange: (Double) -> Void = { _ in }
     var terrainInspectionPoint: GeoPoint? = nil
     var onTargetInteractionBegan: () -> Void = {}
+    var onTargetInteractionCancelled: () -> Void = {}
     var onTargetCommitted: (GeoPoint) -> Void = { _ in }
+    var simulatedUserLocation: GeoPoint? = nil
+
+    private var hasPlayerOrigin: Bool { usesGPS || simulatedUserLocation != nil }
 
     @State private var position: MapCameraPosition = .automatic
     @State private var cameraRevision = 0
@@ -22,21 +26,34 @@ struct HoleMapView: View {
     var body: some View {
         MapReader { proxy in
             Map(position: $position, bounds: cameraBounds, interactionModes: isZoomedIn ? [.pan, .zoom] : [.zoom]) {
-                if usesGPS {
+                if usesGPS && simulatedUserLocation == nil {
                     UserAnnotation()
                 }
 
+                #if DEBUG
+                if let simulatedUserLocation {
+                    Annotation("Simulated golfer · Development", coordinate: simulatedUserLocation.coordinate) {
+                        Label("DEV YOU", systemImage: "figure.golf")
+                            .font(.caption2.bold())
+                            .padding(6)
+                            .foregroundStyle(.white)
+                            .background(FairwayVectorColors.orange, in: Capsule())
+                    }
+                    .annotationTitles(.hidden)
+                }
+                #endif
+
                 if let tee = hole.tee {
-                    Annotation(usesGPS ? "Tee" : "You", coordinate: tee.coordinate, anchor: .bottom) {
+                    Annotation(hasPlayerOrigin ? "Tee" : "You", coordinate: tee.coordinate, anchor: .bottom) {
                         VStack(spacing: 3) {
-                            Text(usesGPS ? "TEE" : "YOU")
+                            Text(hasPlayerOrigin ? "TEE" : "YOU")
                                 .font(.caption2.bold())
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 4)
                                 .background(FairwayVectorColors.surface, in: Capsule())
                             Image(systemName: "mappin.and.ellipse")
                                 .font(.title2.weight(.semibold))
-                                .foregroundStyle(usesGPS ? FairwayVectorColors.navy : FairwayVectorColors.orange)
+                                .foregroundStyle(hasPlayerOrigin ? FairwayVectorColors.navy : FairwayVectorColors.orange)
                                 .shadow(color: .black.opacity(0.3), radius: 2)
                         }
                     }
@@ -204,7 +221,10 @@ struct HoleMapView: View {
         .onChange(of: hole.number) { frameHole() }
         .onChange(of: targetGestureActive) { _, active in
             // A cancelled recognizer resets gesture state without a release commit.
-            if !active { isDraggingTarget = false }
+            if !active, isDraggingTarget {
+                isDraggingTarget = false
+                onTargetInteractionCancelled()
+            }
         }
     }
 

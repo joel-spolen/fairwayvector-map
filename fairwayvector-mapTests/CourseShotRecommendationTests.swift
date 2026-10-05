@@ -113,7 +113,7 @@ final class CourseShotRecommendationTests: XCTestCase {
         XCTAssertNil(capture(weather: weather(pressure: nil))) // Never substitute pressure_msl.
         XCTAssertNil(capture(weather: weather(direction: nil)))
         XCTAssertNil(capture(selected: GeoPoint(lat: target.lat + 0.001, lon: target.lon)))
-        XCTAssertNil(capture(liveOrigin: GeoPoint(lat: origin.lat + 0.001, lon: origin.lon)))
+        XCTAssertEqual(capture(liveOrigin: GeoPoint(lat: origin.lat + 0.001, lon: origin.lon)), capture())
         XCTAssertNil(capture(profile: TrajectoryPlayerProfile()))
         XCTAssertNil(capture(profile: TrajectoryPlayerProfile(isSetupComplete: true, availableClubs: [])))
         let missing = TerrainProfile(samples: [TerrainSample(distanceMeters: 0, point: origin, elevationMeters: nil),
@@ -125,9 +125,9 @@ final class CourseShotRecommendationTests: XCTestCase {
         XCTAssertNil(CourseShotRecommendationInput.capture(request: request(), selectedTarget: nil,
             liveOrigin: origin, usesGPS: true, weather: weather(), weatherLocation: origin,
             shotProfile: terrain(), profile: TrajectoryPlayerProfile(isSetupComplete: true)))
-        XCTAssertNil(CourseShotRecommendationInput.capture(request: request(), selectedTarget: target,
+        XCTAssertEqual(CourseShotRecommendationInput.capture(request: request(), selectedTarget: target,
             liveOrigin: origin, usesGPS: false, weather: weather(), weatherLocation: origin,
-            shotProfile: terrain(), profile: TrajectoryPlayerProfile(isSetupComplete: true)))
+            shotProfile: terrain(), profile: TrajectoryPlayerProfile(isSetupComplete: true))?.request.usesGPS, true)
     }
 
     func testDetailedProfilesRequireAnApplicableCalibrationAnchor() {

@@ -1,5 +1,209 @@
 # FairwayVector Map — development API pause + GPXZ terrain
 
+## Compact Course Map controls
+
+The map uses independent top/bottom safe-area insets rather than an oversized
+overlay stack. Front / center / back, selected point and point-to-flag distances
+remain at the top (adaptive second row when space is tight), with a single
+temperature / wind summary. Wind is a small camera-heading-relative **blowing-TO**
+arrow, not a separate large compass card. The bottom contains compact club advice,
+a signed committed origin-to-target terrain delta, and one hole / par / stroke
+index / length navigation row. Ordinary lower controls fit roughly 180–220 points;
+their content-measured scroll area is capped at 170 points plus hole navigation,
+so larger accessibility text scrolls instead of clipping or covering the map.
+Distances have no fixed-height text container. The main tab bar remains hidden.
+
+- **Tap weather** for the original temperature, humidity, weather elevation,
+  surface/sea-level pressure, wind direction/speed/gusts, Open-Meteo source,
+  observed time/timezone, fetched/cache age, loading and provider error. Opening
+  the sheet reads the existing location-associated store only. The single
+  automatic location-load task stays on the summary; Refresh / Retry is manual
+  and retains the existing request/cache behavior.
+- **Tap terrain**, including **Terrain unavailable**, for the existing full
+  Hole / Current shot chart, inspection marker, both shot-leg source metadata,
+  provider errors and local budget / planned-span information. Retry / refresh
+  now lives here and still requires the same confirmation, retains reservations
+  and backoff, and never authorizes live paid acquisition for a simulated origin.
+  Opening details, changing chart mode or inspection never loads new terrain.
+- **Tap club advice**, even with no target/result/calibration, for complete
+  actionable status and **Wedge calibration & matrix** / **Practice / Profile**
+  setup sheets. Available advice shows just the best club/scoring combination,
+  carry with short/long error and a concise nearest-alternatives line. Details
+  retain all ranked/unavailable combinations, trajectories, captured conditions,
+  calibration assumptions and source provenance. No Practice inputs or engine
+  calculations are changed by the compact presentation.
+- **Tap toolbar information or the hole row** for course/club/tee/ratings,
+  GPS/tee-fallback and point-only geometry explanations, saved-course update
+  errors and data credits. Short **Saved Hills / DEMO terrain** and **Simulated
+  position** badges remain on the map; synthetic data is never presented as real.
+
+In DEBUG builds, the persistent **dice / DEV** toolbar menu (accessibility label
+**Development tools**) is visible whenever a course is selected, including
+loading or missing-hole states. It contains **Random scoring position**, **Use
+device GPS**, personal wedge/profile setup and guidance. Entries, not the whole
+menu, disable when geometry/calibration is missing or a request/held gesture is
+pending; setup remains reachable. Toolbar and hole navigation targets are at
+least 44 points. Ordinary advice invalidation no longer sets `shotPending` as if
+a gesture were held; a cancelled target drag clears that gate without committing
+or fetching. Generator, calibrated threshold, provider modes, real GPS and paid
+blocking rules are unchanged. The former large development overlay is removed.
+
+Validation is compile-only (Debug and Release with keys blank, provider modes
+mock and package resolution disabled), editor diagnostics and whitespace checks.
+No tests, app launch, provider/network requests or secret-file inspection.
+Small-screen/Dynamic Type appearance and sheet interactions remain runtime
+unverified under those restrictions.
+
+## On-course scoring mode — personal wedge range
+
+### DEBUG-only random scoring position
+
+Course Map has a persistent **Development tools** dice/DEV toolbar menu in DEBUG
+builds only. It reads the same `ScoringShotPlan.make(...).maxFullCarryM` as the
+recommendation engine: the longest eligible personal Mid/Stock 100% wedge carry,
+never a stock 100 m threshold. Missing calibration disables it with guidance to
+**Wedge calibration & matrix** / **Practice / Profile**; profile setup is required.
+Defaults and unverified legacy carries do not enable it.
+
+The target is the selected point, otherwise the saved custom flag / green target.
+A spherical forward geodesic places the golfer toward the tee with ±20° jitter,
+normally 25–80% of personal range, with a 3 m preferred minimum when possible and
+a cap short of the tee. Very short ranges safely collapse to a single distance;
+positions below 0.2 m cannot be generated. The actual `CLLocation` horizontal
+distance must exceed 0.1 m and be ≤99% of personal range and pass the existing
+scoring helper. Course information shows measured distance and personal threshold. This
+directional placement is not verified fairway/obstacle containment.
+
+Simulation is ephemeral view state, bypasses the ordinary 100 m GPS corridor
+resolver, and never changes `CLLocationManager`, Practice or the player profile.
+**DEV YOU** replaces the real user marker; committed card/detail/terrain labels
+say **Simulated golfer · Development**, with `usesGPS == false` and separate
+simulation metadata. GPS fixes continue normally but cannot move simulation.
+**Use device GPS** clears it and captures real GPS or the normal tee fallback
+cache-only. Hole/course/tee/geometry/flag changes and leaving the map clear it.
+Bottom hole controls and the hidden main-tab layout are retained.
+
+Random placement immediately selects/commits the target through existing terrain
+and recommendation generation/cancellation guards. Mock GPXZ fills only isolated
+local synthetic terrain; live GPXZ is **cache-only**, including simulated target
+release and confirmed terrain refresh (no failure-lock clearing). Neither button
+fetches Golf API or weather. Existing course-associated weather and matching
+terrain endpoints are still required: live cache gaps block advice with explicit
+guidance, never fake flat heights. Provider modes and keys are unchanged. There
+is no release-build button, override state, random generator or simulated marker.
+
+Scoring is selected only when the **committed horizontal origin→target distance
+is positive and ≤ the longest eligible personal Mid/Stock 100% wedge carry**.
+The existing capture requires distance >0.1 m. Equality is included; even 0.001 m
+beyond the range retains ordinary full-bag suggestions. There is no hard-coded
+metre/yard limit, and GPS being enabled does **not** activate scoring at 400 m.
+Weather/elevation do not alter this nominal mode boundary. The origin, target
+and GPS/tee source remain the immutable committed terrain request: subsequent
+GPS fixes never move advice or change mode. Target release or confirmed terrain
+refresh recaptures the origin using the existing flow.
+
+**True GPS is not required for a testing preview.** Existing tee fallback is
+allowed at the same distance threshold and labelled **Tee-fallback scoring
+preview**, not golfer proximity. Details state the personal range and rationale;
+the card shows the best full shot title (club · Low/Mid/High · 50/75/100%), plus the closest two
+valid combinations. Details browse every ranked reachable combination by unique
+shot ID, with the selected physics trajectory and corrected scalar outputs.
+Unavailable combinations are separately listed with their individual reasons;
+an entirely unavailable scoring bag is not replaced with full-bag advice.
+
+### Personal carry sources and migration
+
+- Wedge Matrix remains yards internally regardless of display units; carries
+  convert once with 0.9144 m/yd. In-bag wedges with an entered Mid/Stock Full cell
+  or an explicitly user-provided Add Club full carry establish the range. The
+  new `fullCarryUserProvided` field records Add Club provenance without changing
+  existing matrix calculations. Existing cell overrides remain authoritative.
+- Untouched `Wedge.defaults`, missing/corrupt saved matrices and legacy
+  `fullCarry` values with no override/provenance are **not** user calibration.
+  Old Add Club records without a Full override cannot be safely distinguished
+  from saved defaults: re-enter Stock Full carry. Partial-only cells do not
+  establish a full-wedge range. No fabricated stock threshold is substituted.
+- Without an authoritative matching matrix entry, available Practice wedges
+  can use the actual effective nominal carry when its source is user-provided,
+  calibrated or interpolated from user carry anchors, not handicap baseline.
+  Interpolated carries are estimates, not measured wedge calibration. Explicit
+  matrix out-of-bag entries exclude their matching Practice wedge. Untouched
+  in-bag matrix defaults do not mask a valid Practice calibration.
+- Matrix in-bag status is authoritative for calibrated matrix wedges and need
+  not mutate the Practice bag. Names map explicitly to PW, GW/50, 52, SW/54,
+  56, 58 or LW/60 (including “Wedge” forms). Unknown/custom names are not guessed;
+  guidance requests an identifiable loft. No cross-club matching by nearest carry.
+- Missing calibration shows setup guidance and a local **Wedge calibration &
+  matrix** sheet. Ordinary full-bag advice remains available using its existing
+  profile requirements; its shared Practice engine and state are unchanged.
+
+### Nine shots per wedge and honest model limitations
+
+Each eligible wedge contributes **3 trajectories × 3 swing lengths = 9** specs.
+Entered per-cell carry is used verbatim. Other cells reuse the **existing Wedge
+Matrix model**: half/“50%” carry factor **0.70**, three-quarter/“75%” **0.90**,
+Full/“100%” **1.00**; Low **0.92**, Mid/Stock **1.00**, High **0.96**. These are
+estimated cell carries, not measured shots. “100%” means stock full carry, not
+maximum effort. Swing labels are **not** literal carry or ball-speed percentages.
+The on-course engine does not use the matrix selector's invented rollout,
+pin-distance bias, swing penalties or strategic ranking.
+
+The current matrix stores **no shot-specific launch angle or spin calibration**.
+Consequently Low/High flight shapes cannot be recovered from entered carry alone.
+The explicit, unvalidated modeling fallback is effective Practice launch angle
+**−6° / unchanged / +6°**, clamped to **5–80°**, with effective profile spin rate
+and spin axis retained for every swing. No partial-spin measurement or confidence
+interval is fabricated. Each candidate exposes carry source, cell-estimate
+factors, launch/spin field provenance and these assumptions in its details.
+This flight-shape assumption is not an existing Wedge Matrix measurement or a
+claim of validated low/high technique. Actual partial-shot launch/spin may differ
+substantially; adding measured per-shot launch/spin storage remains future work.
+
+Ball speed is **inversely fitted**, not scaled by 0.50/0.75: the same bundled
+Physics V1.1 + HGB predictor solves nominal carry at **20°C, 1013.25 hPa,
+50% humidity, zero wind, level ground**. A bounded first-crossing search uses
+16 intervals across 2–90 m/s followed by 14 refinement steps, with closest-fit
+error ≤0.5 m. HGB residuals can be discontinuous; unbracketable/non-finite shots
+or fits outside tolerance are explicitly unavailable, not presented as exact
+calibration. The 0.5 m figure is a numerical fit tolerance, **not real-world
+accuracy**. Reference conditions are a modeling convention: matrix carry entries
+do not store the conditions in which the user measured them.
+
+After that reference fit, captured temperature, humidity, **local surface
+pressure**, meteorological FROM wind rotated to shot tail/right components and
+target-minus-origin terrain height are applied normally by the shared engine.
+There is no calm/flat weather fallback, sea-level pressure substitution,
+double altitude correction or second “plays-like” carry adjustment. Ranking is
+the existing absolute **hybrid radial-carry error** with deterministic candidate
+order ties. It is not lateral-miss/aim optimization, roll, obstacle clearance,
+green reading or a guaranteed target hit. HGB training-domain validity for very
+short/low/high shots has not been established; physics paths and corrected
+scalar carry remain distinct. Synthetic development terrain keeps its warnings.
+
+Reference fitting and evaluation run on a separate background actor with
+cancellation checks and a bounded 126-entry calibration cache. At most 14
+in-bag eligible wedges / 126 combinations are supported; larger bags show
+guidance rather than synchronously evaluating or silently truncating them.
+The existing task cancellation and complete input-equality publication guards
+also cover matrix edits, weather, profile and committed target changes. No
+Practice selected club, inputs, profile, persisted conditions or prediction are
+written. Providers, paid-ledger behavior and default mock modes are untouched.
+
+Offline regression **source** covers inclusive boundaries, GPS-on far targets,
+tee preview/immutable origin, 9-per-wedge identities, matrix-cell precedence,
+legacy/default rejection, effective Practice carry fallback, out-of-bag status,
+unknown loft/invalid cells/oversized bags, reference fitting, stable rankings,
+captured wind/pressure/terrain application, cancellation and Practice isolation.
+Validation is app + test-source compilation only; no tests execute, app launches,
+provider/network requests or credential-file reads are authorized here.
+Fresh generic iOS Simulator `build-for-testing` completed successfully with
+both provider keys overridden blank and package resolution/updates disabled.
+Both compiled provider modes remain `mock`; new regression objects were verified
+for arm64 and x86_64, alongside compiled unit/UI test bundles. No tests ran or app
+launched. Runtime UI, fit success across a real user's matrix and short-shot
+accuracy remain unverified. Editor diagnostics and whitespace checks are clean;
+Xcode emitted only its existing supported-platform diagnostic.
+
 ## Development pause — default for BOTH Debug and Release
 
 **Golf API and GPXZ default to MOCK, regardless of existing credentials.**
@@ -303,9 +507,9 @@ on opening, while its ledger failure history remains intact. Without saved
 coverage, the panel invites a map tap rather than immediately reporting a
 missing key or repeating a previous HTTP 400.
 
-The visible hole chart reads cached coverage only and may remain partial even
-after shot acquisition. Distinct holes are never concatenated. Its
-compact chart stays available while a target is dragged. Target taps commit at
+The hole chart in terrain details reads cached coverage only and may remain partial
+even after shot acquisition. Distinct holes are never concatenated. The full
+chart stays available in the sheet while a target is dragged. Target taps commit at
 release; genuine target drags update draft marker/distance on change and commit
 once on end. Ordinary pan/zoom/heading and incoming GPS fixes do not request
 terrain. Target interaction closes a shared thread-safe dispatch gate and
@@ -331,8 +535,9 @@ target commit. Paid paths are only origin→clicked target and clicked target→
 when distinct, each independently cache-first and budgeted; only uncovered
 intervals are acquired. Explicit confirmed Retry/Refresh can acquire these shot
 legs using the latest origin (flag is the target if none was selected), never
-the unrelated whole hole. Hole/current-shot modes share one compact/expanded
-gap-aware chart renderer. Sheet inspection only updates the map inspection mark.
+the unrelated whole hole. Hole/current-shot modes share the existing gap-aware
+chart renderer in details; the map shows only a compact delta row. Sheet
+inspection only updates the map inspection mark.
 
 ### HTTP 400 diagnosis (documentation checked 2026-10-05)
 
@@ -368,8 +573,8 @@ shows the best modeled full-swing club and up to two closest alternatives, with
 predicted carry and signed short/long error against the horizontal origin→target
 distance. Tap for alternatives, existing Trajectory results/physics charts with
 target markers, captured conditions and endpoint terrain provenance. GPS is used
-when the existing on-hole origin resolver permits it; otherwise the card explicitly
-labels the tee fallback. No recommendation is shown for an unselected flag alone.
+when the existing on-hole origin resolver permits it; otherwise details explicitly
+label the tee fallback. No recommendation is shown for an unselected flag alone.
 
 Practice and Course share `ClubRecommendationEngine`: the same effective club
 launch profiles, Physics V1.1 integration, bundled HGB residual models, and absolute
@@ -385,7 +590,7 @@ wind plus matching finite origin/target terrain endpoints are required. No flat,
 calm, sea-level-pressure or phone-altitude fallback is invented. Weather wind is
 already m/s; meteorological FROM direction is rotated relative to the true shot
 bearing: tailwind = −speed·cos(FROM−bearing), right-crosswind = −speed·sin(FROM−bearing).
-The weather UI's km/h conversion is display-only. Pressure remains hPa; the existing
+Weather wind is displayed in m/s (any km/h conversion in shot details is display-only). Pressure remains hPa; the existing
 atmosphere routine converts it to Pa exactly once. Absolute GPXZ heights are shown
 as provenance; target-minus-origin height alone sets the landing plane. Direct
 surface pressure is **not** compensated again for terrain altitude.

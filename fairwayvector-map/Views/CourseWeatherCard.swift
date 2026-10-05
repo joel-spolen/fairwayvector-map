@@ -3,103 +3,117 @@ import SwiftUI
 struct CourseWeatherCard: View {
     let location: GeoPoint
     let store: CourseWeatherStore
+    var mapHeading: Double = 0
+    @State private var isShowingDetails = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "cloud.sun.fill")
-                .font(.title3)
-                .foregroundStyle(FairwayVectorColors.orange)
-                .frame(width: 34, height: 34)
-                .background(FairwayVectorColors.conditionsSurface, in: Circle())
-
-            if let weather = store.weather {
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 10) {
-                        weatherValue("TEMP", weather.temperatureC.map { String(format: "%.0f°C", $0) } ?? "–")
-                        weatherValue("HUMIDITY", weather.relativeHumidityPercent.map { String(format: "%.0f%%", $0) } ?? "–")
-                        weatherValue("ELEVATION", weather.elevationMeters.map { String(format: "%.0f m", $0) } ?? "–")
+        Button { isShowingDetails = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "cloud.sun.fill").foregroundStyle(FairwayVectorColors.orange)
+                if let weather = store.weather(for: location) {
+                    Text(weather.temperatureC.map { String(format: "%.0f°C", $0) } ?? "–°C").fontWeight(.semibold)
+                    Spacer(minLength: 0)
+                    CourseWindIndicator(weather: weather, mapHeading: mapHeading)
+                    if store.errorMessage != nil || store.isStale {
+                        Image(systemName: "clock.badge.exclamationmark")
+                            .accessibilityLabel("Cached weather; see details")
                     }
-                    HStack(spacing: 10) {
-                        weatherValue("PRESSURE", weather.surfacePressureHpa.map { String(format: "%.0f hPa", $0) } ?? "–")
-                        weatherValue("WIND", windText(weather))
-                        if store.isLoading {
-                            ProgressView().controlSize(.mini)
-                        } else {
-                            Button {
-                                Task { await store.load(for: location, forceRefresh: true) }
-                            } label: {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.caption.weight(.semibold))
-                            }
-                            .accessibilityLabel("Refresh course weather")
-                        }
-                    }
+                } else {
+                    Text(store.isLoading ? "Loading weather…" : "Weather unavailable · tap to retry")
+                    Spacer(minLength: 0)
                 }
-            } else if store.isLoading {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Course weather")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(FairwayVectorColors.navy)
-                    ProgressView("Loading current conditions…")
-                        .font(.caption2)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Course weather unavailable")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(FairwayVectorColors.navy)
-                    if let errorMessage = store.errorMessage {
-                        Text(errorMessage)
-                            .font(.caption2)
-                            .foregroundStyle(FairwayVectorColors.slate)
-                            .lineLimit(2)
-                    }
-                }
-                Spacer(minLength: 0)
-                Button("Retry") {
-                    Task { await store.load(for: location, forceRefresh: true) }
-                }
-                .font(.caption.weight(.semibold))
+                if store.isLoading { ProgressView().controlSize(.mini) }
+                Image(systemName: "chevron.right").font(.caption2)
             }
+            .font(.caption)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.plain)
+        .foregroundStyle(FairwayVectorColors.navy)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        // This is the sole automatic load. The detail sheet has no task/onAppear fetch.
         .task(id: locationKey) {
             await store.load(for: location)
         }
-        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Course weather details")
+        .accessibilityValue(accessibilitySummary)
+        .accessibilityHint("Opens all conditions, source time, cached status, provider errors and manual refresh")
+        .accessibilityIdentifier("course-weather-summary")
+        .sheet(isPresented: $isShowingDetails) {
+            CourseWeatherDetail(location: location, store: store)
+        }
     }
 
     private var locationKey: String {
         String(format: "%.3f,%.3f", location.lat, location.lon)
     }
 
-    private func weatherValue(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.system(size: 7, weight: .semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
-            Text(value)
-                .font(.caption2.weight(.semibold).monospacedDigit())
-                .foregroundStyle(FairwayVectorColors.charcoal)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+    private var accessibilitySummary: String {
+        guard let weather = store.weather(for: location) else {
+            return store.isLoading ? "Loading weather" : "Weather unavailable"
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        let temperature = weather.temperatureC.map { String(format: "%.0f degrees Celsius", $0) } ?? "Temperature unavailable"
+        let wind = weather.windSpeedMps.map { String(format: "%.1f metres per second", $0) } ?? "unavailable"
+        let direction = weather.windDirectionDegrees.map { String(format: "from %.0f degrees true north", $0) } ?? "direction unavailable"
+        return "\(temperature), wind \(wind), \(direction). \(store.isStale || store.errorMessage != nil ? "Cached conditions; review details." : "")"
+    }
+}
+
+private struct CourseWeatherDetail: View {
+    let location: GeoPoint
+    let store: CourseWeatherStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Current course conditions") {
+                    if let weather = store.weather(for: location) {
+                        metric("Temperature", weather.temperatureC, "°C")
+                        metric("Relative humidity", weather.relativeHumidityPercent, "%")
+                        metric("Course weather elevation", weather.elevationMeters, "m")
+                        metric("Surface pressure", weather.surfacePressureHpa, "hPa")
+                        metric("Sea-level pressure", weather.seaLevelPressureHpa, "hPa")
+                        metric("Wind speed (10 m)", weather.windSpeedMps, "m/s")
+                        metric("Wind FROM (true north)", weather.windDirectionDegrees, "°")
+                        metric("Wind gusts", weather.windGustsMps, "m/s")
+                    } else {
+                        Text("Weather unavailable. Refresh manually to try again.")
+                    }
+                }
+                Section("Source & snapshot") {
+                    Text("Open-Meteo · course-level forecast conditions, not measurements at the ball.")
+                    if let weather = store.weather(for: location) {
+                        LabeledContent("Observed at", value: weather.observedAt)
+                        LabeledContent("Timezone", value: weather.timezone ?? "Provider local time")
+                        if let fetchedAt = store.fetchedAt { LabeledContent("Fetched / cached", value: fetchedAt.formatted()) }
+                        Text(store.isStale ? "Cached snapshot is over 30 minutes old." : "Snapshot is within the 30-minute cache window.")
+                    }
+                    Text(String(format: "Course location: %.5f, %.5f", location.lat, location.lon))
+                    Text("The map arrow points where wind blows TO, rotated with map heading. Recommendations use surface pressure directly; weather elevation is not terrain height, and gusts are not used.")
+                }
+                Section("Loading & refresh") {
+                    if store.isLoading { ProgressView("Loading current conditions…") }
+                    if let error = store.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                        Text("Any displayed cached conditions are retained; no automatic retry.")
+                    }
+                    Button(store.errorMessage == nil ? "Refresh course weather" : "Retry course weather", systemImage: "arrow.clockwise") {
+                        Task { await store.load(for: location, forceRefresh: true) }
+                    }
+                    .disabled(store.isLoading)
+                }
+            }
+            .navigationTitle("Course weather")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .tint(FairwayVectorColors.navy)
     }
 
-    private func windText(_ weather: CourseWeather) -> String {
-        guard let speed = weather.windSpeedMps else { return "–" }
-        let direction = weather.windDirectionDegrees.map(cardinalDirection) ?? ""
-        let gust = weather.windGustsMps.map { " · gust \(Int($0.rounded()))" } ?? ""
-        return "\(Int(speed.rounded())) m/s from \(direction)\(gust)"
-    }
-
-    private func cardinalDirection(_ degrees: Double) -> String {
-        let points = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-        let index = Int(((degrees.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360) / 45).rounded()) % points.count
-        return points[index]
+    private func metric(_ title: String, _ value: Double?, _ unit: String) -> some View {
+        LabeledContent(title, value: value.map { String(format: "%.1f %@", $0, unit) } ?? "Not supplied")
     }
 }

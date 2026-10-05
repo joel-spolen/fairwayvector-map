@@ -150,6 +150,15 @@ final class TerrainElevationStore {
         invalidateShot()
     }
 
+    /// A cancelled recognizer is not a release commit and must not acquire data.
+    func cancelTargetInteraction() {
+        guard targetInteractionActive else { return }
+        targetInteractionActive = false
+        interactionGate.setActive(true)
+        shotPending = false
+        shotMessage = "Target movement cancelled. Tap the map and release a target to commit its terrain."
+    }
+
     /// Invalidate obsolete shot state without changing the hole pipeline or interaction gate.
     func invalidateShot(showHole: Bool = true) {
         shotGeneration += 1
@@ -159,8 +168,9 @@ final class TerrainElevationStore {
         snapshot.targetToFlagProfile = nil
         committedRequest = nil
         isShotLoading = false
-        shotPending = true
-        shotMessage = "Target is being moved. Release to load its terrain."
+        // Invalidating cached advice (hole change/deactivation) is not a held gesture.
+        shotPending = targetInteractionActive
+        shotMessage = targetInteractionActive ? "Target is being moved. Release to load its terrain." : nil
     }
 
     func commitShot(_ request: TerrainRequest, selectShot: Bool = true, allowPaid: Bool = true) {

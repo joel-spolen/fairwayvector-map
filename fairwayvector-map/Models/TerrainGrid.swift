@@ -48,6 +48,13 @@ nonisolated struct TerrainRequest: Hashable, Sendable {
     let target: GeoPoint?
     let usesPointOnlyGeometry: Bool
     let usesGPS: Bool
+    // Ephemeral request metadata, not persisted/Codable. Existing callers default to real sources.
+    var isSimulatedOrigin: Bool = false
+
+    var originLabel: String {
+        isSimulatedOrigin ? "Simulated golfer · Development"
+            : usesGPS ? "Captured GPS" : "Captured tee fallback"
+    }
 }
 
 nonisolated struct TerrainSnapshot: Sendable {

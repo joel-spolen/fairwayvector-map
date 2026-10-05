@@ -26,37 +26,27 @@ struct CourseWindIndicator: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text("WIND")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(FairwayVectorColors.slate)
-
+        HStack(spacing: 4) {
             ZStack {
                 Circle()
                     .fill(FairwayVectorColors.conditionsSurface)
                 if !isCalm, let bearing = windToBearing {
                     Image(systemName: "arrow.up")
-                        .font(.system(size: 30, weight: .bold))
+                        .font(.caption.bold())
                         .foregroundStyle(FairwayVectorColors.orange)
                         // Up represents the camera heading, not geographic north.
                         .rotationEffect(.degrees(bearing - mapHeading))
                 } else {
                     Image(systemName: isCalm ? "wind" : "questionmark")
-                        .font(.title2)
+                        .font(.caption)
                         .foregroundStyle(FairwayVectorColors.slate)
                 }
             }
-            .frame(width: 54, height: 54)
-
-            Text(isCalm ? "Calm" : "To \(destination)")
-                .font(.caption.weight(.semibold))
-            Text(speedText)
-                .font(.caption2.monospacedDigit())
+            .frame(width: 26, height: 26)
+            Text(isCalm ? "Calm" : "\(speedText) → \(destination)")
+                .font(.caption.monospacedDigit())
         }
         .foregroundStyle(FairwayVectorColors.navy)
-        .padding(10)
-        .frame(minWidth: 84)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Course wind")

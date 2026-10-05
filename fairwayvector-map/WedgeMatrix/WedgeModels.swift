@@ -9,6 +9,8 @@ struct Wedge: Identifiable, Codable, Equatable {
     var notes = ""
     var fullCarry: Double
     var isInBag = true
+    // Legacy/default numbers are not evidence of user calibration.
+    var fullCarryUserProvided = false
     private var shotCarries: [String: Double] = [:]
 
     var brandDisplay: String? {
@@ -16,13 +18,14 @@ struct Wedge: Identifiable, Codable, Equatable {
         return trimmedBrand.isEmpty ? nil : trimmedBrand
     }
 
-    init(id: UUID = UUID(), name: String, brand: String = "", notes: String = "", fullCarry: Double, isInBag: Bool = true) {
+    init(id: UUID = UUID(), name: String, brand: String = "", notes: String = "", fullCarry: Double, isInBag: Bool = true, fullCarryUserProvided: Bool = false) {
         self.id = id
         self.name = name
         self.brand = brand
         self.notes = notes
         self.fullCarry = fullCarry
         self.isInBag = isInBag
+        self.fullCarryUserProvided = fullCarryUserProvided
     }
 
     func carry(for trajectory: WedgeTrajectory, swing: SwingLength) -> Double {
@@ -50,7 +53,7 @@ struct Wedge: Identifiable, Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, brand, notes, fullCarry, isInBag, shotCarries
+        case id, name, brand, notes, fullCarry, isInBag, fullCarryUserProvided, shotCarries
     }
 
     init(from decoder: Decoder) throws {
@@ -61,6 +64,7 @@ struct Wedge: Identifiable, Codable, Equatable {
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
         fullCarry = try container.decode(Double.self, forKey: .fullCarry)
         isInBag = try container.decodeIfPresent(Bool.self, forKey: .isInBag) ?? true
+        fullCarryUserProvided = try container.decodeIfPresent(Bool.self, forKey: .fullCarryUserProvided) ?? false
         shotCarries = try container.decodeIfPresent([String: Double].self, forKey: .shotCarries) ?? [:]
     }
 

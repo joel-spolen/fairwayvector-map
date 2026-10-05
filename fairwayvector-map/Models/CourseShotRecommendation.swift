@@ -10,6 +10,9 @@ struct CourseShotRecommendationInput: Equatable {
     let profile: TrajectoryPlayerProfile
     let distanceM: Double
     let bearingDeg: Double
+    let scoringPlan: ScoringShotPlan
+
+    var isScoring: Bool { scoringPlan.isScoring(distanceM: distanceM) }
 
     var conditions: ClubRecommendationConditions {
         let wind = Self.wind(speedMps: weather.windSpeedMps!, fromDeg: weather.windDirectionDegrees!, bearingDeg: bearingDeg)
@@ -32,7 +35,8 @@ struct CourseShotRecommendationInput: Equatable {
     // a committed shot. Only the request's captured origin/source defines advice.
     static func capture(request: TerrainRequest?, selectedTarget: GeoPoint?, liveOrigin _: GeoPoint? = nil,
                         usesGPS _: Bool = false, weather: CourseWeather?, weatherLocation: GeoPoint?,
-                        shotProfile: TerrainProfile?, profile: TrajectoryPlayerProfile) -> Self? {
+                        shotProfile: TerrainProfile?, profile: TrajectoryPlayerProfile, wedges: [Wedge] = []) -> Self? {
+        let scoringPlan = ScoringShotPlan.make(profile: profile, wedges: wedges)
         guard let request, let selectedTarget, let origin = request.origin,
               request.target == selectedTarget,
               let weatherLocation, let weather, valid(weather),
@@ -41,12 +45,13 @@ struct CourseShotRecommendationInput: Equatable {
               TerrainGeometry.length(last.point, selectedTarget) <= TerrainGeometry.tolerance,
               let originHeight = first.elevationMeters, originHeight.isFinite,
               let targetHeight = last.elevationMeters, targetHeight.isFinite,
-              profileIssue(profile) == nil else { return nil }
+              profile.isSetupComplete else { return nil }
         let distance = GolfGeometry.distance(origin, selectedTarget)
         guard distance.isFinite, distance > 0.1 else { return nil }
+          guard profileIssue(profile) == nil || scoringPlan.isScoring(distanceM: distance) else { return nil }
         return Self(request: request, weather: weather, weatherLocation: weatherLocation,
                     originSample: first, targetSample: last, profile: profile, distanceM: distance,
-                    bearingDeg: GolfGeometry.bearing(from: origin, to: selectedTarget))
+                  bearingDeg: GolfGeometry.bearing(from: origin, to: selectedTarget), scoringPlan: scoringPlan)
     }
 
     static func valid(_ weather: CourseWeather) -> Bool {
@@ -81,5 +86,6 @@ struct CourseShotRecommendationInput: Equatable {
 
 struct CourseShotRecommendationResult {
     let input: CourseShotRecommendationInput
-    let recommendations: [ClubRecommendation]
+    let recommendations: [CourseClubRecommendation]
+    var unavailableScoringShots: [UnavailableScoringShot] = []
 }

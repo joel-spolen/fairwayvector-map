@@ -9,13 +9,21 @@ struct CourseMapView: View {
     @State private var weatherStore = CourseWeatherStore()
     @State private var terrainStore = TerrainElevationStore()
     @State private var isShowingTerrainProfile = false
-    @State private var isConfirmingTerrainRetry = false
+    @State private var isShowingCourseInfo = false
     @State private var terrainInspectionPoint: GeoPoint?
     @State private var mapHeading = 0.0
     @State private var locationManager = LocationManager()
     @State private var holeIndex = 0
     @State private var tapPoint: GeoPoint?
     @State private var isShowingFlagEditor = false
+    @State private var adviceContentHeight: CGFloat = 150
+    #if DEBUG
+    @State private var simulatedGolfer: GeoPoint?
+    @State private var simulationError: String?
+    @State private var isShowingDevelopmentWedges = false
+    @State private var isShowingDevelopmentProfile = false
+    @AppStorage("wedgeMatrix.wedges") private var developmentStoredWedges = ""
+    #endif
     @AppStorage("distanceUnit") private var unit: DistanceUnit = .meters
     @AppStorage("customFlagPositions") private var customFlagPositions = ""
 
@@ -38,11 +46,21 @@ struct CourseMapView: View {
                             Task { await store.refresh() }
                         }
                         .labelStyle(.iconOnly)
+                        .frame(minWidth: 44, minHeight: 44)
                         .disabled(store.isLoading)
+                    }
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        #if DEBUG
+                        developmentToolsMenu
+                        #endif
+                        Button("Course information", systemImage: "info.circle") { isShowingCourseInfo = true }
+                            .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Change course", systemImage: "arrow.left.arrow.right", action: onChangeCourse)
                             .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44)
                             .accessibilityLabel("Change course, club, or tee")
                     }
                 }
@@ -51,15 +69,21 @@ struct CourseMapView: View {
             locationManager.start()
             await store.load()
         }
-        .onChange(of: holeIndex) { tapPoint = nil; terrainStore.invalidateShot() }
-        .onDisappear { terrainStore.deactivate() }
+        .onChange(of: holeIndex) {
+            clearSimulation()
+            tapPoint = nil
+            terrainStore.invalidateShot()
+        }
+        .onDisappear { clearSimulation(); terrainStore.deactivate() }
         .sheet(isPresented: $isShowingTerrainProfile, onDismiss: { terrainInspectionPoint = nil }) {
             if let holes = store.course?.holes, !holes.isEmpty {
                 let hole = holes[min(holeIndex, holes.count - 1)]
                 HoleElevationProfileView(
                     store: terrainStore, holeNumber: hole.number, unit: unit,
                     usesGPS: terrainStore.usesGPS,
-                    inspectionPoint: $terrainInspectionPoint
+                    inspectionPoint: $terrainInspectionPoint,
+                    retryMessage: terrainRetryMessage(for: hole),
+                    onRetry: { retryTerrain(for: hole) }
                 )
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
@@ -77,15 +101,37 @@ struct CourseMapView: View {
                 }
             }
         }
+        .sheet(isPresented: $isShowingCourseInfo) { courseInformation }
+        #if DEBUG
+        .sheet(isPresented: $isShowingDevelopmentWedges) {
+            NavigationStack {
+                WedgeMatrixView()
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { isShowingDevelopmentWedges = false } } }
+            }
+        }
+        .sheet(isPresented: $isShowingDevelopmentProfile) {
+            if trajectoryModel.playerProfileStore.needsSetup {
+                TrajectoryProfileSetupWizardView(profileStore: trajectoryModel.playerProfileStore,
+                    unitPreferences: trajectoryModel.unitPreferences, onClose: { isShowingDevelopmentProfile = false })
+            } else {
+                NavigationStack {
+                    TrajectoryProfileSettingsView(profileStore: trajectoryModel.playerProfileStore,
+                        unitPreferences: trajectoryModel.unitPreferences, settingsViewModel: trajectoryModel)
+                        .navigationTitle("Clubs & launch profile")
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { isShowingDevelopmentProfile = false } } }
+                }
+            }
+        }
+        #endif
     }
 
     @ViewBuilder
     private var content: some View {
         if let holes = store.course?.holes, !holes.isEmpty {
             let hole = holes[min(holeIndex, holes.count - 1)]
-            let origin = DistanceOrigin.resolve(location: locationManager.location, hole: hole)
+            let origin = distanceOrigin(for: hole)
             let holeRequest = terrainRequest(for: hole, origin: nil, target: nil)
-            ZStack {
+            GeometryReader { geometry in
                 HoleMapView(
                     hole: hole,
                     flag: flagPosition(for: hole),
@@ -96,90 +142,56 @@ struct CourseMapView: View {
                     onHeadingChange: { mapHeading = $0 },
                     terrainInspectionPoint: terrainInspectionPoint,
                     onTargetInteractionBegan: { terrainStore.beginTargetInteraction() },
+                    onTargetInteractionCancelled: { terrainStore.cancelTargetInteraction() },
                     onTargetCommitted: { point in
                         terrainInspectionPoint = nil
-                        terrainStore.commitShot(terrainRequest(for: hole,
-                            origin: DistanceOrigin.resolve(location: locationManager.location, hole: hole), target: point))
-                    }
+                        commitSelectedShot(for: hole, target: point)
+                    },
+                    simulatedUserLocation: origin?.isSimulated == true ? origin?.point : nil
                 )
                 .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    topDistanceMenu(hole: hole, origin: origin, flag: flagPosition(for: hole))
-                    if DevelopmentAPIConfiguration.isDemoCourse(store.reference.golfAPICourseID ?? "") {
-                        Text("DEMO HILLS · invented GPS layout & ratings · not for play")
-                            .font(.caption2.bold()).padding(6)
-                            .frame(maxWidth: .infinity)
-                            .background(FairwayVectorColors.conditionsSurface)
-                    } else if DevelopmentAPIConfiguration.current.golfAPI == .mock {
-                            Text(store.reference.golfAPICourseID == BundledSavedCourseStore.hillsCourseID
-                                ? "Saved Hills offline · APIs paused" : "Saved course · APIs paused")
-                            .font(.caption2.bold()).padding(6)
-                            .frame(maxWidth: .infinity)
-                            .background(FairwayVectorColors.conditionsSurface)
-                    }
-                    if let location = courseWeatherLocation {
-                        CourseWeatherCard(location: location, store: weatherStore)
-                            .padding(.horizontal, 12)
-                            .padding(.bottom, 4)
-                    }
-                    if hole.usesPointOnlyGeometry {
-                        Label("GPS tee and green points are available; detailed fairway and green outlines are not.", systemImage: "info.circle")
-                            .font(.caption)
-                            .foregroundStyle(FairwayVectorColors.navy)
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(FairwayVectorColors.surface.opacity(0.95))
-                            .padding(.horizontal, 12)
-                    }
-                    if store.errorMessage != nil {
-                        HStack(spacing: 10) {
-                            Label("Showing saved map · update unavailable", systemImage: "wifi.slash")
-                                .font(.caption)
-                                .lineLimit(2)
-                            Spacer(minLength: 0)
-                            Button("Retry") { Task { await store.refresh() } }
-                                .font(.caption.weight(.semibold))
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(spacing: 4) {
+                        topDistanceMenu(hole: hole, origin: origin, flag: flagPosition(for: hole))
+                        if let location = courseWeatherLocation {
+                            CourseWeatherCard(location: location, store: weatherStore, mapHeading: mapHeading)
+                                .padding(.horizontal, 12)
                         }
-                        .padding(10)
-                        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 10))
-                        .padding(.horizontal, 12)
+                        mapStatusBadge(origin: origin)
                     }
-                    if let weather = weatherStore.weather, courseWeatherLocation != nil {
-                        HStack {
-                            Spacer(minLength: 0)
-                            CourseWindIndicator(weather: weather, mapHeading: mapHeading)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.top, 10)
-                    }
-                    Spacer(minLength: 0)
-                    CourseShotRecommendationView(terrainStore: terrainStore, weatherStore: weatherStore,
-                        weatherLocation: courseWeatherLocation, selectedTarget: tapPoint,
-                        unit: unit, model: trajectoryModel)
-                    terrainPanel(hole: hole)
-                    bottomHoleMenu(hole: hole, holeCount: holes.count)
+                    .padding(.bottom, 4)
                 }
-                VStack {
-                    Spacer(minLength: 0)
-                    HStack {
-                            Text(DevelopmentAPIConfiguration.isDemoCourse(store.reference.golfAPICourseID ?? "")
-                             ? "Demo course data · Imagery © Apple Maps · Weather © Open-Meteo (live)"
-                                : "Saved course data © \(store.reference.golfAPICourseID == nil ? "OpenStreetMap contributors" : "Golf API") · Imagery © Apple Maps · Weather © Open-Meteo")
-                            .font(.system(size: 7))
-                            .foregroundStyle(.white.opacity(0.85))
-                        Spacer()
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    // Normal text uses ~180 pt. Large accessibility text scrolls rather
+                    // than clipping cards or pushing the top/bottom stacks together.
+                    VStack(spacing: 0) {
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                CourseShotRecommendationView(terrainStore: terrainStore, weatherStore: weatherStore,
+                                    weatherLocation: courseWeatherLocation, selectedTarget: tapPoint,
+                                    unit: unit, model: trajectoryModel)
+                                terrainPanel
+                            }
+                            .background {
+                                GeometryReader { content in
+                                    Color.clear.preference(key: MapAdviceHeightKey.self, value: content.size.height)
+                                }
+                            }
+                        }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .frame(height: min(adviceContentHeight, max(100, min(170, geometry.size.height * 0.3))))
+                        .onPreferenceChange(MapAdviceHeightKey.self) { adviceContentHeight = $0 }
+                        bottomHoleMenu(hole: hole, holeCount: holes.count)
                     }
-                    .padding(.leading, 8)
-                    .padding(.bottom, 66)
                 }
             }
             .task(id: holeRequest) {
                 // Opening geometry/tee/hole/saved flag reads terrain cache ONLY.
                 tapPoint = nil
                 terrainInspectionPoint = nil
+                clearSimulation()
                 terrainStore.open(terrainRequest(for: hole,
-                    origin: DistanceOrigin.resolve(location: locationManager.location, hole: hole), target: nil))
+                    origin: distanceOrigin(for: hole), target: nil))
             }
         } else if store.isLoading || store.errorMessage == nil {
             ProgressView("Loading course…")
@@ -195,6 +207,104 @@ struct CourseMapView: View {
             }
         }
     }
+
+    private func distanceOrigin(for hole: Hole) -> DistanceOrigin? {
+        #if DEBUG
+        if let simulatedGolfer { return DistanceOrigin(point: simulatedGolfer, source: .simulated) }
+        #endif
+        return DistanceOrigin.resolve(location: locationManager.location, hole: hole)
+    }
+
+    private func clearSimulation() {
+        #if DEBUG
+        simulatedGolfer = nil
+        simulationError = nil
+        #endif
+    }
+
+    private func commitSelectedShot(for hole: Hole, target: GeoPoint?) {
+        let origin = distanceOrigin(for: hole)
+        // Simulated target release also remains cache-only in live GPXZ mode.
+        terrainStore.commitShot(terrainRequest(for: hole, origin: origin, target: target),
+            allowPaid: origin?.isSimulated != true || DevelopmentAPIConfiguration.current.gpxz == .mock)
+    }
+
+    #if DEBUG
+    private var developmentScoringPlan: ScoringShotPlan {
+        let wedges = developmentStoredWedges.data(using: .utf8)
+            .flatMap { try? JSONDecoder().decode([Wedge].self, from: $0) } ?? []
+        return ScoringShotPlan.make(profile: trajectoryModel.playerProfileStore.profile, wedges: wedges)
+    }
+
+    private func simulationIssue(hole: Hole, plan: ScoringShotPlan) -> String? {
+        guard trajectoryModel.playerProfileStore.profile.isSetupComplete else {
+            return "Set up Practice / Profile, then enter a personal Mid/Stock Full wedge carry."
+        }
+        guard plan.maxFullCarryM != nil else {
+            return "Enter a personal Mid/Stock Full carry in Wedge calibration & matrix, or calibrate a Practice wedge. No stock range is assumed. \(plan.guidance)"
+        }
+        guard let target = tapPoint ?? flagPosition(for: hole), let tee = hole.tee,
+              DevelopmentScoringPosition.distanceRange(plan: plan, target: target, tee: tee) != nil else {
+            return "Choose a valid target away from the tee; the personal range must allow at least 0.2 m of simulated distance."
+        }
+        return nil
+    }
+
+    private var developmentHole: Hole? {
+        guard let holes = store.course?.holes, !holes.isEmpty else { return nil }
+        return holes[min(holeIndex, holes.count - 1)]
+    }
+
+    private var developmentToolsMenu: some View {
+        Menu {
+            Button("Random scoring position", systemImage: "dice") {
+                if let hole = developmentHole { randomScoringPosition(hole: hole) }
+            }
+            .disabled(developmentHole == nil || store.isLoading || terrainStore.isHoleLoading || terrainStore.isShotLoading || terrainStore.shotPending
+                || developmentHole.map { simulationIssue(hole: $0, plan: developmentScoringPlan) != nil } == true)
+            .accessibilityIdentifier("random-scoring-position")
+            Button("Use device GPS", systemImage: "location") {
+                guard let hole = developmentHole else { return }
+                clearSimulation()
+                terrainInspectionPoint = nil
+                terrainStore.commitShot(terrainRequest(for: hole, origin: distanceOrigin(for: hole), target: tapPoint), allowPaid: false)
+            }
+            .disabled(simulatedGolfer == nil || terrainStore.shotPending || developmentHole == nil)
+            .accessibilityIdentifier("use-device-gps")
+            Section("Personal calibration") {
+                Button("Configure wedge calibration & matrix", systemImage: "slider.horizontal.3") { isShowingDevelopmentWedges = true }
+                Button("Configure Practice / Profile", systemImage: "person.crop.circle") { isShowingDevelopmentProfile = true }
+                Button("Development guidance", systemImage: "info.circle") { isShowingCourseInfo = true }
+            }
+        } label: {
+            VStack(spacing: 0) {
+                Image(systemName: "dice").font(.body)
+                Text("DEV").font(.system(size: 8, weight: .bold))
+            }
+            .frame(minWidth: 44, minHeight: 44)
+        }
+        .accessibilityLabel("Development tools")
+        .accessibilityHint("Random scoring position, reset to device GPS, and personal wedge calibration")
+        .accessibilityIdentifier("development-tools")
+    }
+
+    private func randomScoringPosition(hole: Hole) {
+        let plan = developmentScoringPlan
+        guard simulationIssue(hole: hole, plan: plan) == nil,
+              let target = tapPoint ?? flagPosition(for: hole), let tee = hole.tee,
+              let point = DevelopmentScoringPosition.make(plan: plan, target: target, tee: tee,
+                fraction: Double.random(in: 0...1), jitterDeg: Double.random(in: -20...20)) else {
+            simulationError = "No valid scoring position could be generated. Review your target and personal wedge calibration."
+            isShowingCourseInfo = true
+            return
+        }
+        simulationError = nil
+        simulatedGolfer = point
+        tapPoint = target
+        terrainInspectionPoint = nil
+        commitSelectedShot(for: hole, target: target)
+    }
+    #endif
 
     private var courseWeatherLocation: GeoPoint? {
         if let location = store.reference.location { return location }
@@ -228,77 +338,70 @@ struct CourseMapView: View {
             holeNumber: hole.number, path: path, flag: flag,
             origin: origin?.point, target: target ?? flag,
             usesPointOnlyGeometry: hole.usesPointOnlyGeometry || path.count <= 2,
-            usesGPS: origin?.usesGPS == true
+            usesGPS: origin?.usesGPS == true,
+            isSimulatedOrigin: origin?.isSimulated == true
         )
     }
 
-    private func terrainPanel(hole: Hole) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 10) {
-                Image(systemName: "mountain.2.fill")
-                    .foregroundStyle(FairwayVectorColors.orange)
-                Picker("Terrain profile", selection: $terrainStore.mode) {
-                    ForEach(TerrainProfileMode.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                if terrainStore.isLoading { ProgressView().controlSize(.small) }
-                Button("Refresh terrain", systemImage: "arrow.clockwise") {
-                    terrainInspectionPoint = nil
-                    isConfirmingTerrainRetry = true
-                }
-                .labelStyle(.iconOnly)
-                .disabled(terrainStore.isHoleLoading || terrainStore.isShotLoading)
-                .accessibilityHint("Asks before retrying failed terrain requests. Existing call reservations are retained.")
-                Button("Expand terrain profile", systemImage: "arrow.up.left.and.arrow.down.right") { isShowingTerrainProfile = true }
-                    .labelStyle(.iconOnly)
+    private var terrainPanel: some View {
+        Button { isShowingTerrainProfile = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "mountain.2.fill").foregroundStyle(FairwayVectorColors.orange)
+                Text(terrainSummary).font(.caption.weight(.semibold))
+                Spacer(minLength: 0)
+                if terrainStore.isShotLoading || terrainStore.isHoleLoading { ProgressView().controlSize(.mini) }
+                Image(systemName: "chevron.right").font(.caption2)
             }
-            if let profile = terrainStore.selectedProfile, profile.samples.contains(where: { $0.elevationMeters != nil }) {
-                TerrainProfileChart(profile: profile, unit: unit, selectedDistance: .constant(nil), height: 74)
-                Text("\(terrainStore.mode == .hole ? "Tee → flag" : terrainStore.usesGPS ? "Committed GPS → target" : "Tee fallback → target") · \(profile.elevationChangeMeters.map(terrainDeltaText) ?? "Partial coverage")")
-                    .font(.caption2)
-                if terrainStore.mode == .shot, let next = terrainStore.snapshot.targetToFlagElevationChangeMeters {
-                    Text("Target → flag: \(terrainDeltaText(next))").font(.caption2)
-                }
-            } else if terrainStore.isLoading {
-                Text("Loading terrain…").font(.caption2)
-            }
-            if terrainStore.shotPending { Text("Shot pending · release target to commit").font(.caption2) }
-            if let message = terrainStore.statusMessage { Text(message).font(.caption2).fixedSize(horizontal: false, vertical: true) }
-            if DevelopmentAPIConfiguration.current.gpxz == .mock {
-                Text("DEMO DATA · Synthetic development terrain · 0 paid requests · live quota/history unchanged")
-                    .font(.caption2.bold())
-            } else {
-                HStack {
-                    Link("Terrain by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
-                    Link("Source credit / licence catalogue", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
-                }
-                .font(.system(size: 8))
-                if let quota = terrainStore.quota {
-                    Text("GPXZ · \(quota.used)/100 calls used · \(quota.remaining) remaining · \(terrainStore.plannedCalls) uncovered spans planned · local UTC month")
-                        .font(.system(size: 8))
-                } else {
-                    Text("GPXZ · local quota unavailable; no paid request without a valid ledger").font(.system(size: 8))
-                }
-            }
+            .padding(.horizontal, 10)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(FairwayVectorColors.navy)
-        .padding(10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
         .accessibilityIdentifier("terrain-profile-button")
-        .confirmationDialog("Retry terrain requests?", isPresented: $isConfirmingTerrainRetry, titleVisibility: .visible) {
-            Button("Retry terrain") {
-                terrainStore.retryFailedRequests(terrainRequest(for: hole,
-                    origin: DistanceOrigin.resolve(location: locationManager.location, hole: hole), target: tapPoint))
+        .accessibilityLabel("Terrain details, \(terrainSummary)")
+        .accessibilityHint("Opens the full chart, source, budget, errors and confirmed retry")
+    }
+
+    private var terrainSummary: String {
+        if terrainStore.shotPending { return "Terrain · release target" }
+        // Summary follows the committed shot, not the mode selected for chart inspection.
+        if let request = terrainStore.committedRequest {
+            if let profile = terrainStore.snapshot.shotProfile,
+               let first = profile.samples.first, let last = profile.samples.last,
+               let origin = request.origin, let target = request.target,
+               TerrainGeometry.length(first.point, origin) <= TerrainGeometry.tolerance,
+               TerrainGeometry.length(last.point, target) <= TerrainGeometry.tolerance,
+               let delta = profile.elevationChangeMeters, delta.isFinite {
+                return "To target · \(terrainDeltaText(delta))"
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(DevelopmentAPIConfiguration.current.gpxz == .mock
-                 ? "Recompute from local synthetic terrain. No GPXZ requests or changes to the live ledger, failure locks or quota."
-                 : "Correct the reported cause first. Saved terrain is reused, but uncovered paths may spend additional calls. This clears failed-request locks only; used calls are not reset or refunded, and provider backoff still applies.")
+            return terrainStore.isShotLoading ? "Loading terrain…" : "Terrain unavailable"
         }
+        if let delta = terrainStore.snapshot.holeProfile?.elevationChangeMeters {
+            return "Tee → flag · \(terrainDeltaText(delta))"
+        }
+        return terrainStore.isHoleLoading ? "Loading terrain…" : "Terrain unavailable"
+    }
+
+    private func retryTerrain(for hole: Hole) {
+        terrainInspectionPoint = nil
+        let origin = distanceOrigin(for: hole)
+        if origin?.isSimulated == true {
+            commitSelectedShot(for: hole, target: tapPoint)
+        } else {
+            terrainStore.retryFailedRequests(terrainRequest(for: hole, origin: origin, target: tapPoint))
+        }
+    }
+
+    private func terrainRetryMessage(for hole: Hole) -> String {
+        distanceOrigin(for: hole)?.isSimulated == true && DevelopmentAPIConfiguration.current.gpxz == .live
+            ? "Simulated golfer: reload saved terrain only. No live requests, failure-lock changes or paid reservations. Missing heights remain unavailable."
+            : DevelopmentAPIConfiguration.current.gpxz == .mock
+            ? "Recompute from local synthetic terrain. No GPXZ requests or changes to the live ledger, failure locks or quota."
+            : "Correct the reported cause first. Saved terrain is reused, but uncovered paths may spend additional calls. This clears failed-request locks only; used calls are not reset or refunded, and provider backoff still applies."
     }
 
     private func terrainDeltaText(_ meters: Double) -> String {
@@ -310,15 +413,19 @@ struct CourseMapView: View {
     private func bottomHoleMenu(hole: Hole, holeCount: Int) -> some View {
         HStack(alignment: .center, spacing: 10) {
             holeNavigationButton(isPrevious: true, count: holeCount)
-            VStack(spacing: 4) {
-                holeSummary(hole)
-                selectedCourseSummary
+            Button { isShowingCourseInfo = true } label: {
+                Text("Hole \(hole.number) · Par \(hole.par.map(String.init) ?? "–") · SI \(hole.handicapIndex.map(String.init) ?? "–") · \(hole.length > 0 ? unit.format(hole.length) : "–")")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(FairwayVectorColors.navy)
+                    .frame(minHeight: 44)
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens course, tee and hole information")
             .frame(maxWidth: .infinity)
             holeNavigationButton(isPrevious: false, count: holeCount)
         }
         .padding(.horizontal, 12)
-        .padding(.top, 8)
+        .padding(.top, 2)
         .padding(.bottom, 2)
         .frame(maxWidth: .infinity)
         .background {
@@ -328,32 +435,107 @@ struct CourseMapView: View {
         }
     }
 
-    private var selectedCourseSummary: some View {
-        let location = store.reference.city.isEmpty ? store.reference.region : store.reference.city
-        return VStack(spacing: 1) {
-            Text("\(store.reference.clubName) · \(location) · \(store.reference.teeName) tee (\(store.reference.teeSex.capitalized))")
-            Text("\(store.reference.holeCount) holes · Par \(store.reference.totalPar) · CR \(store.reference.courseRating, specifier: "%.1f") · Slope \(store.reference.slopeRating)")
+    private func mapStatusBadge(origin: DistanceOrigin?) -> some View {
+        let demo = DevelopmentAPIConfiguration.isDemoCourse(store.reference.golfAPICourseID ?? "")
+        let saved = DevelopmentAPIConfiguration.current.golfAPI == .mock
+        let synthetic = DevelopmentAPIConfiguration.current.gpxz == .mock
+        let labels = [origin?.isSimulated == true ? "Simulated position" : nil,
+            demo ? "DEMO course" : saved ? (store.reference.golfAPICourseID == BundledSavedCourseStore.hillsCourseID ? "Saved Hills" : "Saved course") : nil,
+            synthetic ? "DEMO terrain" : nil,
+            store.errorMessage != nil ? "Update unavailable ⓘ" : nil].compactMap { $0 }
+        return Text(labels.joined(separator: " · "))
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(FairwayVectorColors.navy)
+            .padding(.horizontal, 10)
+            .padding(.vertical, labels.isEmpty ? 0 : 3)
+            .background(.regularMaterial, in: Capsule())
+            .accessibilityLabel(labels.joined(separator: ", "))
+    }
+
+    private var courseInformation: some View {
+        NavigationStack {
+            Form {
+                Section("Course & tee") {
+                    LabeledContent("Club", value: store.reference.clubName)
+                    LabeledContent("Course", value: store.reference.courseName)
+                    LabeledContent("Location", value: store.reference.city.isEmpty ? store.reference.region : store.reference.city)
+                    LabeledContent("Tee", value: "\(store.reference.teeName) · \(store.reference.teeSex.capitalized)")
+                    LabeledContent("Holes / par", value: "\(store.reference.holeCount) / \(store.reference.totalPar)")
+                    LabeledContent("Rating / slope", value: String(format: "%.1f / %d", store.reference.courseRating, store.reference.slopeRating))
+                }
+                if let holes = store.course?.holes, !holes.isEmpty {
+                    let hole = holes[min(holeIndex, holes.count - 1)]
+                    Section("Hole \(hole.number)") {
+                        holeSummary(hole)
+                        if hole.usesPointOnlyGeometry {
+                            Text("GPS tee and green points are available; detailed fairway and green outlines are not. Tee-set positions are not moved to match published lengths.")
+                        }
+                        if let origin = distanceOrigin(for: hole) {
+                            switch origin.source {
+                            case .gps(let accuracy): Text("Distances use device GPS · accuracy ±\(Int(accuracy.rounded())) m.")
+                            case .simulated: Text("Distances use a simulated development position, not device GPS.")
+                            case .teeNoFix: Text("No usable GPS fix: distances preview from the tee.")
+                            case .teeFarAway: Text("GPS is outside the hole corridor: distances preview from the tee.")
+                            }
+                        }
+                        Text("Recommendations and terrain use the committed position, not incoming GPS fixes. Release a target or confirm Retry terrain to recapture it.")
+                    }
+                    #if DEBUG
+                    Section("Development tools · dice / DEV menu") {
+                        if let message = simulationError ?? simulationIssue(hole: hole, plan: developmentScoringPlan) { Text(message) }
+                        if let threshold = developmentScoringPlan.maxFullCarryM { Text("Personal Mid/Stock 100% wedge range: \(unit.format(threshold)).") }
+                        if let simulatedGolfer, let target = tapPoint ?? flagPosition(for: hole) {
+                            Text("Simulated position: \(unit.format(GolfGeometry.distance(simulatedGolfer, target))) to target.")
+                        }
+                        Text("Choose Configure wedge calibration & matrix or Configure Practice / Profile in the dice menu. Random placement requires personal carry calibration and valid hole geometry. It is temporarily disabled during loading or a held target gesture, not merely when cached advice is invalidated.")
+                        Text("Simulation never changes device GPS or Practice. Live GPXZ uses saved terrain only, with no paid calls or failure-lock changes. Missing endpoint heights still block advice.")
+                    }
+                    #endif
+                }
+                Section("Availability & sources") {
+                    if DevelopmentAPIConfiguration.isDemoCourse(store.reference.golfAPICourseID ?? "") {
+                        Text("DEMO HILLS · invented GPS layout and ratings · not for play.")
+                    } else if DevelopmentAPIConfiguration.current.golfAPI == .mock {
+                        Text("Saved course geometry · Golf API paused. No live update check in mock mode.")
+                    }
+                    if DevelopmentAPIConfiguration.current.gpxz == .mock {
+                        Text("DEMO terrain · synthetic analytical elevations, not a surveyed course. Estimates are not for play. Live terrain, budget and history are untouched.")
+                    }
+                    Text("Course data © \(store.reference.golfAPICourseID == nil ? "OpenStreetMap contributors" : "Golf API") · Imagery © Apple Maps · Weather © Open-Meteo.")
+                    if let error = store.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                        Button("Retry course update") { Task { await store.refresh() } }.disabled(store.isLoading)
+                    }
+                    Text("Tap weather, terrain or club advice on the map for full conditions, sources, errors and setup controls. Opening details never acquires new data.")
+                }
+            }
+            .navigationTitle("Course information")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { isShowingCourseInfo = false } } }
         }
-        .font(.system(size: 8, weight: .medium))
-        .foregroundStyle(FairwayVectorColors.slate)
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
-        .multilineTextAlignment(.center)
+        .tint(FairwayVectorColors.navy)
     }
 
     private func topDistanceMenu(hole: Hole, origin: DistanceOrigin?, flag: GeoPoint?) -> some View {
-        VStack(spacing: 4) {
-            DistanceCard(hole: hole, origin: origin, unit: unit)
+        ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
+                DistanceCard(hole: hole, origin: origin, unit: unit)
+                Divider().frame(height: 32)
                 distanceSummary("POINT", pointDistanceText(origin: origin), color: FairwayVectorColors.orange)
-                Spacer(minLength: 0)
                 distanceSummary("TO FLAG", flagDistanceText(flag: flag, origin: origin), color: FairwayVectorColors.flightBlue)
+            }
+            VStack(spacing: 4) {
+                DistanceCard(hole: hole, origin: origin, unit: unit)
+                HStack {
+                    distanceSummary("POINT", pointDistanceText(origin: origin), color: FairwayVectorColors.orange)
+                    Spacer(minLength: 0)
+                    distanceSummary("TO FLAG", flagDistanceText(flag: flag, origin: origin), color: FairwayVectorColors.flightBlue)
+                }
             }
         }
         .padding(.horizontal, 12)
-        .padding(.top, 0)
+        .padding(.top, 4)
         .padding(.bottom, 5)
-        .frame(height: 68, alignment: .bottom)
         .frame(maxWidth: .infinity)
         .background {
             Rectangle()
@@ -365,7 +547,7 @@ struct CourseMapView: View {
     private func distanceSummary(_ title: String, _ value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title)
-                .font(.system(size: 8, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(FairwayVectorColors.slate)
             Text(value)
                 .font(.caption.weight(.semibold).monospacedDigit())
@@ -376,7 +558,7 @@ struct CourseMapView: View {
     }
 
     private func pointDistanceText(origin: DistanceOrigin?) -> String {
-        guard let tapPoint, let origin else { return unit.format(0) }
+        guard let tapPoint, let origin else { return "–" }
         return unit.format(GolfGeometry.distance(origin.point, tapPoint))
     }
 
@@ -423,7 +605,7 @@ struct CourseMapView: View {
     private func summaryValue(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(.system(size: 8, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(FairwayVectorColors.slate)
             Text(value)
                 .font(.caption.weight(.semibold).monospacedDigit())
@@ -440,13 +622,18 @@ struct CourseMapView: View {
         } label: {
             Image(systemName: isPrevious ? "chevron.left" : "chevron.right")
                 .font(.headline.weight(.bold))
-                .frame(width: 42, height: 42)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .buttonStyle(.borderedProminent)
         .tint(FairwayVectorColors.navy)
         .disabled(unavailable)
         .accessibilityLabel(isPrevious ? "Previous hole" : "Next hole")
     }
+}
+
+private struct MapAdviceHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 150
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 #Preview {

@@ -628,7 +628,8 @@ private struct WedgeAddClubView: View {
                                 brand: brand.trimmingCharacters(in: .whitespacesAndNewlines),
                                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
                                 fullCarry: stockDistance,
-                                isInBag: isInBag
+                                isInBag: isInBag,
+                                fullCarryUserProvided: true
                             )
                         )
                         dismiss()

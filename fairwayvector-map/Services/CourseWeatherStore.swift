@@ -38,6 +38,7 @@ enum CourseWeatherError: LocalizedError {
 final class CourseWeatherStore {
     private(set) var weather: CourseWeather?
     private(set) var weatherLocation: GeoPoint?
+    private(set) var fetchedAt: Date?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
     private var loadedLocationKey: String?
@@ -58,6 +59,10 @@ final class CourseWeatherStore {
         return weather
     }
 
+    var isStale: Bool {
+        fetchedAt.map { Date.now.timeIntervalSince($0) >= cacheDuration } ?? true
+    }
+
     func load(for location: GeoPoint, forceRefresh: Bool = false) async {
         let locationKey = Self.locationKey(location)
         if loadedLocationKey == locationKey, !forceRefresh, weather != nil { return }
@@ -67,6 +72,7 @@ final class CourseWeatherStore {
         if let cached = readCache(for: locationKey) {
             weather = cached.weather
             weatherLocation = location
+            fetchedAt = cached.fetchedAt
             if !forceRefresh, Date.now.timeIntervalSince(cached.fetchedAt) < cacheDuration {
                 errorMessage = nil
                 return
@@ -74,6 +80,7 @@ final class CourseWeatherStore {
         } else if locationChanged {
             weather = nil
             weatherLocation = nil
+            fetchedAt = nil
         }
 
         let requestID = UUID()
@@ -86,7 +93,9 @@ final class CourseWeatherStore {
             guard activeRequestID == requestID else { return }
             weather = current
             weatherLocation = location
-            writeCache(CachedCourseWeather(fetchedAt: .now, weather: current), for: locationKey)
+            let savedAt = Date.now
+            fetchedAt = savedAt
+            writeCache(CachedCourseWeather(fetchedAt: savedAt, weather: current), for: locationKey)
         } catch {
             guard activeRequestID == requestID else { return }
             errorMessage = error.localizedDescription

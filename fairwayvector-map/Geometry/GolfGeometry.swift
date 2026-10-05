@@ -137,6 +137,19 @@ enum GolfGeometry {
         return (degrees + 360).truncatingRemainder(dividingBy: 360)
     }
 
+    #if DEBUG
+    /// Spherical forward geodesic, with longitude normalized across the dateline.
+    static func destination(from start: GeoPoint, distanceM: Double, bearingDeg: Double) -> GeoPoint {
+        let lat = start.lat * .pi / 180, lon = start.lon * .pi / 180
+        let angle = distanceM / earthRadius, bearing = bearingDeg * .pi / 180
+        let nextLat = asin(max(-1, min(1, sin(lat) * cos(angle) + cos(lat) * sin(angle) * cos(bearing))))
+        let nextLon = lon + atan2(sin(bearing) * sin(angle) * cos(lat), cos(angle) - sin(lat) * sin(nextLat))
+        let degrees = nextLon * 180 / .pi
+        let normalized = (degrees + 540).truncatingRemainder(dividingBy: 360) - 180
+        return GeoPoint(lat: nextLat * 180 / .pi, lon: normalized)
+    }
+    #endif
+
     static func interpolate(_ a: GeoPoint, _ b: GeoPoint, fraction: Double) -> GeoPoint {
         GeoPoint(lat: a.lat + (b.lat - a.lat) * fraction, lon: a.lon + (b.lon - a.lon) * fraction)
     }

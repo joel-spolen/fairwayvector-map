@@ -33,7 +33,7 @@ struct DistanceCard: View {
     private func metric(_ title: String, _ meters: Double?, color: Color, prominent: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title.uppercased())
-                .font(.system(size: 8, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(FairwayVectorColors.slate)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(meters.map { "\(unit.value($0))" } ?? "–")
@@ -55,6 +55,7 @@ struct DistanceCard: View {
 struct DistanceOrigin {
     enum Source {
         case gps(accuracy: Double)
+        case simulated
         case teeNoFix
         case teeFarAway(distance: Double)
     }
@@ -66,6 +67,11 @@ struct DistanceOrigin {
 
     var usesGPS: Bool {
         if case .gps = source { return true }
+        return false
+    }
+
+    var isSimulated: Bool {
+        if case .simulated = source { return true }
         return false
     }
 
