@@ -76,7 +76,7 @@ enum ProfileDetailLevel: String, CaseIterable, Codable, Identifiable {
     }
 }
 
-enum TrajectoryGolfClub: String, CaseIterable, Codable, Identifiable {
+nonisolated enum TrajectoryGolfClub: String, CaseIterable, Codable, Identifiable, Sendable {
     case driver
     case threeWood
     case fourWood

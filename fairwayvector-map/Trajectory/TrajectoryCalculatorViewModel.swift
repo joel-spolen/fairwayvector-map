@@ -45,7 +45,7 @@ private struct PersistedTrajectoryConditions: Codable {
     let elevationDeltaM: Double
 }
 
-struct ClubRecommendation: Identifiable {
+nonisolated struct ClubRecommendation: Identifiable, Sendable {
     let club: TrajectoryGolfClub
     let estimatedCarryM: Double
     let differenceM: Double
@@ -53,11 +53,12 @@ struct ClubRecommendation: Identifiable {
     let targetElevationM: Double
     let heightAtTargetDistanceM: Double?
     let lateralAtTargetDistanceM: Double?
+    let prediction: HybridPrediction
 
     var id: TrajectoryGolfClub { club }
 }
 
-struct ClubRecommendationConditions {
+struct ClubRecommendationConditions: Equatable {
     var temperatureC: Double = 20.0
     var pressureInputMode: PressureInputMode = .elevation
     var pressureHpa: Double = 1013.25
@@ -128,6 +129,7 @@ final class TrajectoryCalculatorViewModel: ObservableObject {
     private(set) var lastCalculationBallSpeedMps: Double?
 
     private var predictor: HybridPredictor?
+    private let recommendationEngine = ClubRecommendationEngine()
     private var loadError: Error?
     private var cancellables = Set<AnyCancellable>()
     private var isSyncingAtmosphere = false
@@ -260,63 +262,10 @@ final class TrajectoryCalculatorViewModel: ObservableObject {
         )
     }
 
-    func recommendClub(for targetCarryM: Double, conditions: ClubRecommendationConditions) async throws -> [ClubRecommendation] {
-        guard targetCarryM > 0 else { return [] }
-        guard let predictor else {
-            throw loadError ?? HybridPredictorError.nonFiniteOutput("Prediction models failed to load.")
-        }
-        let pressure = try conditions.effectivePressureHpa()
-        let profile = playerProfileStore.profile
-        var recommendations: [ClubRecommendation] = []
-        var highestApexM = 0.0
-        for club in TrajectoryGolfClub.allCases where profile.availableClubs.contains(club) {
-            let launchProfile = ClubProfileDefaults.effectiveProfile(for: club, playerProfile: profile)
-            let shot = ShotInputs(
-                ballSpeedMps: launchProfile.ballSpeedMps.value,
-                launchAngleDeg: launchProfile.launchAngleDeg.value,
-                launchDirectionDeg: 0.0,
-                spinRateRpm: launchProfile.spinRateRpm.value,
-                spinAxisDeg: launchProfile.spinAxisDeg.value,
-                temperatureC: conditions.temperatureC,
-                pressureHpa: pressure,
-                relativeHumidityPct: conditions.humidityPct,
-                windXMps: conditions.tailwindMps,
-                windYMps: conditions.crosswindMps,
-                targetElevationDeltaM: conditions.elevationDeltaM
-            )
-            do {
-                let prediction = try predictor.predict(shot)
-                let carryM = prediction.hybrid["carry_m"] ?? launchProfile.carryDistanceM.value
-                recommendations.append(ClubRecommendation(
-                    club: club,
-                    estimatedCarryM: carryM,
-                    differenceM: abs(carryM - targetCarryM),
-                    trajectory: prediction.physics.trajectory,
-                    targetElevationM: conditions.elevationDeltaM,
-                    heightAtTargetDistanceM: heightAtDistance(
-                        targetCarryM,
-                        in: prediction.physics.trajectory
-                    ),
-                    lateralAtTargetDistanceM: lateralAtDistance(
-                        targetCarryM,
-                        in: prediction.physics.trajectory
-                    )
-                ))
-            } catch let error as HybridPredictorError {
-                if case let .targetElevationExceedsApex(_, apexM) = error {
-                    highestApexM = max(highestApexM, apexM)
-                    continue
-                }
-                throw error
-            }
-        }
-        if recommendations.isEmpty, conditions.elevationDeltaM > 0 {
-            throw HybridPredictorError.noClubCanReachTargetElevation(
-            targetM: conditions.elevationDeltaM,
-                highestApexM: highestApexM
-            )
-        }
-        return recommendations.sorted { $0.differenceM < $1.differenceM }
+    func recommendClub(for targetCarryM: Double, conditions: ClubRecommendationConditions,
+                       profile: TrajectoryPlayerProfile? = nil) async throws -> [ClubRecommendation] {
+        let launches = try ClubRecommendationEngine.launches(profile: profile ?? playerProfileStore.profile, conditions: conditions)
+        return try await recommendationEngine.recommend(for: targetCarryM, launches: launches)
     }
 
     func prepareTrajectory(for club: TrajectoryGolfClub, conditions: ClubRecommendationConditions) {
@@ -332,41 +281,6 @@ final class TrajectoryCalculatorViewModel: ObservableObject {
         crosswindMps = conditions.crosswindMps
         elevationDeltaM = conditions.elevationDeltaM
         errorMessage = nil
-    }
-
-    private func heightAtDistance(_ distanceM: Double, in trajectory: GolfTrajectory) -> Double? {
-        guard distanceM >= 0, trajectory.xM.count == trajectory.zM.count, !trajectory.xM.isEmpty else {
-            return nil
-        }
-        guard let lastX = trajectory.xM.last, distanceM <= lastX else { return nil }
-
-        for index in 1..<trajectory.xM.count {
-            let lowerX = trajectory.xM[index - 1]
-            let upperX = trajectory.xM[index]
-            guard distanceM <= upperX else { continue }
-            guard upperX != lowerX else { return trajectory.zM[index] }
-            let fraction = (distanceM - lowerX) / (upperX - lowerX)
-            return trajectory.zM[index - 1] + (trajectory.zM[index] - trajectory.zM[index - 1]) * fraction
-        }
-        return trajectory.zM.last
-    }
-
-    private func lateralAtDistance(_ distanceM: Double, in trajectory: GolfTrajectory) -> Double? {
-        guard distanceM >= 0, trajectory.xM.count == trajectory.yM.count, !trajectory.xM.isEmpty else {
-            return nil
-        }
-        guard let lastX = trajectory.xM.last else { return nil }
-        let sampledDistance = min(distanceM, lastX)
-
-        for index in 1..<trajectory.xM.count {
-            let lowerX = trajectory.xM[index - 1]
-            let upperX = trajectory.xM[index]
-            guard sampledDistance <= upperX else { continue }
-            guard upperX != lowerX else { return trajectory.yM[index] }
-            let fraction = (sampledDistance - lowerX) / (upperX - lowerX)
-            return trajectory.yM[index - 1] + (trajectory.yM[index] - trajectory.yM[index - 1]) * fraction
-        }
-        return trajectory.yM.last
     }
 
     func calculate(includeAdvancedConditions: Bool = true) {

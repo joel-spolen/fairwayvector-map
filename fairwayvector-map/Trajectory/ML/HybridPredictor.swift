@@ -1,6 +1,6 @@
 import Foundation
 
-enum HybridPredictorError: Error, LocalizedError {
+nonisolated enum HybridPredictorError: Error, LocalizedError {
     case missingResource(String)
     case invalidManifest(String)
     case nonFiniteOutput(String)
@@ -24,7 +24,7 @@ enum HybridPredictorError: Error, LocalizedError {
 }
 
 /// Physics-only, ML-correction, and final hybrid scalar outputs for one shot.
-struct HybridPrediction {
+nonisolated struct HybridPrediction: Sendable {
     var physics: FlightResult
     var corrections: [String: Double]
     var hybrid: [String: Double]
@@ -32,7 +32,7 @@ struct HybridPrediction {
 
 /// Frozen feature order for the HGB residual models. Must match `CONTINUOUS_FEATURES`
 /// in `validate_v11_ml_features.py` exactly.
-private let continuousFeatures = [
+nonisolated private let continuousFeatures = [
     "ball_speed_mps",
     "launch_angle_deg",
     "launch_direction_deg",
@@ -54,7 +54,7 @@ private let continuousFeatures = [
 ]
 
 /// Runtime port of `hybrid_v11_ml.py`: Physics V1.1 followed by five HGB residual corrections.
-final class HybridPredictor {
+nonisolated final class HybridPredictor: Sendable {
     private let models: [String: HGBModel]
     private static let dtS = 0.01
     private static let spinDecayPerS = 0.0

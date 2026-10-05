@@ -3,6 +3,7 @@ import SwiftUI
 struct CourseMapView: View {
     let reference: CourseReference
     let onChangeCourse: () -> Void
+    @EnvironmentObject private var trajectoryModel: TrajectoryCalculatorViewModel
 
     @State private var store: CourseStore
     @State private var weatherStore = CourseWeatherStore()
@@ -140,6 +141,9 @@ struct CourseMapView: View {
                         .padding(.top, 10)
                     }
                     Spacer(minLength: 0)
+                    CourseShotRecommendationView(terrainStore: terrainStore, weatherStore: weatherStore,
+                        weatherLocation: courseWeatherLocation, selectedTarget: tapPoint,
+                        unit: unit, model: trajectoryModel)
                     terrainPanel(hole: hole)
                     bottomHoleMenu(hole: hole, holeCount: holes.count)
                 }
@@ -425,4 +429,5 @@ struct CourseMapView: View {
 
 #Preview {
     CourseMapView(reference: .hills)
+        .environmentObject(TrajectoryCalculatorViewModel())
 }

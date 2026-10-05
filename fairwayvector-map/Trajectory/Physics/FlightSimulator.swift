@@ -1,7 +1,7 @@
 import Foundation
 
 /// Launch state, environment, and target geometry for one shot. Ported from `ShotInputs`.
-struct ShotInputs {
+nonisolated struct ShotInputs: Sendable {
     var ballSpeedMps: Double
     var launchAngleDeg: Double
     var launchDirectionDeg: Double
@@ -20,7 +20,7 @@ struct ShotInputs {
 }
 
 /// Full sampled flight path in ground-fixed axes (x = downrange, y = right, z = up).
-struct GolfTrajectory {
+nonisolated struct GolfTrajectory: Sendable {
     var tS: [Double] = []
     var xM: [Double] = []
     var yM: [Double] = []
@@ -32,7 +32,7 @@ struct GolfTrajectory {
 }
 
 /// Scalar and trajectory outputs for one simulated shot. Ported from `FlightResult`.
-struct FlightResult {
+nonisolated struct FlightResult: Sendable {
     var landed: Bool
 
     var actualTerrainCarryM: Double?
@@ -51,7 +51,7 @@ struct FlightResult {
 }
 
 /// Simple 3-vector for the flight-dynamics state, avoiding a SIMD dependency.
-private struct Vec3 {
+nonisolated private struct Vec3 {
     var x: Double
     var y: Double
     var z: Double
@@ -74,7 +74,7 @@ private struct Vec3 {
 }
 
 /// State vector integrated by RK4: [x, y, z, vx, vy, vz, omega_rad_s].
-private struct FlightState {
+nonisolated private struct FlightState {
     var position: Vec3
     var velocity: Vec3
     var omega: Double
@@ -87,7 +87,7 @@ private struct FlightState {
     }
 }
 
-enum FlightSimulator {
+nonisolated enum FlightSimulator {
     static func simulateShot(
         _ shot: ShotInputs,
         aero: PhysicsV11AeroModel = PhysicsV11AeroModel(),

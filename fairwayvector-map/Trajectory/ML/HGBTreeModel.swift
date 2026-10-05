@@ -1,7 +1,7 @@
 import Foundation
 
 /// One decision-tree node from an exported `HistGradientBoostingRegressor` tree.
-struct HGBNode: Decodable {
+nonisolated struct HGBNode: Decodable, Sendable {
     let isLeaf: Bool
     let value: Double
     let featureIdx: Int
@@ -12,7 +12,7 @@ struct HGBNode: Decodable {
 }
 
 /// One target's exported HGB model: baseline prediction plus an additive tree ensemble.
-struct HGBModel: Decodable {
+nonisolated struct HGBModel: Decodable, Sendable {
     let target: String
     let exportName: String
     let featureList: [String]
@@ -44,7 +44,7 @@ struct HGBModel: Decodable {
     }
 }
 
-enum HGBModelLoader {
+nonisolated enum HGBModelLoader {
     /// Loads a single exported model JSON (e.g. "carry") from the app bundle.
     static func load(exportName: String, bundle: Bundle = .main) throws -> HGBModel {
         guard let url = bundle.url(forResource: exportName, withExtension: "json", subdirectory: "MLModels")

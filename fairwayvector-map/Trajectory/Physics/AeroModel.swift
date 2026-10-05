@@ -1,7 +1,7 @@
 import Foundation
 
 /// Replaceable Cd/Cl calibration scaffold, ported from `ParametricAeroModel`.
-struct ParametricAeroModel {
+nonisolated struct ParametricAeroModel: Sendable {
     var cd0: Double = 0.225
     var cdSpinSlope: Double = 0.28
     var clSpinSlope: Double = 1.50
@@ -18,7 +18,7 @@ struct ParametricAeroModel {
 }
 
 /// V1 candidate model: baseline drag * 0.97 with the KK raw lift relation, ported from `V1AeroModel`.
-struct V1AeroModel {
+nonisolated struct V1AeroModel: Sendable {
     var baselineModel = ParametricAeroModel()
     var cdMultiplier: Double = 0.97
 
@@ -31,7 +31,7 @@ struct V1AeroModel {
 }
 
 /// Frozen Physics V1.1 configuration, ported from `physics_v11.py`. Do not retune.
-enum PhysicsV11Constants {
+nonisolated enum PhysicsV11Constants {
     static let version = "Physics V1.1"
     static let s1Upper = 0.08164632386599759
     static let s2Upper = 0.10409826875477744
@@ -39,7 +39,7 @@ enum PhysicsV11Constants {
 }
 
 /// V1.1 aerodynamic wrapper over V1 with smooth low-spin Cl taper, ported from `PhysicsV11AeroModel`.
-struct PhysicsV11AeroModel {
+nonisolated struct PhysicsV11AeroModel: Sendable {
     var baseV1Model = V1AeroModel()
 
     private func clMultiplier(spinFactor: Double) -> Double {

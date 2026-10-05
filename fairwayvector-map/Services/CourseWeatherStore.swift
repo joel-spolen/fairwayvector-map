@@ -37,6 +37,7 @@ enum CourseWeatherError: LocalizedError {
 @Observable
 final class CourseWeatherStore {
     private(set) var weather: CourseWeather?
+    private(set) var weatherLocation: GeoPoint?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
     private var loadedLocationKey: String?
@@ -50,6 +51,13 @@ final class CourseWeatherStore {
         self.fileManager = fileManager
     }
 
+    /// Read-only association check; never loads or refreshes weather. Prevents
+    /// an old location's conditions being used during a geometry/location change.
+    func weather(for location: GeoPoint) -> CourseWeather? {
+        guard let weatherLocation, Self.locationKey(weatherLocation) == Self.locationKey(location) else { return nil }
+        return weather
+    }
+
     func load(for location: GeoPoint, forceRefresh: Bool = false) async {
         let locationKey = Self.locationKey(location)
         if loadedLocationKey == locationKey, !forceRefresh, weather != nil { return }
@@ -58,12 +66,14 @@ final class CourseWeatherStore {
         loadedLocationKey = locationKey
         if let cached = readCache(for: locationKey) {
             weather = cached.weather
+            weatherLocation = location
             if !forceRefresh, Date.now.timeIntervalSince(cached.fetchedAt) < cacheDuration {
                 errorMessage = nil
                 return
             }
         } else if locationChanged {
             weather = nil
+            weatherLocation = nil
         }
 
         let requestID = UUID()
@@ -75,6 +85,7 @@ final class CourseWeatherStore {
             let current = try await fetch(for: location)
             guard activeRequestID == requestID else { return }
             weather = current
+            weatherLocation = location
             writeCache(CachedCourseWeather(fetchedAt: .now, weather: current), for: locationKey)
         } catch {
             guard activeRequestID == requestID else { return }

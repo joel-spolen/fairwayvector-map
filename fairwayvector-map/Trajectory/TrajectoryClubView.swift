@@ -77,9 +77,23 @@ struct TrajectoryClubView: View {
     @State private var recommendations: [ClubRecommendation] = []
     @State private var errorMessage: String?
     @State private var isCalculating = false
+    @State private var recommendationGeneration = 0
+    @State private var recommendationTask: Task<Void, Never>?
     @State private var showConditions = false
     @State private var showSettings = false
     private let recommendationAnchor = "recommended-club"
+
+    private struct RecommendationInput: Equatable {
+        let targetCarryM: Double
+        let conditions: ClubRecommendationConditions
+        let profile: TrajectoryPlayerProfile
+    }
+
+    private var recommendationInput: RecommendationInput {
+        RecommendationInput(targetCarryM: targetCarryMetersValue,
+                            conditions: clubConditions.snapshot,
+                            profile: viewModel.playerProfileStore.profile)
+    }
 
     init(viewModel: TrajectoryCalculatorViewModel, onOpenTrajectory: @escaping () -> Void = {}) {
         self.viewModel = viewModel
@@ -134,10 +148,9 @@ struct TrajectoryClubView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button {
+                            invalidateRecommendation()
                             targetCarryMetersValue = Units.metersFromYards(150)
                             clubConditions.reset()
-                            recommendations = []
-                            errorMessage = nil
                         } label: {
                             Text("Reset")
                         }
@@ -157,6 +170,8 @@ struct TrajectoryClubView: View {
         }
         .navigationTitle("Club")
         .accessibilityIdentifier("club-screen")
+        .onChange(of: recommendationInput) { _, _ in invalidateRecommendation() }
+        .onDisappear { invalidateRecommendation() }
         .sheet(isPresented: $showSettings) {
             UnifiedSettingsView()
         }
@@ -586,24 +601,47 @@ struct TrajectoryClubView: View {
         return lateral > 0 ? "Aim \(aimDistance) left" : "Aim \(aimDistance) right"
     }
 
+    private func invalidateRecommendation() {
+        recommendationGeneration += 1
+        recommendationTask?.cancel()
+        recommendationTask = nil
+        isCalculating = false
+        recommendations = []
+        errorMessage = nil
+    }
+
     private func calculateRecommendation() {
-        guard targetCarryMetersValue > 0 else {
+        invalidateRecommendation()
+        let captured = recommendationInput
+        let generation = recommendationGeneration
+        guard captured.targetCarryM.isFinite, captured.targetCarryM > 0 else {
             errorMessage = "Set a target carry distance greater than zero."
-            recommendations = []
             return
         }
-        let targetCarryM = targetCarryMetersValue
-        errorMessage = nil
         isCalculating = true
-        let conditions = clubConditions.snapshot
-        Task { @MainActor in
+        recommendationTask = Task { @MainActor in
+            // Only the owning request may clear the spinner/task of a newer run.
+            defer {
+                if recommendationGeneration == generation {
+                    isCalculating = false
+                    recommendationTask = nil
+                }
+            }
+            guard !Task.isCancelled, recommendationGeneration == generation,
+                  recommendationInput == captured else { return }
             do {
-                recommendations = try await viewModel.recommendClub(for: targetCarryM, conditions: conditions)
+                let calculated = try await viewModel.recommendClub(for: captured.targetCarryM,
+                    conditions: captured.conditions, profile: captured.profile)
+                guard !Task.isCancelled, recommendationGeneration == generation,
+                      recommendationInput == captured else { return }
+                recommendations = calculated
+            } catch is CancellationError {
+                // Reset/input edits/new requests own the screen now.
             } catch {
-                recommendations = []
+                guard !Task.isCancelled, recommendationGeneration == generation,
+                      recommendationInput == captured else { return }
                 errorMessage = error.localizedDescription
             }
-            isCalculating = false
         }
     }
 }

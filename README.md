@@ -47,8 +47,8 @@ cancellations, server failures and other uncertain attempts remain counted.
 Every validated returned point is preserved exactly with source name, source
 resolution, capture dates, dataset version header, interpolation, fetched date,
 and **EGM2008** height datum. Displayed sample interval and actual source
-resolution are separate. No guaranteed accuracy, green-reading or plays-like
-recommendation is implied. The profile and Settings link to GPXZ and its public
+resolution are separate. Terrain alone does not imply guaranteed accuracy,
+green-reading or plays-like advice. The profile and Settings link to GPXZ and its public
 source/credit/licence catalogue. The sheet displays separate provenance for
 origin→target and target→flag, including each path's returned source identifiers,
 resolution, dates, version and sample interval. No real source-specific credit
@@ -207,6 +207,79 @@ Runtime GPXZ sampling sends course/shot coordinates, potentially the golfer's
 captured GPS location, to GPXZ. Weather (Open-Meteo), course providers and Apple
 Maps remain independent and unchanged. This README/UI disclosure is not a
 substitute for reviewing the release privacy policy and App Store declarations.
+
+## On-course club recommendation
+
+After releasing a selected map target, a compact card above the terrain panel
+shows the best modeled full-swing club and up to two closest alternatives, with
+predicted carry and signed short/long error against the horizontal origin→target
+distance. Tap for alternatives, existing Trajectory results/physics charts with
+target markers, captured conditions and endpoint terrain provenance. GPS is used
+when the existing on-hole origin resolver permits it; otherwise the card explicitly
+labels the tee fallback. No recommendation is shown for an unselected flag alone.
+
+Practice and Course share `ClubRecommendationEngine`: the same effective club
+launch profiles, Physics V1.1 integration, bundled HGB residual models, and absolute
+corrected-carry-error ranking. Evaluation uses immutable launch snapshots on a
+background actor and never prepares/selects a club or writes Practice conditions,
+results, units or profile state. Missing model outputs do not fall back to stock
+yardages. Setup and a nonempty bag are required. Simple mode explicitly labels its
+handicap-based defaults; Medium/Advanced without any applicable calibration anchor
+offer the existing Practice/Profile configuration sheet instead of predictions.
+
+Complete captured course temperature, relative humidity, **surface** pressure and
+wind plus matching finite origin/target terrain endpoints are required. No flat,
+calm, sea-level-pressure or phone-altitude fallback is invented. Weather wind is
+already m/s; meteorological FROM direction is rotated relative to the true shot
+bearing: tailwind = −speed·cos(FROM−bearing), right-crosswind = −speed·sin(FROM−bearing).
+The weather UI's km/h conversion is display-only. Pressure remains hPa; the existing
+atmosphere routine converts it to Pa exactly once. Absolute GPXZ heights are shown
+as provenance; target-minus-origin height alone sets the landing plane. Direct
+surface pressure is **not** compensated again for terrain altitude.
+
+The shared top-down physics chart is viewed from the golfer toward the target:
+forward is up, positive lateral (physical right) is screen-right, and the target
+is at zero lateral/selected downrange. Previously it plotted downrange horizontally
+and lateral vertically (positive right upward), a different viewpoint from the map.
+Course details now show a blowing-TO arrow from the **captured** tail/right wind
+components in these same chart axes, true shot/right cardinal bearings, and the
+selected club's modeled spin axis. The map arrow still correctly converts FROM
+to TO and subtracts the actual camera heading, initially tee→green; that heading
+can differ from the captured origin→target bearing. Physics, FROM conversion,
+Practice wind controls and recommendation ranking are unchanged. Spin-induced
+curvature can oppose wind; no claim is made that it caused the reported shot.
+New offline regression source covers northward shots with east/west FROM wind,
+shared-engine wind signs, zero-spin physical lateral signs, top-down coordinates,
+target placement and arrow rotations. This fix is validated with an **app-only**
+build; these new tests are neither compiled nor executed in that validation.
+
+Dragging clears obsolete recommendations; only committed targets are evaluated.
+Weather/profile changes recompute locally, with cancellation, captured-input
+identity and publication guards. Incoming GPS fixes do **not** recommit shots,
+read terrain cache, or invalidate captured-origin advice or an ongoing acquisition.
+The card explicitly describes advice at the committed GPS/tee fallback position,
+not live GPS. Releasing a target or confirming Refresh terrain captures the latest
+origin using the existing cache-first acquisition/permission flow. Practice also
+invalidates pending results on Reset, target/condition edits and profile/bag changes;
+only the matching request generation and complete captured input may publish or
+finish its calculating state. The recommender contains no GPXZ, Golf API or weather
+requests and does not trigger weather refresh. Existing weather refresh/cache
+behavior is unchanged; a read-only weather-location association guard prevents
+old-location weather from being relabelled during a geometry change. Details always identify the provider observation time,
+which can be cached; forecast surface pressure and 10 m wind are course-level,
+not measurements at the golfer. Gusts and altitude-based pressure relocation are
+not modeled.
+
+Carry includes the existing ML correction; charts and lateral/downrange outcomes
+remain uncorrected physics paths and are labelled accordingly. Ranking is closest
+carry (the existing horizontal landing distance including lateral drift, not
+downrange alone), not a guaranteed target hit or crosswind-optimized aim. The landing surface
+is a horizontal plane at the target elevation, not the intervening terrain profile:
+obstacles, hazards, roll, partial swings, GPS error and shot dispersion are not
+simulated. Short/unreachable physics flights are disclosed in details. Offline
+regression source covers wind rotation, pressure/height separation, missing inputs,
+stale endpoint rejection, shared-engine equivalence and Practice-state preservation;
+it is compiled only, **not executed**.
 
 ## Legacy work and validation policy
 

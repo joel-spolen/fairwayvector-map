@@ -1,7 +1,7 @@
 import Foundation
 
 /// Physical constants and atmosphere helpers ported from `golf_flight_sim.py`.
-enum GolfConstants {
+nonisolated enum GolfConstants {
     static let gravityMps2 = 9.80665
     static let ballMassKg = 0.04593
     static let ballRadiusM = 0.021335
@@ -12,7 +12,7 @@ enum GolfConstants {
     static let rWaterVapor = 461.495
 }
 
-enum AtmosphereError: Error, LocalizedError {
+nonisolated enum AtmosphereError: Error, LocalizedError {
     case invalidAltitude
     case invalidPressure
 
@@ -26,7 +26,7 @@ enum AtmosphereError: Error, LocalizedError {
     }
 }
 
-enum Atmosphere {
+nonisolated enum Atmosphere {
     /// Smooth engineering approximation for saturation vapor pressure over water.
     static func saturationVaporPressurePa(temperatureC: Double) -> Double {
         611.2 * exp(17.67 * temperatureC / (temperatureC + 243.5))

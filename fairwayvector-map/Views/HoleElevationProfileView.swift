@@ -27,7 +27,7 @@ struct HoleElevationProfileView: View {
     }
 
     private var startLabel: String {
-        mode == .hole ? "Tee" : (usesGPS ? "GPS position" : "Tee fallback")
+        mode == .hole ? "Tee" : (usesGPS ? "Captured GPS position" : "Captured tee fallback")
     }
 
     private var endLabel: String {
@@ -140,10 +140,10 @@ struct HoleElevationProfileView: View {
             .font(.subheadline)
 
             if mode == .shot && !usesGPS {
-                Text("The current shot starts at the tee fallback, not your GPS position. Its endpoint is the selected target.")
+                Text("The committed shot starts at the captured tee fallback, not your live GPS position. Its endpoint is the selected target.")
                     .font(.footnote).foregroundStyle(.secondary)
             } else if mode == .shot {
-                Text("The current shot runs from your GPS position to the selected target, not necessarily the flag.")
+                Text("The committed shot runs from your captured GPS position to the selected target, not necessarily the flag. Incoming GPS fixes do not update this origin.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             if profile.isStraightLine {
