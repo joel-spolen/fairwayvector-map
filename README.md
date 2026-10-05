@@ -1,8 +1,72 @@
-# FairwayVector Map — GPXZ terrain migration
+# FairwayVector Map — development API pause + GPXZ terrain
+
+## Development pause — default for BOTH Debug and Release
+
+**Golf API and GPXZ default to MOCK, regardless of existing credentials.**
+Tracked build settings are `GOLF_API_MODE = mock` and `GPXZ_API_MODE = mock`.
+The shared `DevelopmentAPIConfiguration` reads their Info.plist values; only
+an explicit `live` value enables a provider. Missing/blank/unknown/unexpanded
+values are mock. Existing ignored credential files were not read or edited.
+Settings displays each provider's read-only mode. There is no persisted runtime
+toggle and no automatic activation when a key exists.
+
+- Golf API search/detail/coordinates/refresh run locally. Search **Sweden** and
+  **Hills** (or leave the name blank) for **Demo Hills**, an invented 18-hole
+  layout near 57.62° N, 12.00° E. Tee lengths, par, indexes, GPS tee/green
+  markers and two rated tee sets are illustrative, **not factual Hills data**.
+  Other countries/clubs return no matches; this is not worldwide coverage.
+- Old live recent selections reopen as Demo Hills, explicitly labelled, without
+  replacing the live recent reference. Demo recent selection has separate storage.
+  CourseStore remaps before cache lookup, including legacy OSM references; mock
+  geometry is reconstructed, never read/written/migrated in live geometry caches.
+- Synthetic elevations form a smooth coordinate-based rolling surface, with
+  coherent shared endpoints, no survey dates and no surveyed height datum.
+  Charts/source metadata and recommendations say **Synthetic development terrain**
+  / **DEMO DATA**. Not for play, navigation, real ratings or terrain assessment.
+- GPXZ mock profiles use the same serialized overlap planner and journal/cache
+  machinery, under `development-gpxz-v1:<courseID>` plus a separate versioned
+  synthetic sidecar. Open/reopen and target commits can compute local fixtures,
+  even with cache-only paid permits. They never read/write the live sidecar or
+  inspect/initialize/reserve/reset the live budget, failure locks or backoff.
+  UI shows **Mock · 0 paid requests**, not a reset live quota. Historical calls
+  (including the existing five), locks and initialization markers stay intact.
+- Both clients hard-gate at their final transport method **before URLSession**.
+  Mock mode does not load bundle keys; explicit injected keys cannot enable it.
+  Golf API mock bypasses all provider caches, including force refresh.
+  Demo IDs are blocked from live provider requests after switching modes.
+- **Open-Meteo weather and Apple Maps remain live/cache-backed and unchanged.**
+  Recommendations still require complete matching weather and the existing
+  Practice bag/calibration; no invented wind, weather or launch calibration.
+
+### Explicit activation for later authorized testing
+
+Leave tracked defaults at `mock`. In the existing ignored local config for the
+provider being tested, add **`GOLF_API_MODE = live`** or **`GPXZ_API_MODE = live`**,
+respectively. Local includes occur **after** tracked defaults. Keep the existing
+`GOLF_API_KEY` / `GPXZ_API_KEY` privately configured there; never paste/print them.
+Alternatively set those mode build settings explicitly in Xcode or as xcodebuild
+build-setting overrides. Rebuild/reinstall and verify Settings says **LIVE** for
+only the intended provider before using it. Keys alone never activate a provider.
+To pause again, remove the local mode override or set it to `mock`, rebuild and
+verify Settings. No UI action can flip a mock build to live.
+
+For full real-course activation enable Golf API, select a real provider course
+instead of a demo reference, and enable GPXZ separately when authorized. Live
+mode retains the existing cache-first release-only acquisition, 100-call ledger,
+failure-lock and backoff rules described below. Live course searches/update
+checks and explicit missing shot terrain acquisition can spend provider calls.
+This does not validate provider acceptance, account credentials or billing.
+
+Offline regression **source** covers fail-safe mode parsing, existing-key mock
+gates, country/club filters, cache bypass, 18-hole geometry, synthetic endpoints,
+reversal/relaunch coverage, untouched five-call ledger/locks/markers/live cache,
+and absence of new ledger initialization. Transport-evaluation tests now opt in
+to `.live` explicitly **only with intercepted offline URLSessions**. Compilation
+is permitted; test execution/app launch/live API calls are not part of this work.
 
 ## Local evaluation configuration
 
-The tracked GPXZ configuration defaults to a blank key. Optionally create
+For later explicitly enabled live evaluation, the tracked GPXZ configuration defaults to a blank key. Optionally create
 `fairwayvector-map/GPXZ.local.xcconfig` locally and set `GPXZ_API_KEY` there.
 It is ignored by Git and excluded from resources. It is independent of the
 Golf API key. Opening a course/hole/tee/saved flag reads terrain cache only,
@@ -19,7 +83,7 @@ source terms and credits before redistributing any cached data.
 
 ## Provider and validation
 
-Only GPXZ `POST /v1/elevation/sample` supplies runtime terrain worldwide.
+In explicitly enabled live mode, only GPXZ `POST /v1/elevation/sample` supplies runtime terrain worldwide.
 Paths use WGS84 latitude/longitude vertices, retained in order, with
 pipe-separated `latlons`, `samples` between 2 and 512, `interpolation: bilinear`,
 `bathymetry: false`, and `x-api-key` in the header only. Maximum path size is

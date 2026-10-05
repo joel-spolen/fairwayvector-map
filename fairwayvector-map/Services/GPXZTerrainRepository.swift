@@ -135,7 +135,7 @@ actor GPXZTerrainRepository {
 
     init(root: URL = CourseDataStore.root, client: GPXZElevationClient? = nil, ledgerURL: URL? = nil) {
         self.root = root
-        self.client = client ?? GPXZElevationClient(key: Bundle.main.object(forInfoDictionaryKey: "GPXZ_API_KEY") as? String ?? "")
+        self.client = client ?? GPXZElevationClient()
         self.ledger = GPXZBudgetLedger(url: ledgerURL ?? root.deletingLastPathComponent()
             .appendingPathComponent("GPXZ", isDirectory: true).appendingPathComponent("monthly-ledger-v1.json"))
     }
@@ -157,6 +157,8 @@ actor GPXZTerrainRepository {
 
     /// Serialize consent after already-sent work so its failure cannot race lock clearing.
     func prepareExplicitRetry() async -> String? {
+        // Mock retry must not even initialize/read the live ledger or clear its locks.
+        guard client.mode == .live else { return nil }
         let previous = tail
         let job = Task.detached { [self] () -> String? in
             await previous?.value
@@ -168,7 +170,8 @@ actor GPXZTerrainRepository {
     }
 
     private func url(_ courseID: String) -> URL {
-        CourseDataStore.directory(courseID: courseID, root: root).appendingPathComponent("terrain-gpxz-v1.json")
+        CourseDataStore.directory(courseID: courseID, root: root).appendingPathComponent(
+            client.mode == .mock ? "terrain-synthetic-development-v1.json" : "terrain-gpxz-v1.json")
     }
     private func journalURL(_ courseID: String) -> URL { url(courseID).appendingPathExtension("pending") }
     private func flushPending(_ courseID: String) throws {
@@ -223,6 +226,13 @@ actor GPXZTerrainRepository {
     private func fetch(courseID: String, path: [GeoPoint], straight: Bool, allowPaid: Bool, maySend: @Sendable () -> Bool,
                        dispatch: @Sendable (@Sendable () -> Void) -> Bool,
                        progress: @Sendable (TerrainFetchResult) async -> Void) async -> TerrainFetchResult {
+                // Before live cache, failure locks, quota reads/initialization, or any reservation.
+                if client.mode == .mock { return await fetchSynthetic(courseID: courseID, path: path, straight: straight, progress: progress) }
+                guard !DevelopmentAPIConfiguration.isDemoCourse(courseID),
+                            !courseID.hasPrefix(DevelopmentAPIConfiguration.terrainNamespace) else {
+                        return TerrainFetchResult(profile: nil,
+                                message: "Demo course: live terrain requests are blocked. Select a real course for live testing.", quota: nil, plannedCalls: 0)
+                }
         var cache: TerrainCourseCache?
         var plan: TerrainCoveragePlan?
         var planned = 0
@@ -309,5 +319,44 @@ actor GPXZTerrainRepository {
         return TerrainFetchResult(profile: cache.flatMap { c in plan.map { $0.profile(cache: c, straight: straight) } },
                                   message: message, quota: quota, plannedCalls: planned,
                                   remainingCalls: plan?.uncovered.count ?? 0, paused: paused)
+    }
+
+    /// Same serialized overlap planner/journal machinery, but a disjoint versioned identity/sidecar.
+    /// Cache-only opens may compute synthetic data locally; no paid permit is needed for arithmetic.
+    private func fetchSynthetic(courseID: String, path: [GeoPoint], straight: Bool,
+                                progress: @Sendable (TerrainFetchResult) async -> Void) async -> TerrainFetchResult {
+        let identity = DevelopmentAPIConfiguration.terrainNamespace + courseID
+        var cache: TerrainCourseCache?
+        do {
+            var current = try read(identity)
+            cache = current
+            let initial = try TerrainCoveragePlan(path: path, cache: current)
+            for gap in initial.uncovered {
+                let span = TerrainGeometry.slice(initial.path, from: gap.lowerBound, to: gap.upperBound)
+                let (request, count) = try client.request(path: span)
+                let record = try await client.send(request, path: span, count: count)
+                current.responses.append(record)
+                try current.validate(expectedID: identity)
+                cache = current
+                try persistReceived(current)
+            }
+            if initial.path.count == 1, let point = initial.path.first {
+                // Coincident paths are local arithmetic, never a fabricated live provider response.
+                let source = TerrainProvenance(dataSource: DevelopmentAPIConfiguration.syntheticSource,
+                    resolutionMeters: 1, captureDateMin: nil, captureDateMax: nil, datasetVersion: "synthetic-development-v1",
+                    fetchedAt: .now, interpolation: "analytical synthetic surface", verticalDatum: "Synthetic (not surveyed)",
+                    providerSampleIntervalMeters: 1)
+                return TerrainFetchResult(profile: TerrainProfile(samples: [TerrainSample(distanceMeters: 0, point: point,
+                    elevationMeters: GPXZElevationClient.syntheticElevation(at: point), provenance: [source])], isStraightLine: straight),
+                    message: nil, quota: nil, plannedCalls: 0)
+            }
+            let profile = try TerrainCoveragePlan(path: path, cache: current).profile(cache: current, straight: straight)
+            let result = TerrainFetchResult(profile: profile, message: nil, quota: nil, plannedCalls: 0)
+            await progress(result)
+            return result
+        } catch {
+            let profile = cache.flatMap { cache in (try? TerrainCoveragePlan(path: path, cache: cache))?.profile(cache: cache, straight: straight) }
+            return TerrainFetchResult(profile: profile, message: "Demo terrain storage: \(error.localizedDescription)", quota: nil, plannedCalls: 0)
+        }
     }
 }

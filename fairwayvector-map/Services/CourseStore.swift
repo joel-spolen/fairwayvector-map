@@ -18,12 +18,14 @@ final class CourseStore {
         client: OverpassClient = OverpassClient(),
         golfAPIClient: GolfAPIClient = GolfAPIClient()
     ) {
-        self.reference = reference
+        self.reference = golfAPIClient.mode == .mock
+            ? DevelopmentGolfAPIFixtures.reference(teeID: reference.golfAPITeeID, sex: reference.teeSex) : reference
         self.client = client
         self.golfAPIClient = golfAPIClient
     }
 
     func load() async {
+        if golfAPIClient.mode == .mock { await refresh(); return }
         if course == nil {
             course = readCache()
         }
@@ -105,6 +107,8 @@ final class CourseStore {
     }
 
     private func writeCache(_ course: Course) {
+        // Demo geometry is inexpensive to reconstruct and must never migrate/write live caches.
+        guard golfAPIClient.mode == .live else { return }
         guard let url = cacheURL, let data = try? JSONEncoder().encode(course) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: url, options: .atomic)

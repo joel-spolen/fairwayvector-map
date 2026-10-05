@@ -11,18 +11,24 @@ struct GolfAPIClient {
     private let session: URLSession
     private let cache: GolfAPICache
     private let apiKey: String
+    let mode: DevelopmentAPIConfiguration.Mode
 
     init(
         session: URLSession = .shared,
         cache: GolfAPICache = GolfAPICache(),
-        apiKey: String? = nil
+        apiKey: String? = nil,
+        mode: DevelopmentAPIConfiguration.Mode = DevelopmentAPIConfiguration.current.golfAPI
     ) {
         self.session = session
         self.cache = cache
-        self.apiKey = apiKey ?? (Bundle.main.object(forInfoDictionaryKey: "GOLF_API_KEY") as? String ?? "")
+        self.mode = mode
+        self.apiKey = mode == .mock ? "" : (apiKey ?? (Bundle.main.object(forInfoDictionaryKey: "GOLF_API_KEY") as? String ?? ""))
     }
 
-    var isConfigured: Bool { !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    var isConfigured: Bool {
+        mode == .mock || (!apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !apiKey.contains("$(") && !apiKey.contains("${"))
+    }
 
     func searchClubs(
         named query: String = "",
@@ -34,7 +40,7 @@ struct GolfAPIClient {
         let normalizedCountry = country.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedRegion = region.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedQuery.isEmpty || !normalizedCountry.isEmpty || !normalizedRegion.isEmpty else { return [] }
-        if !forceRefresh, let cached = cache.readSearch(query: normalizedQuery, country: normalizedCountry, region: normalizedRegion) {
+        if mode == .live, !forceRefresh, let cached = cache.readSearch(query: normalizedQuery, country: normalizedCountry, region: normalizedRegion) {
             return try Self.decodeClubs(from: cached)
         }
 
@@ -44,12 +50,12 @@ struct GolfAPIClient {
         if !normalizedQuery.isEmpty { queryItems.append(URLQueryItem(name: "name", value: normalizedQuery)) }
         let data = try await get("/clubs", queryItems: queryItems)
         _ = try Self.decodeClubs(from: data)
-        cache.writeSearch(data, query: normalizedQuery, country: normalizedCountry, region: normalizedRegion)
+        if mode == .live { cache.writeSearch(data, query: normalizedQuery, country: normalizedCountry, region: normalizedRegion) }
         return try Self.decodeClubs(from: data)
     }
 
     func loadCourseDetail(id: String, forceRefresh: Bool = false) async throws -> GolfAPICourseDetail {
-        if !forceRefresh, let cached = cache.readCourseDetail(id: id) {
+        if mode == .live, !forceRefresh, let cached = cache.readCourseDetail(id: id) {
             return try Self.decodeDetail(from: cached)
         }
         let data = try await get("/courses/\(id)")
@@ -57,17 +63,17 @@ struct GolfAPIClient {
         guard detail.courseID == id else {
             throw GolfAPIError.invalidResponse("The returned course ID does not match the requested course.")
         }
-        cache.writeCourseDetail(data, id: id)
+        if mode == .live { cache.writeCourseDetail(data, id: id) }
         return detail
     }
 
     func loadCoordinates(id: String, forceRefresh: Bool = false) async throws -> [GolfAPICoordinate] {
-        if !forceRefresh, let cached = cache.readCoordinates(id: id) {
+        if mode == .live, !forceRefresh, let cached = cache.readCoordinates(id: id) {
             return try Self.decodeCoordinates(from: cached, expectedCourseID: id)
         }
         let data = try await get("/coordinates/\(id)")
         let coordinates = try Self.decodeCoordinates(from: data, expectedCourseID: id)
-        cache.writeCoordinates(data, id: id)
+        if mode == .live { cache.writeCoordinates(data, id: id) }
         return coordinates
     }
 
@@ -88,6 +94,7 @@ struct GolfAPIClient {
     }
 
     func checkForUpdates(to detail: GolfAPICourseDetail) async throws -> Bool {
+        guard mode == .live else { return false }
         guard let timestamp = detail.timestampUpdated, !timestamp.isEmpty else { return false }
         let data = try await get("/courses", queryItems: [
             URLQueryItem(name: "country", value: "Sweden"),
@@ -101,6 +108,11 @@ struct GolfAPIClient {
     }
 
     private func get(_ path: String, queryItems: [URLQueryItem] = []) async throws -> Data {
+        // Hard gate at the only transport boundary, BEFORE keys, URLRequest or URLSession.
+        if mode == .mock { return try DevelopmentGolfAPIFixtures.response(path: path, queryItems: queryItems) }
+        guard !DevelopmentAPIConfiguration.isDemoCourse(path) else {
+            throw GolfAPIError.invalidResponse("Demo IDs cannot be sent to the live provider. Select a real course after rebuilding in live mode.")
+        }
         guard isConfigured else { throw GolfAPIError.missingAPIKey }
         var components = URLComponents(url: Self.baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
         if !queryItems.isEmpty { components.queryItems = queryItems }

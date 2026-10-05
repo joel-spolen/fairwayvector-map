@@ -13,8 +13,12 @@ nonisolated final class GPXZRedirectPolicy: NSObject, URLSessionTaskDelegate, @u
 nonisolated struct GPXZElevationClient: Sendable {
     let session: URLSession
     let key: String
-    init(key: String, session: URLSession? = nil) {
-        self.key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+    let mode: DevelopmentAPIConfiguration.Mode
+    init(key: String? = nil, session: URLSession? = nil,
+         mode: DevelopmentAPIConfiguration.Mode = DevelopmentAPIConfiguration.current.gpxz) {
+        self.mode = mode
+        self.key = mode == .mock ? "" : (key ?? (Bundle.main.object(forInfoDictionaryKey: "GPXZ_API_KEY") as? String ?? ""))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 45
@@ -22,8 +26,9 @@ nonisolated struct GPXZElevationClient: Sendable {
         self.session = session ?? URLSession(configuration: config, delegate: GPXZRedirectPolicy(), delegateQueue: nil)
     }
     var configured: Bool {
-        !key.isEmpty && !key.contains("$(") && !key.contains("${") && !key.contains("YOUR_")
+        mode == .mock || (!key.isEmpty && !key.contains("$(") && !key.contains("${") && !key.contains("YOUR_")
             && !key.contains("<") && !key.contains(">")
+        )
     }
 
     struct Response: Decodable, Sendable {
@@ -51,9 +56,10 @@ nonisolated struct GPXZElevationClient: Sendable {
         guard path.count >= 2, length > 0, length.isFinite else { throw TerrainError.invalidPath }
         let count = length >= 511 ? 512 : max(2, Int(ceil(length)) + 1)
         guard (2...512).contains(count) else { throw TerrainError.invalidPath }
-        var request = URLRequest(url: URL(string: "https://api.gpxz.io/v1/elevation/sample")!)
+        var request = URLRequest(url: URL(string: mode == .mock
+            ? "https://development.invalid/synthetic-terrain" : "https://api.gpxz.io/v1/elevation/sample")!)
         request.httpMethod = "POST"
-        request.setValue(key, forHTTPHeaderField: "x-api-key")
+        if mode == .live { request.setValue(key, forHTTPHeaderField: "x-api-key") }
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         var form = URLComponents()
         form.queryItems = [
@@ -72,6 +78,10 @@ nonisolated struct GPXZElevationClient: Sendable {
 
     func send(_ request: URLRequest, path: [GeoPoint], count: Int,
               dispatch: @Sendable (@Sendable () -> Void) -> Bool = { start in start(); return true }) async throws -> TerrainResponseRecord {
+        // Final hard gate also protects callers passing an already-built live URLRequest.
+        // No dispatch callback, credential access or session task exists in mock mode.
+        if mode == .mock { return try Self.syntheticRecord(path: path, count: count) }
+        guard configured else { throw TerrainError.notConfigured }
         let (data, rawResponse): (Data, URLResponse) = try await withCheckedThrowingContinuation { continuation in
             // Task creation/resume shares the interaction lock with beginTargetInteraction.
             // A maySend check alone could race an executor hop before actual dispatch.
@@ -94,6 +104,29 @@ nonisolated struct GPXZElevationClient: Sendable {
         }
         return try Self.validate(data: data, path: path, count: count,
                                  datasetVersion: http.value(forHTTPHeaderField: "X-DATASET-VERSION"), fetchedAt: .now)
+    }
+
+    /// Coordinate-based surface keeps shared endpoints identical across independently sampled paths.
+    static func syntheticElevation(at point: GeoPoint) -> Double {
+        let offset = TerrainGeometry.vector(point, from: GeoPoint(lat: 57.623, lon: 12.0))
+        return 72 + 9 * sin(offset.x / 210) + 6 * cos(offset.y / 170) + 3 * sin((offset.x + offset.y) / 95)
+    }
+
+    static func syntheticRecord(path: [GeoPoint], count: Int, generatedAt: Date = .now) throws -> TerrainResponseRecord {
+        let path = try TerrainGeometry.clean(path)
+        let length = TerrainGeometry.chainages(path).last ?? 0
+        guard path.count >= 2, length > 0, length.isFinite, (2...512).contains(count) else { throw TerrainError.invalidPath }
+        let provenance = TerrainProvenance(dataSource: DevelopmentAPIConfiguration.syntheticSource,
+            resolutionMeters: 1, captureDateMin: nil, captureDateMax: nil, datasetVersion: "synthetic-development-v1",
+            fetchedAt: generatedAt, interpolation: "analytical synthetic surface", verticalDatum: "Synthetic (not surveyed)",
+            providerSampleIntervalMeters: length / Double(count - 1))
+        let samples = (0..<count).map { i in
+            let distance = Double(i) / Double(count - 1) * length
+            let point = i == 0 ? path[0] : i == count - 1 ? path[path.count - 1] : TerrainGeometry.point(path, at: distance)
+            return TerrainSample(distanceMeters: distance, point: point,
+                elevationMeters: syntheticElevation(at: point), provenance: [provenance])
+        }
+        return TerrainResponseRecord(path: path, samples: samples, fetchedAt: generatedAt)
     }
 
     static func validate(data: Data, path: [GeoPoint], count: Int, datasetVersion: String?, fetchedAt: Date) throws -> TerrainResponseRecord {

@@ -33,6 +33,7 @@ nonisolated struct TerrainCourseCache: Codable, Sendable {
 
     func validate(expectedID: String) throws {
         guard schemaVersion == 1, courseID == expectedID else { throw TerrainError.cacheUnavailable }
+        let synthetic = courseID.hasPrefix(DevelopmentAPIConfiguration.terrainNamespace)
         for response in responses {
             guard response.path.count >= 2, response.path.count <= 5_000,
                   response.path.allSatisfy(TerrainGeometry.valid), response.length > 0,
@@ -49,7 +50,9 @@ nonisolated struct TerrainCourseCache: Codable, Sendable {
                           && $0.fetchedAt.timeIntervalSince1970.isFinite
                           && $0.providerSampleIntervalMeters.isFinite && $0.providerSampleIntervalMeters > 0
                           && abs($0.providerSampleIntervalMeters - response.length / Double(response.samples.count - 1)) < 0.000001
-                          && $0.verticalDatum == "EGM2008" && $0.interpolation == "bilinear" }),
+                          && (synthetic
+                              ? $0.isSynthetic && $0.verticalDatum == "Synthetic (not surveyed)" && $0.interpolation == "analytical synthetic surface"
+                              : !$0.isSynthetic && $0.verticalDatum == "EGM2008" && $0.interpolation == "bilinear") }),
                                             TerrainGeometry.length(sample.point, TerrainGeometry.point(response.path, at: sample.distanceMeters))
                                                 <= min(max(0.5, response.length * 0.00001), response.length / Double(response.samples.count - 1) * 0.4) else {
                     throw TerrainError.cacheUnavailable

@@ -11,6 +11,7 @@ nonisolated struct TerrainProvenance: Codable, Hashable, Sendable {
     let interpolation: String
     let verticalDatum: String
     let providerSampleIntervalMeters: Double
+    var isSynthetic: Bool { dataSource == DevelopmentAPIConfiguration.syntheticSource }
 }
 
 nonisolated struct TerrainSample: Codable, Identifiable, Hashable, Sendable {

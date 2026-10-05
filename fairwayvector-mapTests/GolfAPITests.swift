@@ -88,7 +88,8 @@ struct GolfAPITests {
         return GolfAPIClient(
             session: URLSession(configuration: configuration),
             cache: GolfAPICache(directoryURL: directory),
-            apiKey: "unit-test-key"
+            apiKey: "unit-test-key",
+            mode: .live // Explicit transport evaluation; this session intercepts every request offline.
         )
     }
 
@@ -211,7 +212,8 @@ struct GolfAPITests {
         let noKeyClient = GolfAPIClient(
             session: URLSession(configuration: configuration),
             cache: GolfAPICache(directoryURL: directory),
-            apiKey: ""
+            apiKey: "",
+            mode: .live
         )
 
         do {

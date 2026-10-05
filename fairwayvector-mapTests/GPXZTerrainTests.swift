@@ -87,7 +87,7 @@ import Testing
 
     @Test func strictResponseValidationAndHonestLongSpacing() throws {
         let path = [a, point(600)]
-        let client = GPXZElevationClient(key: "OFFLINE_NOT_A_REAL_KEY", session: mockSession())
+        let client = GPXZElevationClient(key: "OFFLINE_NOT_A_REAL_KEY", session: mockSession(), mode: .live)
         let (request, count) = try client.request(path: path)
         #expect(count == 512)
         let body = try #require(request.httpBody)
@@ -107,11 +107,11 @@ import Testing
         #expect(throws: TerrainError.self) {
             try GPXZElevationClient.validate(data: invalid, path: path, count: count, datasetVersion: nil, fetchedAt: .now)
         }
-        #expect(!GPXZElevationClient(key: "$(GPXZ_API_KEY)", session: mockSession()).configured)
+        #expect(!GPXZElevationClient(key: "$(GPXZ_API_KEY)", session: mockSession(), mode: .live).configured)
     }
 
     @Test func formSampleCountAndCoordinatesRoundTripAtBounds() throws {
-        let client = GPXZElevationClient(key: "OFFLINE_NOT_A_REAL_KEY", session: mockSession())
+        let client = GPXZElevationClient(key: "OFFLINE_NOT_A_REAL_KEY", session: mockSession(), mode: .live)
         for length in [0.1, 1.1, 100, 510, 511, 600] {
             let path = [a, point(length)]
             let (request, count) = try client.request(path: path)
@@ -132,7 +132,7 @@ import Testing
         defer { try? FileManager.default.removeItem(at: root) }
         let url = root.appendingPathComponent("ledger.json")
         let repo = GPXZTerrainRepository(root: root,
-            client: GPXZElevationClient(key: "", session: mockSession()), ledgerURL: url)
+            client: GPXZElevationClient(key: "", session: mockSession(), mode: .live), ledgerURL: url)
         let store = TerrainElevationStore(repository: repo)
         let request = TerrainRequest(courseID: identity, holeNumber: 1, path: [a, point(200)],
             flag: point(200), origin: point(20), target: point(100), usesPointOnlyGeometry: true, usesGPS: true)
@@ -192,7 +192,7 @@ import Testing
         let directory = CourseDataStore.directory(courseID: identity, root: root)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try JSONEncoder().encode(cache([record([a, point(200)])])).write(to: directory.appendingPathComponent("terrain-gpxz-v1.json"), options: .atomic)
-        let client = GPXZElevationClient(key: "", session: mockSession())
+        let client = GPXZElevationClient(key: "", session: mockSession(), mode: .live)
         for _ in 0..<2 {
             let repository = GPXZTerrainRepository(root: root, client: client, ledgerURL: root.appendingPathComponent("ledger.json"))
             let result = await repository.profile(courseID: identity, path: [point(150), point(50)], straight: true)

@@ -18,6 +18,15 @@ struct UnifiedSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Development API mode (build-time)") {
+                    LabeledContent("Golf API", value: DevelopmentAPIConfiguration.current.golfAPI.status)
+                    LabeledContent("GPXZ", value: DevelopmentAPIConfiguration.current.gpxz.status)
+                    Text("Mock modes ignore existing keys. Demo Hills and synthetic terrain are not real course data. Live caches and GPXZ budget/history remain untouched. Activation requires an explicit per-provider build setting and rebuild; there is no runtime toggle.")
+                        .font(.footnote)
+                    Text("Weather remains Open-Meteo (live/cache); Apple Maps imagery is unchanged. This is not an entirely offline app.")
+                        .font(.footnote)
+                }
+                .listRowBackground(FairwayVectorColors.conditionsSurface)
                 Section("Distance units") {
                     Picker("Distance", selection: Binding(
                         get: { mapUnit },
@@ -79,15 +88,22 @@ struct UnifiedSettingsView: View {
                     Link("Handicap privacy", destination: URL(string: "https://fairwayvector.com/hcp-projection/privacy-policy")!)
                     Link("Trajectory privacy", destination: URL(string: "https://fairwayvector.com/trajectory/privacy-policy")!)
                     Link("Wedge Matrix privacy", destination: URL(string: "https://fairwayvector.com/wedge-matrix/privacy-policy")!)
-                    Text("Course and GPS data provided by Golf API. Satellite imagery provided by Apple Maps.")
+                    Text(DevelopmentAPIConfiguration.current.golfAPI == .mock
+                        ? "Course/GPS: local invented Demo Hills fixtures, not Golf API data. Satellite imagery provided by Apple Maps."
+                        : "Course and GPS data provided by Golf API. Satellite imagery provided by Apple Maps.")
                         .font(.footnote)
                     Link("Weather data by Open-Meteo", destination: URL(string: "https://open-meteo.com/")!)
-                    Link("Terrain profiles by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
-                    Link("Terrain source credits and licences", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
-                    Text("The profile shows returned source identifiers for both origin→target and target→flag. Source-specific attribution records and full licence texts have not been downloaded or bundled; the link opens the GPXZ catalogue for review.")
-                        .font(.footnote)
-                    Text("Committed terrain profiles can send path coordinates, including your captured GPS position, to GPXZ. Source resolution and survey dates vary; sample spacing is not guaranteed accuracy. Saved data has no automatic expiry, prefetch, or retries. The local 100-call UTC monthly ledger is a device safeguard, not cross-device account enforcement.")
-                        .font(.footnote)
+                    if DevelopmentAPIConfiguration.current.gpxz == .mock {
+                        Text("Terrain: Synthetic development terrain. Analytical local surface with no survey dates, real source resolution or surveyed height datum. No coordinates sent to GPXZ; no paid quota spent.")
+                            .font(.footnote)
+                    } else {
+                        Link("Terrain profiles by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
+                        Link("Terrain source credits and licences", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
+                        Text("The profile shows returned source identifiers for both origin→target and target→flag. Source-specific attribution records and full licence texts have not been downloaded or bundled; the link opens the GPXZ catalogue for review.")
+                            .font(.footnote)
+                        Text("Committed terrain profiles can send path coordinates, including your captured GPS position, to GPXZ. Source resolution and survey dates vary; sample spacing is not guaranteed accuracy. Saved data has no automatic expiry, prefetch, or retries. The local 100-call UTC monthly ledger is a device safeguard, not cross-device account enforcement.")
+                            .font(.footnote)
+                    }
                 }
                 .listRowBackground(FairwayVectorColors.surface)
             }

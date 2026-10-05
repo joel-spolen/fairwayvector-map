@@ -171,32 +171,44 @@ struct HoleElevationProfileView: View {
     private func sourceDetails(_ records: [TerrainProvenance], sourceProfile: TerrainProfile?, title: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.headline)
-            Link("Elevation profiles by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
-            LabeledContent("Coordinates / heights", value: "WGS84 / EGM2008")
-            if let profile = sourceProfile {
-                LabeledContent("Displayed maximum sample interval", value: "\(profile.maximumSpacingMeters.formatted(.number.precision(.fractionLength(2)))) m")
-                if profile.samples.contains(where: \.locallyInterpolated) {
-                    Text("Subpath boundaries and bends may be interpolated locally along the original provider path. Bracketing source provenance is retained.")
+            if records.contains(where: \.isSynthetic) || DevelopmentAPIConfiguration.current.gpxz == .mock {
+                Text("DEMO DATA · Synthetic development terrain").fontWeight(.bold)
+                Text("Local analytical rolling hills, not GPXZ measurements or an actual Hills survey. Synthetic height datum; no real source resolution, licence catalogue or capture dates. Generated/saved dates are not survey dates.")
+                if let profile = sourceProfile {
+                    LabeledContent("Displayed maximum sample interval", value: "\(profile.maximumSpacingMeters.formatted()) m")
+                    if profile.samples.contains(where: \.locallyInterpolated) {
+                        Text("Includes local interpolation along saved synthetic coverage.")
+                    }
                 }
-            }
-            if let low = records.map(\.resolutionMeters).min(), let high = records.map(\.resolutionMeters).max() {
-                LabeledContent("Actual source resolution", value: "\(low.formatted())–\(high.formatted()) m")
-            }
-            ForEach(Array(records.enumerated()), id: \.offset) { _, record in
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Returned source: \(record.dataSource)").fontWeight(.semibold)
-                    Link("GPXZ catalogue — look up this source’s credits and licence", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
-                    Text("Captured: \(record.captureDateMin ?? "not supplied") – \(record.captureDateMax ?? "not supplied")")
-                    Text("Dataset: \(record.datasetVersion ?? "not supplied") · Saved \(record.fetchedAt.formatted())")
-                    Text("Provider interpolation: \(record.interpolation) · Resolution \(record.resolutionMeters.formatted()) m")
-                    Text("Original provider sample interval: \(record.providerSampleIntervalMeters.formatted(.number.precision(.fractionLength(2)))) m (separate from source resolution)")
+                Text("Mock · 0 paid requests. Live quota, failed-request locks and cache are untouched. Sample spacing is not real terrain accuracy.")
+            } else {
+                Link("Elevation profiles by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
+                LabeledContent("Coordinates / heights", value: "WGS84 / EGM2008")
+                if let profile = sourceProfile {
+                    LabeledContent("Displayed maximum sample interval", value: "\(profile.maximumSpacingMeters.formatted(.number.precision(.fractionLength(2)))) m")
+                    if profile.samples.contains(where: \.locallyInterpolated) {
+                        Text("Subpath boundaries and bends may be interpolated locally along the original provider path. Bracketing source provenance is retained.")
+                    }
                 }
+                if let low = records.map(\.resolutionMeters).min(), let high = records.map(\.resolutionMeters).max() {
+                    LabeledContent("Actual source resolution", value: "\(low.formatted())–\(high.formatted()) m")
+                }
+                ForEach(Array(records.enumerated()), id: \.offset) { _, record in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Returned source: \(record.dataSource)").fontWeight(.semibold)
+                        Link("GPXZ catalogue — look up this source’s credits and licence", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
+                        Text("Captured: \(record.captureDateMin ?? "not supplied") – \(record.captureDateMax ?? "not supplied")")
+                        Text("Dataset: \(record.datasetVersion ?? "not supplied") · Saved \(record.fetchedAt.formatted())")
+                        Text("Provider interpolation: \(record.interpolation) · Resolution \(record.resolutionMeters.formatted()) m")
+                        Text("Original provider sample interval: \(record.providerSampleIntervalMeters.formatted(.number.precision(.fractionLength(2)))) m (separate from source resolution)")
+                    }
+                }
+                Text("Only source identifiers and sampling provenance are stored here. Source-specific attribution records and full licence texts have not been downloaded or bundled. These links open GPXZ’s public catalogue; review the matching entry before redistributing data.")
+                if let quota = store.quota { Text("Local budget: \(quota.used)/100 used; \(quota.remaining) remaining for \(quota.month) UTC. This is not cross-device account authority.") }
+                Text("Sampling spacing is not source resolution or guaranteed accuracy. Profiles may use coarser source data. GPS error and capture dates affect the result; these are terrain heights, not phone altitude, green-reading data, or plays-like advice.")
+                Text("A committed profile may send its path coordinates, including your captured GPS origin, to GPXZ. Saved profiles have no expiry or automatic retry. Refresh is cache-first.")
+                    .foregroundStyle(.secondary)
             }
-            Text("Only source identifiers and sampling provenance are stored here. Source-specific attribution records and full licence texts have not been downloaded or bundled. These links open GPXZ’s public catalogue; review the matching entry before redistributing data.")
-            if let quota = store.quota { Text("Local budget: \(quota.used)/100 used; \(quota.remaining) remaining for \(quota.month) UTC. This is not cross-device account authority.") }
-            Text("Sampling spacing is not source resolution or guaranteed accuracy. Profiles may use coarser source data. GPS error and capture dates affect the result; these are terrain heights, not phone altitude, green-reading data, or plays-like advice.")
-            Text("A committed profile may send its path coordinates, including your captured GPS origin, to GPXZ. Saved profiles have no expiry or automatic retry. Refresh is cache-first.")
-                .foregroundStyle(.secondary)
         }
         .font(.footnote)
         .fixedSize(horizontal: false, vertical: true)

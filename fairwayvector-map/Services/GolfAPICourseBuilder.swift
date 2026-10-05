@@ -55,6 +55,19 @@ enum GolfAPICourseBuilder {
         }
 
         guard !holes.isEmpty else { throw GolfAPIError.noGPSData(reference.courseName) }
+        if courseID == DevelopmentGolfAPIFixtures.courseID {
+            // Fixture coordinates describe the common layout; selected synthetic tee length
+            // locates that tee on its centerline. Real provider geometry is never adjusted.
+            for i in holes.indices {
+                guard let teePoint = holes[i].tee, let green = holes[i].greenCenter,
+                      let length = holes[i].measuredLengthMeters, length > 0 else { continue }
+                let actual = TerrainGeometry.length(green, teePoint)
+                guard actual > 0 else { continue }
+                holes[i].path[0] = TerrainGeometry.interpolate(green, teePoint, length / actual)
+                holes[i].teeFront = TerrainGeometry.interpolate(green, teePoint, (length - 4) / actual)
+                holes[i].teeBack = TerrainGeometry.interpolate(green, teePoint, (length + 4) / actual)
+            }
+        }
         return Course(golfAPICourseID: courseID, name: reference.courseName, holes: holes, fetchedAt: fetchedAt)
     }
 

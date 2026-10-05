@@ -105,6 +105,12 @@ struct CourseMapView: View {
 
                 VStack(spacing: 0) {
                     topDistanceMenu(hole: hole, origin: origin, flag: flagPosition(for: hole))
+                    if DevelopmentAPIConfiguration.isDemoCourse(store.reference.golfAPICourseID ?? "") {
+                        Text("DEMO HILLS · invented GPS layout & ratings · not for play")
+                            .font(.caption2.bold()).padding(6)
+                            .frame(maxWidth: .infinity)
+                            .background(FairwayVectorColors.conditionsSurface)
+                    }
                     if let location = courseWeatherLocation {
                         CourseWeatherCard(location: location, store: weatherStore)
                             .padding(.horizontal, 12)
@@ -150,7 +156,9 @@ struct CourseMapView: View {
                 VStack {
                     Spacer(minLength: 0)
                     HStack {
-                        Text("Course data © Golf API · Imagery © Apple Maps · Weather © Open-Meteo")
+                        Text(DevelopmentAPIConfiguration.current.golfAPI == .mock
+                             ? "Demo course data · Imagery © Apple Maps · Weather © Open-Meteo (live)"
+                             : "Course data © Golf API · Imagery © Apple Maps · Weather © Open-Meteo")
                             .font(.system(size: 7))
                             .foregroundStyle(.white.opacity(0.85))
                         Spacer()
@@ -249,16 +257,21 @@ struct CourseMapView: View {
             }
             if terrainStore.shotPending { Text("Shot pending · release target to commit").font(.caption2) }
             if let message = terrainStore.statusMessage { Text(message).font(.caption2).fixedSize(horizontal: false, vertical: true) }
-            HStack {
-                Link("Terrain by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
-                Link("Source credit / licence catalogue", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
-            }
-            .font(.system(size: 8))
-            if let quota = terrainStore.quota {
-                Text("GPXZ · \(quota.used)/100 calls used · \(quota.remaining) remaining · \(terrainStore.plannedCalls) uncovered spans planned · local UTC month")
-                    .font(.system(size: 8))
+            if DevelopmentAPIConfiguration.current.gpxz == .mock {
+                Text("DEMO DATA · Synthetic development terrain · 0 paid requests · live quota/history unchanged")
+                    .font(.caption2.bold())
             } else {
-                Text("GPXZ · local quota unavailable; no paid request without a valid ledger").font(.system(size: 8))
+                HStack {
+                    Link("Terrain by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
+                    Link("Source credit / licence catalogue", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
+                }
+                .font(.system(size: 8))
+                if let quota = terrainStore.quota {
+                    Text("GPXZ · \(quota.used)/100 calls used · \(quota.remaining) remaining · \(terrainStore.plannedCalls) uncovered spans planned · local UTC month")
+                        .font(.system(size: 8))
+                } else {
+                    Text("GPXZ · local quota unavailable; no paid request without a valid ledger").font(.system(size: 8))
+                }
             }
         }
         .buttonStyle(.plain)
@@ -275,7 +288,9 @@ struct CourseMapView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Correct the reported cause first. Saved terrain is reused, but uncovered paths may spend additional calls. This clears failed-request locks only; used calls are not reset or refunded, and provider backoff still applies.")
+            Text(DevelopmentAPIConfiguration.current.gpxz == .mock
+                 ? "Recompute from local synthetic terrain. No GPXZ requests or changes to the live ledger, failure locks or quota."
+                 : "Correct the reported cause first. Saved terrain is reused, but uncovered paths may spend additional calls. This clears failed-request locks only; used calls are not reset or refunded, and provider backoff still applies.")
         }
     }
 

@@ -5,12 +5,18 @@ struct CourseSelectionView: View {
 
     @State private var model = GolfAPICourseSelectionModel()
     @AppStorage("map.recentCourseReference") private var recentCourseData = Data()
+    @AppStorage("map.development.recentCourseReference.v1") private var demoRecentCourseData = Data()
+    private var isMock: Bool { DevelopmentAPIConfiguration.current.golfAPI == .mock }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
+                    if isMock {
+                        Label("DEMO DATA · Golf API paused · 0 paid requests. Search Sweden / Hills. Only one invented 18-hole course is included; ratings and GPS layout are not real Hills data. A saved live course reopens as Demo Hills without changing its live reference or cache.", systemImage: "testtube.2")
+                            .font(.footnote).foregroundStyle(FairwayVectorColors.orange)
+                    }
                     searchField
 
                     if let recentCourse {
@@ -64,7 +70,8 @@ struct CourseSelectionView: View {
                         .accessibilityIdentifier("view-course-button")
                     }
 
-                    Text("Golf API search is low-cost. Opening a course downloads its detail and coordinate data once; both are cached on this device. Use the course refresh button to check for provider updates.")
+                    Text(isMock ? "Development fixtures run locally. Other country/club filters return no demo matches; this is not a worldwide dataset. Refresh never contacts Golf API."
+                        : "Golf API search is low-cost. Opening a course downloads its detail and coordinate data once; both are cached on this device. Use the course refresh button to check for provider updates.")
                         .font(.footnote)
                         .foregroundStyle(FairwayVectorColors.slate)
                         .fixedSize(horizontal: false, vertical: true)
@@ -79,14 +86,21 @@ struct CourseSelectionView: View {
     }
 
     private var recentCourse: CourseReference? {
-        try? JSONDecoder().decode(CourseReference.self, from: recentCourseData)
+        if isMock {
+            let saved = try? JSONDecoder().decode(CourseReference.self,
+                from: demoRecentCourseData.isEmpty ? recentCourseData : demoRecentCourseData)
+            return saved.map { DevelopmentGolfAPIFixtures.reference(teeID: $0.golfAPITeeID, sex: $0.teeSex) }
+        }
+        let saved = try? JSONDecoder().decode(CourseReference.self, from: recentCourseData)
+        return saved.flatMap { DevelopmentAPIConfiguration.isDemoCourse($0.golfAPICourseID ?? "") ? nil : $0 }
     }
 
     private func startCourse(_ reference: CourseReference) {
-        if let data = try? JSONEncoder().encode(reference) {
-            recentCourseData = data
+        let effective = isMock ? DevelopmentGolfAPIFixtures.reference(teeID: reference.golfAPITeeID, sex: reference.teeSex) : reference
+        if let data = try? JSONEncoder().encode(effective) {
+            if isMock { demoRecentCourseData = data } else { recentCourseData = data }
         }
-        onStartCourse(reference)
+        onStartCourse(effective)
     }
 
     private func recentCourseShortcut(_ reference: CourseReference) -> some View {
@@ -208,7 +222,7 @@ struct CourseSelectionView: View {
             .padding(.horizontal, 12)
             .background(.white, in: RoundedRectangle(cornerRadius: 12))
 
-            Button("Refresh search from Golf API") {
+            Button(isMock ? "Refresh demo search (local)" : "Refresh search from Golf API") {
                 Task { await model.search(forceRefresh: true) }
             }
             .font(.caption.weight(.medium))

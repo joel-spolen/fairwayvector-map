@@ -15,7 +15,7 @@ import Testing
         config.protocolClasses = [GPXZOfflineProtocol.self]
         config.httpAdditionalHeaders = ["X-Offline-Test": id]
         return GPXZTerrainRepository(root: root,
-            client: GPXZElevationClient(key: "OFFLINE_FIXTURE_NOT_A_KEY", session: URLSession(configuration: config)),
+            client: GPXZElevationClient(key: "OFFLINE_FIXTURE_NOT_A_KEY", session: URLSession(configuration: config), mode: .live),
             ledgerURL: root.appendingPathComponent("ledger.json"))
     }
 

@@ -34,6 +34,10 @@ struct CourseShotRecommendationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
+            if DevelopmentAPIConfiguration.current.golfAPI == .mock || terrainStore.metadata.contains(where: \.isSynthetic) {
+                Text("DEMO DATA · recommendations use synthetic course/terrain, not for play")
+                    .font(.caption2.bold())
+            }
             if let currentResult, let best = currentResult.recommendations.first {
                 Button { isShowingDetails = true } label: {
                     VStack(alignment: .leading, spacing: 5) {
@@ -175,6 +179,10 @@ private struct CourseShotRecommendationDetail: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if DevelopmentAPIConfiguration.isDemoCourse(input.request.courseID) || input.originSample.provenance.contains(where: \.isSynthetic) {
+                        Text("DEMO DATA · Synthetic development course/terrain · real Open-Meteo weather · not for play")
+                            .font(.caption.bold())
+                    }
                     Text("\(unit.format(input.distanceM)) horizontal target · \(input.request.usesGPS ? "Captured GPS origin" : "Tee fallback origin")")
                         .font(.headline)
                     Text("Advice uses the committed origin, not your live GPS position. Release a map target or confirm Refresh terrain to capture a new origin.")
@@ -257,12 +265,16 @@ private struct CourseShotRecommendationDetail: View {
             LabeledContent("Wind (meteorological FROM)", value: String(format: "%.1f m/s (%.1f km/h) from %.0f°", input.weather.windSpeedMps!, input.weather.windSpeedMps! * 3.6, input.weather.windDirectionDegrees!))
             LabeledContent(input.conditions.tailwindMps >= 0 ? "Tailwind" : "Headwind", value: String(format: "%.1f m/s", abs(input.conditions.tailwindMps)))
             LabeledContent("Crosswind toward \(input.conditions.crosswindMps >= 0 ? "right" : "left")", value: String(format: "%.1f m/s", abs(input.conditions.crosswindMps)))
-            LabeledContent("Terrain origin / target (EGM2008)", value: String(format: "%.1f / %.1f m", input.originSample.elevationMeters!, input.targetSample.elevationMeters!))
+            LabeledContent(input.originSample.provenance.contains(where: \.isSynthetic) ? "Synthetic terrain origin / target" : "Terrain origin / target (EGM2008)", value: String(format: "%.1f / %.1f m", input.originSample.elevationMeters!, input.targetSample.elevationMeters!))
             LabeledContent("Target minus origin", value: String(format: "%+.1f m", input.conditions.elevationDeltaM))
             Text("Open-Meteo course weather snapshot: \(input.weather.observedAt) (\(input.weather.timezone ?? "provider local time")). This may be cached; course-level surface pressure and 10 m wind are used unchanged, not measured at the ball. Absolute terrain height is provenance only: pressure is supplied directly, not altitude-compensated again. Gusts are not used.")
             Text(String(format: "Weather location: %.5f, %.5f · origin: %.5f, %.5f · target: %.5f, %.5f", input.weatherLocation.lat, input.weatherLocation.lon, input.originSample.point.lat, input.originSample.point.lon, input.targetSample.point.lat, input.targetSample.point.lon))
             ForEach(Array(Set(input.originSample.provenance + input.targetSample.provenance)).sorted { $0.dataSource < $1.dataSource }, id: \.self) { record in
-                Text("GPXZ · \(record.dataSource) · source resolution \(record.resolutionMeters.formatted()) m · captured \(record.captureDateMin ?? "unknown")–\(record.captureDateMax ?? "unknown") · dataset \(record.datasetVersion ?? "unknown") · saved \(record.fetchedAt.formatted())")
+                if record.isSynthetic {
+                    Text("Synthetic development terrain · analytical surface · no surveyed datum/resolution or capture date · generated/saved \(record.fetchedAt.formatted())")
+                } else {
+                    Text("GPXZ · \(record.dataSource) · source resolution \(record.resolutionMeters.formatted()) m · captured \(record.captureDateMin ?? "unknown")–\(record.captureDateMax ?? "unknown") · dataset \(record.datasetVersion ?? "unknown") · saved \(record.fetchedAt.formatted())")
+                }
             }
             if input.originSample.locallyInterpolated || input.targetSample.locallyInterpolated {
                 Text("Endpoint heights include local interpolation along saved provider coverage.")
