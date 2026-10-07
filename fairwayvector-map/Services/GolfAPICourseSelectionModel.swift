@@ -4,8 +4,11 @@ import Observation
 @MainActor
 @Observable
 final class GolfAPICourseSelectionModel {
+    enum Purpose { case map, handicap }
     private let client: GolfAPIClient
+    let purpose: Purpose
     let savedCourses: [CourseReference]
+    var savedClubs: [GolfAPIClub] { client.cachedClubs(requiresGPS: purpose == .map) }
 
     var selectedRegion = "Europe"
     var selectedCountry = "Sweden"
@@ -21,10 +24,12 @@ final class GolfAPICourseSelectionModel {
     private(set) var errorMessage: String?
     private(set) var apiRequestsLeft: String?
 
-    init(client: GolfAPIClient? = nil) {
-        let resolved = client ?? GolfAPIClient()
+    init(client: GolfAPIClient? = nil, purpose: Purpose = .map, sex: String = "male") {
+        let resolved = client ?? .shared
         self.client = resolved
-        savedCourses = resolved.mode == .mock ? resolved.savedReferences : []
+        self.purpose = purpose
+        self.selectedSex = sex
+        savedCourses = purpose == .map && resolved.mode == .mock ? resolved.savedReferences : []
     }
 
     var isConfigured: Bool { client.isConfigured }
@@ -51,7 +56,12 @@ final class GolfAPICourseSelectionModel {
 
     var ratedTees: [GolfAPITee] {
         guard let courseDetail else { return [] }
-        return courseDetail.tees.filter { $0.rating(for: selectedSex) != nil && $0.slope(for: selectedSex) != nil }
+        return courseDetail.tees.filter { tee in
+            if purpose == .handicap {
+                return (try? HCPProviderCourse.convert(detail: courseDetail, tee: tee, sex: selectedSex)) != nil
+            }
+            return tee.rating(for: selectedSex) != nil && tee.slope(for: selectedSex) != nil
+        }
     }
 
     var selectedTee: GolfAPITee? {
@@ -79,7 +89,16 @@ final class GolfAPICourseSelectionModel {
         errorMessage = nil
         defer { isSearching = false }
         do {
-            clubs = try await client.searchClubs(named: query, country: selectedCountry, forceRefresh: forceRefresh)
+            clubs = try await client.searchClubs(named: query, country: selectedCountry, forceRefresh: forceRefresh,
+                                               requiresGPS: purpose == .map)
+            if purpose == .handicap {
+                clubs = clubs.compactMap { club in
+                    let courses = club.courses.filter { !DevelopmentAPIConfiguration.isDemoCourse($0.courseID) }
+                    guard !courses.isEmpty else { return nil }
+                    return GolfAPIClub(clubID: club.clubID, clubName: club.clubName, city: club.city,
+                                       state: club.state, country: club.country, courses: courses)
+                }
+            }
             apiRequestsLeft = nil
             selectedClubID = nil
             selectedCourseID = nil
@@ -95,6 +114,11 @@ final class GolfAPICourseSelectionModel {
     }
 
     func selectClub(_ club: GolfAPIClub) {
+        if let index = clubs.firstIndex(where: { $0.clubID == club.clubID }) {
+            clubs[index] = club
+        } else {
+            clubs.append(club)
+        }
         selectedClubID = club.clubID
         selectedCourseID = nil
         courseDetail = nil
@@ -114,7 +138,12 @@ final class GolfAPICourseSelectionModel {
     }
 
     func selectCourse(_ course: GolfAPICourseSummary) async {
-        guard course.hasGPS else {
+        guard !isLoadingCourse else { return }
+        guard purpose != .handicap || !DevelopmentAPIConfiguration.isDemoCourse(course.courseID) else {
+            errorMessage = "Demo courses cannot be used for Handicap. Choose a real provider course or an explicitly custom course."
+            return
+        }
+        guard purpose != .map || course.hasGPS else {
             errorMessage = "\(course.courseName) has no GPS data in Golf API."
             return
         }
@@ -126,15 +155,37 @@ final class GolfAPICourseSelectionModel {
         defer { isLoadingCourse = false }
         do {
             let details = try await client.loadCourseDetail(id: course.courseID)
+            guard selectedCourseID == course.courseID, !Task.isCancelled else { return }
             courseDetail = details
             apiRequestsLeft = nil
             if ratedTees.isEmpty {
-                errorMessage = "No rated tee sets were returned for this course."
+                errorMessage = purpose == .handicap
+                    ? "No eligible \(selectedSex == "female" ? "Women" : "Men") tees with valid ratings and complete hole pars. Use Custom course or an official differential."
+                    : "No rated tee sets were returned for this course."
             } else {
-                selectedTeeID = ratedTees.first?.teeID
+                // Map keeps its default; Handicap requires explicit tee confirmation.
+                selectedTeeID = purpose == .map ? ratedTees.first?.teeID : nil
             }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Explicit recent selection always revalidates the exact provider ID and current rating sex.
+    func selectReference(_ reference: CourseReference) async {
+        guard let id = reference.golfAPICourseID else {
+            errorMessage = "This recent course has no Golf API identity. Select a provider course or use Custom course."
+            return
+        }
+        let summary = GolfAPICourseSummary(courseID: id, courseName: reference.courseName,
+            numHoles: reference.holeCount, hasGPS: client.cachedDetail(id: id)?.hasGPS ?? (purpose == .map), timestampUpdated: nil)
+        let club = GolfAPIClub(clubID: id, clubName: reference.clubName,
+            city: reference.city, state: reference.region, country: "", courses: [summary])
+        selectClub(club)
+        await selectCourse(summary)
+        if purpose == .handicap {
+            selectedTeeID = reference.teeSex == selectedSex
+                && ratedTees.contains(where: { $0.teeID == reference.golfAPITeeID }) ? reference.golfAPITeeID : nil
         }
     }
 }

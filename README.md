@@ -1,5 +1,40 @@
 # FairwayVector Map — development API pause + GPXZ terrain
 
+## Shared Golf API course selection in Handicap
+
+**Add round** and **Predict → Choose Golf API course** share Course map's
+`GolfAPICourseSelectionModel`, client and persistent detail/search caches, including
+the real saved Hills bundle. Handicap selection is selection-only: no map start,
+scorecard resume/discard, location permission, coordinate download, terrain request
+or provider update check. Course detail is loaded only after explicitly choosing a
+course or recent entry; cached detail is reused. Map retains its GPS requirement
+and original defaults; Handicap can use rated provider courses without GPS.
+
+The chooser uses the Profile's Men/Women rating category and offers every eligible
+tee for that category. A recent HCP or map reference is revalidated by provider ID
+and tee ID; a different sex or unavailable tee requires explicit tee choice, never
+a silent swap. HCP has its own recent preference and does not overwrite map recents.
+Exact selected rating, slope, hole count, actual hole pars/total par and valid unique
+provider stroke indices are used. Only real 9/18-hole courses with finite positive
+CR (up to 100), slope 55–155 and complete pars (3–6) are accepted. Missing/invalid SI
+disables hole-by-hole entry, not adjusted-gross/Stableford; no provider pars or SI
+are invented. Nine-hole calculations retain the existing HCP limitations and notices.
+
+**Use a custom course** is explicitly separate user-entered data, not a name match
+to provider courses. **No course** preserves manual official-differential entry.
+The old Sweden catalog is not an Add round/Predict selection source. Existing
+history snapshots, WHS calculators and SwiftData schema/persistence are unchanged;
+provider identity lives only in transient selection state and recent references.
+Demo courses are excluded from both HCP choosers and rejected by conversion; they
+cannot create real HCP history. API mock modes remain paused/read-only, and searches
+show saved detail-only courses without requiring GPS caches. Live mode still needs
+explicit build-time activation; uncached explicit search/detail may then use Golf API.
+
+Offline regression source covers exact conversion, tee overrides, nine-hole SI,
+invalid/missing data, demo exclusion, category-safe recents, detail-only reuse in
+both modes and unchanged map GPS gating. Tests must not be executed during the
+development pause; compile-only validation does not verify runtime UI or assertions.
+
 ## Played rounds, scorecards & Statistics
 
 **Start round** is available from Home, the normal course/tee selector (including

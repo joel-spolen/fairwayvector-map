@@ -7,6 +7,7 @@ struct GolfAPICoursePayload {
 
 struct GolfAPIClient {
     static let baseURL = URL(string: "https://golfapi.io/api/v2.3")!
+    static let shared = GolfAPIClient()
 
     private let session: URLSession
     private let cache: GolfAPICache
@@ -37,7 +38,8 @@ struct GolfAPIClient {
         named query: String = "",
         country: String,
         region: String = "",
-        forceRefresh: Bool = false
+        forceRefresh: Bool = false,
+        requiresGPS: Bool = true
     ) async throws -> [GolfAPIClub] {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedCountry = country.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -45,7 +47,7 @@ struct GolfAPIClient {
         guard !normalizedQuery.isEmpty || !normalizedCountry.isEmpty || !normalizedRegion.isEmpty else { return [] }
         if mode == .mock {
             // Read-only, including force refresh. Only complete downloaded courses are selectable.
-            let saved = cachedClubs().filter {
+            let saved = cachedClubs(requiresGPS: requiresGPS).filter {
                 (normalizedCountry.isEmpty || $0.country.caseInsensitiveCompare(normalizedCountry) == .orderedSame)
                     && (normalizedRegion.isEmpty || ($0.state ?? "").localizedCaseInsensitiveContains(normalizedRegion))
                     && (normalizedQuery.isEmpty || $0.clubName.localizedCaseInsensitiveContains(normalizedQuery)
@@ -156,7 +158,14 @@ struct GolfAPIClient {
                 bundledSavedCourses?.course(reference: reference)
         }
 
-    func cachedClubs() -> [GolfAPIClub] {
+    /// Detail-only access for handicap selection; never requests coordinates or transport.
+    func cachedDetail(id: String) -> GolfAPICourseDetail? {
+        [cache.readCourseDetail(id: id), bundledSavedCourses?.detail(id: id)]
+            .compactMap { $0 }.compactMap { try? Self.decodeDetail(from: $0) }
+            .first { $0.courseID == id }
+    }
+
+    func cachedClubs(requiresGPS: Bool = true) -> [GolfAPIClub] {
         // Some detail payloads omit club/country names; saved search metadata supplies
         // those names, but search metadata alone NEVER makes a course downloadable offline.
         var clubs: [GolfAPIClub] = cache.searchData().flatMap { (try? Self.decodeClubs(from: $0)) ?? [] }
@@ -172,8 +181,12 @@ struct GolfAPIClient {
         var saved: [GolfAPIClub] = []
         for club in clubs {
             let courses = club.courses.filter { summary in
-                guard !seen.contains(summary.courseID), summary.hasGPS,
-                      cachedPayload(id: summary.courseID) != nil else { return false }
+                guard !seen.contains(summary.courseID) else { return false }
+                if requiresGPS {
+                    guard summary.hasGPS, cachedPayload(id: summary.courseID) != nil else { return false }
+                } else {
+                    guard cachedDetail(id: summary.courseID) != nil else { return false }
+                }
                 seen.insert(summary.courseID)
                 return true
             }

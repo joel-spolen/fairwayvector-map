@@ -16,7 +16,7 @@ final class CourseStore {
     init(
         reference: CourseReference,
         client: OverpassClient = OverpassClient(),
-        golfAPIClient: GolfAPIClient = GolfAPIClient(),
+        golfAPIClient: GolfAPIClient = .shared,
         initialCourse: Course? = nil
     ) {
         self.reference = reference

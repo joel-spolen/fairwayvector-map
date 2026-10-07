@@ -24,6 +24,27 @@ private extension View {
     }
 }
 
+private struct HCPPageHeader: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.largeTitle.weight(.semibold))
+                .foregroundStyle(PureLineStyle.ink)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(PureLineStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(PureLineStyle.canvas)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct HCPPureLineIntro: View {
     let title: String
     let subtitle: String
@@ -75,6 +96,22 @@ struct HCPProjectionRootView: View {
             case .round: "Add round"
             }
         }
+
+        var pageTitle: String {
+            switch self {
+            case .home: "Your handicap"
+            case .predict: "Plan your next round"
+            case .round: "Record a round"
+            }
+        }
+
+        var pageSubtitle: String {
+            switch self {
+            case .home: "Track your rounds. Plan your next score."
+            case .predict: "Choose a course and tee to see how your score could move your Handicap Index."
+            case .round: "Select your course and tee, or enter an official HCP score without a course."
+            }
+        }
     }
 
     let courseCatalog: CourseCatalogStore
@@ -124,6 +161,8 @@ struct HCPProjectionRootView: View {
             .background(PureLineStyle.canvas)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Handicap tools")
+
+            HCPPageHeader(title: selectedTab.pageTitle, subtitle: selectedTab.pageSubtitle)
 
             Group {
                 switch selectedTab {
@@ -180,15 +219,6 @@ private struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Your handicap")
-                            .font(.largeTitle.weight(.semibold))
-                            .foregroundStyle(PureLineStyle.ink)
-                        Text("Track your rounds. Plan your next score.")
-                            .font(.subheadline)
-                            .foregroundStyle(PureLineStyle.muted)
-                    }
-
                     metricLinks
 
                     VStack(spacing: 8) {
@@ -797,6 +827,10 @@ private struct TargetCalculatorView: View {
     @State private var improvingLimit = 6
     @State private var showMoreWorsening = false
     @State private var showingAddCourse = false
+    @State private var showingCustomCourses = false
+    @State private var selectedCustomTeeID: PersistentIdentifier?
+    @State private var addCourseCountry = ""
+    @State private var providerCourse: HCPProviderCourse?
     @State private var projectionResults: [TargetResult] = []
     @State private var projectionHandicap: Double?
 
@@ -804,71 +838,14 @@ private struct TargetCalculatorView: View {
         profile?.countryOrDefault ?? "Sweden"
     }
 
-    private var clubsInCountry: [CourseClubInfo] {
-        let bundled = courseCatalog.clubs(in: activeCountry)
-        let custom = clubs
-            .filter { $0.country.localizedCaseInsensitiveCompare(activeCountry) == .orderedSame }
-            .map(CourseClubInfo.init(custom:))
-        return bundled + custom
-    }
-
-    private var validClubNames: Set<String> {
-        Set(clubsInCountry.map(\.name))
-    }
-
-    private var eligibleTeesInCountry: [CourseTeeInfo] {
-        let sex = profile?.sexOrDefault ?? .male
-        let bundled = courseCatalog.tees(in: activeCountry, for: sex)
-        let custom = tees
-            .filter { validClubNames.contains($0.clubName) && $0.isAvailable(for: sex) }
-            .map(CourseTeeInfo.init(custom:))
-        return bundled + custom
-    }
-
-    private struct ClubMatch: Identifiable {
-        var id: String { club.name }
-        var club: CourseClubInfo
-        var courseNames: [String]
-    }
-
-    private var matchedClubs: [ClubMatch] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let coursesByClub = Dictionary(grouping: eligibleTeesInCountry, by: \.clubName)
-            .mapValues { tees in
-                Array(Set(tees.map(\.courseName))).sorted()
-            }
-
-        let matches = clubsInCountry.compactMap { club in
-            let allCourses = coursesByClub[club.name] ?? []
-
-            if query.isEmpty {
-                return ClubMatch(club: club, courseNames: allCourses)
-            }
-
-            let clubMatches = club.name.localizedCaseInsensitiveContains(query) || club.city.localizedCaseInsensitiveContains(query)
-            let matchingCourses = allCourses.filter { $0.localizedCaseInsensitiveContains(query) }
-
-            if clubMatches || !matchingCourses.isEmpty {
-                return ClubMatch(club: club, courseNames: allCourses)
-            }
-            return nil
-        }.sorted { $0.club.name < $1.club.name }
-        return Array(matches.prefix(query.isEmpty ? 24 : 60))
-    }
-
-    private var availableCourses: [String] {
-        guard !selectedClubName.isEmpty else { return [] }
-        return Array(Set(eligibleTeesInCountry.filter { $0.clubName == selectedClubName }.map(\.courseName))).sorted()
-    }
-
-    private var availableTees: [CourseTeeInfo] {
-        guard !selectedClubName.isEmpty, !selectedCourseName.isEmpty else { return [] }
-        return eligibleTeesInCountry.filter { $0.clubName == selectedClubName && $0.courseName == selectedCourseName }
-    }
-
     private var selectedTee: CourseTeeInfo? {
-        guard !selectedClubName.isEmpty, !selectedCourseName.isEmpty, !selectedTeeName.isEmpty else { return nil }
-        return availableTees.first { $0.name == selectedTeeName }
+        if let providerCourse {
+            return providerCourse.tee.ratingSex == (profile?.sexOrDefault ?? .male) ? providerCourse.tee : nil
+        }
+        guard showingCustomCourses else { return nil }
+                guard let tee = tees.first(where: { $0.persistentModelID == selectedCustomTeeID }),
+              tee.isAvailable(for: profile?.sexOrDefault ?? .male) else { return nil }
+                return CourseTeeInfo(custom: tee)
     }
 
     private var selectedTeeSummary: String {
@@ -928,13 +905,7 @@ private struct TargetCalculatorView: View {
     }
 
     var body: some View {
-        let displayedClubs = selectedClubName.isEmpty ? matchedClubs : []
-        let selectionTees = selectedClubName.isEmpty
-            ? []
-            : eligibleTeesInCountry.filter { $0.clubName == selectedClubName }
-        let courseOptions = Array(Set(selectionTees.map(\.courseName))).sorted()
-        let teeOptions = selectionTees.filter { $0.courseName == selectedCourseName }
-        let activeTee = teeOptions.first { $0.name == selectedTeeName }
+        let activeTee = selectedTee
         let activeHasHoleDetails = activeTee.map {
             let pars = $0.holeParsData ?? []
             let indices = $0.holeHandicapIndicesData ?? []
@@ -944,37 +915,40 @@ private struct TargetCalculatorView: View {
         let calculatedResults = projectionResults
         let improvingResults = improvingResults(from: calculatedResults)
         let worseningResults = worseningResults(from: calculatedResults, currentHandicap: calculatedHandicap)
-        let projectionKey = "\(activeCountry)|\(profile?.sexOrDefault.rawValue ?? PlayerSex.male.rawValue)|\(selectedClubName)|\(selectedCourseName)|\(selectedTeeName)|\(inputMode.rawValue)|\(rounds.count)|\(profile?.lowHandicapIndex ?? 0)"
+        let projectionKey = "\(providerCourse?.id ?? "custom")|\(activeTee?.hashValue ?? 0)|\(activeCountry)|\(profile?.sexOrDefault.rawValue ?? PlayerSex.male.rawValue)|\(selectedClubName)|\(selectedCourseName)|\(selectedTeeName)|\(inputMode.rawValue)|\(rounds.count)|\(profile?.lowHandicapIndex ?? 0)"
 
         NavigationStack {
             List {
                 Section {
-                    HCPPureLineIntro(title: "Plan your next round", subtitle: "Choose a course and tee to see how your score could move your Handicap Index.")
-                }
-
-                if selectedClubName.isEmpty {
-                    Section {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.secondary)
-                            TextField("Search club or course name...", text: $searchText)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                            if !searchText.isEmpty {
-                                Button {
-                                    searchText = ""
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
+                    HCPProviderCourseSelectionView(profile: profile, clubs: clubs, courses: courses, tees: tees,
+                            country: activeCountry, confirmedCourseID: providerCourse?.id,
+                            confirmedCustomTeeID: $selectedCustomTeeID, onSelectCustom: { tee in
+                                providerCourse = nil
+                                showingCustomCourses = true
+                                selectedClubName = tee.clubName
+                                selectedCourseName = tee.courseName
+                                selectedTeeName = tee.name
+                                projectionResults = []
+                                projectionHandicap = nil
+                                improvingLimit = 6
+                                showMoreWorsening = false
+                            }, onAddCustom: { query, country in
+                                searchText = query
+                                addCourseCountry = country
+                                showingAddCourse = true
+                            }) { selection in
+                            providerCourse = selection
+                            showingCustomCourses = false
+                            selectedClubName = selection.tee.clubName
+                            selectedCourseName = selection.tee.courseName
+                            selectedTeeName = selection.tee.name
+                            projectionResults = []
+                            projectionHandicap = nil
+                            improvingLimit = 6
+                            showMoreWorsening = false
                         }
-                    } header: {
-                        Text("Search in \(activeCountry)")
-                    }
-                    .listRowBackground(PureLineStyle.surface)
                 }
+                .listRowBackground(PureLineStyle.surface)
 
                 if !selectedClubName.isEmpty {
                     Section("Course & scoring") {
@@ -982,38 +956,18 @@ private struct TargetCalculatorView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(selectedClubName)
                                     .font(.headline)
-                                if let city = clubsInCountry.first(where: { $0.name == selectedClubName })?.city, !city.isEmpty {
-                                    Text("\(city) · \(activeCountry)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                if let providerCourse {
+                                    Text("\(providerCourse.tee.courseName) · \(providerCourse.tee.name) tee · \(providerCourse.tee.ratingSex?.label ?? "")")
+                                        .font(.subheadline).foregroundStyle(PureLineStyle.muted)
+                                    if activeTee == nil {
+                                        Text("Profile rating category changed. Choose a matching provider tee again.")
+                                            .font(.caption).foregroundStyle(PureLineStyle.muted)
+                                    }
                                 }
-                            }
-                        }
-
-                        if !courseOptions.isEmpty {
-                            Picker("Course", selection: $selectedCourseName) {
-                                Text("Select Course").tag("")
-                                ForEach(courseOptions, id: \.self) { course in
-                                    Text(course).tag(course)
+                                if showingCustomCourses {
+                                    Text("Custom · \(selectedCourseName) · \(selectedTeeName) tee")
+                                        .font(.subheadline).foregroundStyle(PureLineStyle.muted)
                                 }
-                            }
-                            .onChange(of: selectedCourseName) {
-                                selectedTeeName = ""
-                                improvingLimit = 6
-                            }
-                        }
-
-                        if !selectedCourseName.isEmpty {
-                            Picker("Tee", selection: $selectedTeeName) {
-                                Text("Select Tee").tag("")
-                                ForEach(teeOptions) { tee in
-                                    Text(tee.name).tag(tee.name)
-                                }
-                            }
-                            .onChange(of: selectedTeeName) {
-                                projectionResults = []
-                                projectionHandicap = nil
-                                improvingLimit = 6
                             }
                         }
 
@@ -1041,63 +995,6 @@ private struct TargetCalculatorView: View {
                                         inputMode = .adjustedGrossScore
                                     }
                                 }
-                        }
-                    }
-                    .listRowBackground(PureLineStyle.surface)
-                } else {
-                    Section(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Suggested Clubs" : "Matching Clubs (\(displayedClubs.count))") {
-                        if displayedClubs.isEmpty {
-                            if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                ContentUnavailableView("No clubs found", systemImage: "flag", description: Text("No courses available for \(activeCountry). Add one or switch country in Settings."))
-                            } else {
-                                ContentUnavailableView("No clubs found", systemImage: "magnifyingglass", description: Text("No matches for \"\(searchText)\" in \(activeCountry)"))
-                            }
-                        } else {
-                            ForEach(displayedClubs) { match in
-                                Button {
-                                    selectedClubName = match.club.name
-                                    if match.courseNames.count == 1, let singleCourse = match.courseNames.first {
-                                        selectedCourseName = singleCourse
-                                    } else {
-                                        selectedCourseName = ""
-                                    }
-                                    selectedTeeName = ""
-                                    improvingLimit = 6
-                                    searchText = ""
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(match.club.name)
-                                                .font(.headline)
-                                                .foregroundStyle(Color.primary)
-                                            HStack(spacing: 4) {
-                                                if !match.club.city.isEmpty {
-                                                    Text("\(match.club.city) ·")
-                                                }
-                                                Text("\(match.courseNames.count) \(match.courseNames.count == 1 ? "course" : "courses")")
-                                            }
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            Text(match.courseNames.prefix(2).joined(separator: " · "))
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                            }
-                        }
-
-                        Button {
-                            showingAddCourse = true
-                        } label: {
-                            Label("Can't find your club? Add custom course", systemImage: "plus.circle")
-                                .font(.subheadline)
-                                .foregroundStyle(PureLineStyle.accent)
                         }
                     }
                     .listRowBackground(PureLineStyle.surface)
@@ -1190,12 +1087,15 @@ private struct TargetCalculatorView: View {
                 }
             }
             .hcpPureLineList()
-            .navigationTitle("Predict")
+            .contentMargins(.top, 18, for: .scrollContent)
             .toolbar {
                 if !selectedClubName.isEmpty {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button {
                             selectedClubName = ""
+                            providerCourse = nil
+                            showingCustomCourses = false
+                            selectedCustomTeeID = nil
                             selectedCourseName = ""
                             selectedTeeName = ""
                             projectionResults = []
@@ -1209,7 +1109,7 @@ private struct TargetCalculatorView: View {
                 }
             }
             .sheet(isPresented: $showingAddCourse) {
-                AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: activeCountry)
+                AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: addCourseCountry)
             }
             .onAppear {
                 if let defaultMode = profile?.defaultInputMode {
@@ -1281,77 +1181,24 @@ private struct NewRoundView: View {
     @State private var pcc = 0.0
     @State private var notes = ""
     @State private var showingAddCourse = false
+    @State private var showingCustomCourses = false
+    @State private var selectedCustomTeeID: PersistentIdentifier?
+    @State private var addCourseCountry = ""
+    @State private var providerCourse: HCPProviderCourse?
     @State private var holeScores: [Int] = Array(repeating: 4, count: 18)
 
     private var activeCountry: String {
         profile?.countryOrDefault ?? "Sweden"
     }
 
-    private var clubsInCountry: [CourseClubInfo] {
-        let bundled = courseCatalog.clubs(in: activeCountry)
-        let custom = clubs
-            .filter { $0.country.localizedCaseInsensitiveCompare(activeCountry) == .orderedSame }
-            .map(CourseClubInfo.init(custom:))
-        return bundled + custom
-    }
-
-    private var validClubNames: Set<String> {
-        Set(clubsInCountry.map(\.name))
-    }
-
-    private var eligibleTeesInCountry: [CourseTeeInfo] {
-        let sex = profile?.sexOrDefault ?? .male
-        let bundled = courseCatalog.tees(in: activeCountry, for: sex)
-        let custom = tees
-            .filter { validClubNames.contains($0.clubName) && $0.isAvailable(for: sex) }
-            .map(CourseTeeInfo.init(custom:))
-        return bundled + custom
-    }
-
-    private struct ClubMatch: Identifiable {
-        var id: String { club.name }
-        var club: CourseClubInfo
-        var courseNames: [String]
-    }
-
-    private var matchedClubs: [ClubMatch] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let coursesByClub = Dictionary(grouping: eligibleTeesInCountry, by: \.clubName)
-            .mapValues { tees in
-                Array(Set(tees.map(\.courseName))).sorted()
-            }
-
-        let matches = clubsInCountry.compactMap { club in
-            let allCourses = coursesByClub[club.name] ?? []
-
-            if query.isEmpty {
-                return ClubMatch(club: club, courseNames: allCourses)
-            }
-
-            let clubMatches = club.name.localizedCaseInsensitiveContains(query) || club.city.localizedCaseInsensitiveContains(query)
-            let matchingCourses = allCourses.filter { $0.localizedCaseInsensitiveContains(query) }
-
-            if clubMatches || !matchingCourses.isEmpty {
-                return ClubMatch(club: club, courseNames: allCourses)
-            }
-            return nil
-        }.sorted { $0.club.name < $1.club.name }
-        return Array(matches.prefix(query.isEmpty ? 24 : 60))
-    }
-
-    private var availableCourses: [String] {
-        guard !selectedClubName.isEmpty else { return [] }
-        return Array(Set(eligibleTeesInCountry.filter { $0.clubName == selectedClubName }.map(\.courseName))).sorted()
-    }
-
-    private var availableTees: [CourseTeeInfo] {
-        guard !selectedClubName.isEmpty, !selectedCourseName.isEmpty else { return [] }
-        return eligibleTeesInCountry.filter { $0.clubName == selectedClubName && $0.courseName == selectedCourseName }
-    }
-
     private var selectedTee: CourseTeeInfo? {
-        guard !selectedClubName.isEmpty, !selectedCourseName.isEmpty, !selectedTeeName.isEmpty else { return nil }
-        return availableTees.first { $0.name == selectedTeeName }
+        if let providerCourse {
+            return providerCourse.tee.ratingSex == (profile?.sexOrDefault ?? .male) ? providerCourse.tee : nil
+        }
+        guard showingCustomCourses else { return nil }
+                guard let tee = tees.first(where: { $0.persistentModelID == selectedCustomTeeID }),
+              tee.isAvailable(for: profile?.sexOrDefault ?? .male) else { return nil }
+                return CourseTeeInfo(custom: tee)
     }
 
     private var selectedTeeSummary: String {
@@ -1373,13 +1220,7 @@ private struct NewRoundView: View {
     }
 
     var body: some View {
-        let displayedClubs = !isManualDifferential && selectedClubName.isEmpty ? matchedClubs : []
-        let selectionTees = selectedClubName.isEmpty
-            ? []
-            : eligibleTeesInCountry.filter { $0.clubName == selectedClubName }
-        let courseOptions = Array(Set(selectionTees.map(\.courseName))).sorted()
-        let teeOptions = selectionTees.filter { $0.courseName == selectedCourseName }
-        let activeTee = teeOptions.first { $0.name == selectedTeeName }
+        let activeTee = selectedTee
         let activeHasHoleDetails = activeTee.map {
             let pars = $0.holeParsData ?? []
             let indices = $0.holeHandicapIndicesData ?? []
@@ -1389,8 +1230,33 @@ private struct NewRoundView: View {
 
         NavigationStack {
             Form {
-                Section {
-                    HCPPureLineIntro(title: "Record a round", subtitle: "Select your course and tee, or enter an official HCP score without a course.")
+                if !isManualDifferential {
+                    Section {
+                        HCPProviderCourseSelectionView(profile: profile, clubs: clubs, courses: courses, tees: tees,
+                            country: activeCountry, confirmedCourseID: providerCourse?.id,
+                            confirmedCustomTeeID: $selectedCustomTeeID, onSelectCustom: { tee in
+                                providerCourse = nil
+                                showingCustomCourses = true
+                                selectedClubName = tee.clubName
+                                selectedCourseName = tee.courseName
+                                selectedTeeName = tee.name
+                                if !hasHoleByHoleData && inputMode == .holeByHole { inputMode = .adjustedGrossScore }
+                                resetHoleScores()
+                            }, onAddCustom: { query, country in
+                                searchText = query
+                                addCourseCountry = country
+                                showingAddCourse = true
+                            }) { selection in
+                            providerCourse = selection
+                            showingCustomCourses = false
+                            selectedClubName = selection.tee.clubName
+                            selectedCourseName = selection.tee.courseName
+                            selectedTeeName = selection.tee.name
+                            if !hasHoleByHoleData && inputMode == .holeByHole { inputMode = .adjustedGrossScore }
+                            resetHoleScores()
+                        }
+                    }
+                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if !isManualDifferential && selectedClubName.isEmpty {
@@ -1416,27 +1282,6 @@ private struct NewRoundView: View {
                     }
                     .listRowBackground(PureLineStyle.surface)
 
-                    Section {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.secondary)
-                            TextField("Search club or course name...", text: $searchText)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                            if !searchText.isEmpty {
-                                Button {
-                                    searchText = ""
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    } header: {
-                        Text("Search in \(activeCountry)")
-                    }
-                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if isManualDifferential || !selectedCourseName.isEmpty {
@@ -1470,35 +1315,18 @@ private struct NewRoundView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(selectedClubName)
                                     .font(.headline)
-                                if let city = clubsInCountry.first(where: { $0.name == selectedClubName })?.city, !city.isEmpty {
-                                    Text("\(city) · \(activeCountry)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                if let providerCourse {
+                                    Text("\(providerCourse.tee.courseName) · \(providerCourse.tee.name) tee · \(providerCourse.tee.ratingSex?.label ?? "")")
+                                        .font(.subheadline).foregroundStyle(PureLineStyle.muted)
+                                    if activeTee == nil {
+                                        Text("Profile rating category changed. Choose a matching provider tee again.")
+                                            .font(.caption).foregroundStyle(PureLineStyle.muted)
+                                    }
                                 }
-                            }
-                        }
-
-                        if !courseOptions.isEmpty {
-                            Picker("Course", selection: $selectedCourseName) {
-                                Text("Select Course").tag("")
-                                ForEach(courseOptions, id: \.self) { course in
-                                    Text(course).tag(course)
+                                if showingCustomCourses {
+                                    Text("Custom · \(selectedCourseName) · \(selectedTeeName) tee")
+                                        .font(.subheadline).foregroundStyle(PureLineStyle.muted)
                                 }
-                            }
-                            .onChange(of: selectedCourseName) {
-                                selectedTeeName = ""
-                            }
-                        }
-
-                        if !selectedCourseName.isEmpty {
-                            Picker("Tee", selection: $selectedTeeName) {
-                                Text("Select Tee").tag("")
-                                ForEach(teeOptions) { tee in
-                                    Text(tee.name).tag(tee.name)
-                                }
-                            }
-                            .onChange(of: selectedTeeName) {
-                                resetHoleScores()
                             }
                         }
 
@@ -1533,62 +1361,6 @@ private struct NewRoundView: View {
                             Text("Stableford scoring becomes available after three rounds have been entered.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
-                    }
-                    .listRowBackground(PureLineStyle.surface)
-                } else if !isManualDifferential {
-                    Section(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Suggested Clubs" : "Matching Clubs (\(displayedClubs.count))") {
-                        if displayedClubs.isEmpty {
-                            if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                ContentUnavailableView("No clubs found", systemImage: "flag", description: Text("No courses available for \(activeCountry). Add one or switch country in Settings."))
-                            } else {
-                                ContentUnavailableView("No clubs found", systemImage: "magnifyingglass", description: Text("No matches for \"\(searchText)\" in \(activeCountry)"))
-                            }
-                        } else {
-                            ForEach(displayedClubs) { match in
-                                Button {
-                                    selectedClubName = match.club.name
-                                    if match.courseNames.count == 1, let singleCourse = match.courseNames.first {
-                                        selectedCourseName = singleCourse
-                                    } else {
-                                        selectedCourseName = ""
-                                    }
-                                    selectedTeeName = ""
-                                    searchText = ""
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(match.club.name)
-                                                .font(.headline)
-                                                .foregroundStyle(Color.primary)
-                                            HStack(spacing: 4) {
-                                                if !match.club.city.isEmpty {
-                                                    Text("\(match.club.city) ·")
-                                                }
-                                                Text("\(match.courseNames.count) \(match.courseNames.count == 1 ? "course" : "courses")")
-                                            }
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            Text(match.courseNames.prefix(2).joined(separator: " · "))
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                            }
-                        }
-
-                        Button {
-                            showingAddCourse = true
-                        } label: {
-                            Label("Can't find your club? Add custom course", systemImage: "plus.circle")
-                                .font(.subheadline)
-                                .foregroundStyle(PureLineStyle.accent)
                         }
                     }
                     .listRowBackground(PureLineStyle.surface)
@@ -1713,12 +1485,15 @@ private struct NewRoundView: View {
                 }
             }
             .hcpPureLineList()
-            .navigationTitle("Add round")
+            .contentMargins(.top, 18, for: .scrollContent)
             .toolbar {
                 if isManualDifferential || !selectedClubName.isEmpty {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button {
                             isManualDifferential = false
+                            providerCourse = nil
+                            showingCustomCourses = false
+                            selectedCustomTeeID = nil
                             selectedClubName = ""
                             selectedCourseName = ""
                             selectedTeeName = ""
@@ -1739,7 +1514,7 @@ private struct NewRoundView: View {
             .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showingAddCourse) {
-                AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: activeCountry)
+                AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: addCourseCountry)
             }
             .onAppear {
                 if let defaultMode = profile?.defaultInputMode {
@@ -1752,6 +1527,9 @@ private struct NewRoundView: View {
             }
             .onChange(of: isManualDifferential) {
                 if isManualDifferential {
+                    providerCourse = nil
+                    selectedCustomTeeID = nil
+                    showingCustomCourses = false
                     selectedClubName = ""
                     selectedCourseName = ""
                     selectedTeeName = ""
@@ -1767,6 +1545,7 @@ private struct NewRoundView: View {
     }
 
     private func saveRound() {
+        guard canSaveRound else { return }
         if isManualDifferential {
             guard let handicapDifferential = parsedManualDifferential else { return }
             modelContext.insert(
@@ -1865,6 +1644,9 @@ private struct NewRoundView: View {
         )
         notes = ""
         roundDate = Date()
+        providerCourse = nil
+        showingCustomCourses = false
+        selectedCustomTeeID = nil
         selectedClubName = ""
         selectedCourseName = ""
         selectedTeeName = ""
@@ -1881,7 +1663,7 @@ private struct NewRoundView: View {
               let selectedTee else { return false }
 
         if inputMode == .holeByHole {
-            return holeScores.count == selectedTee.holes && holeScores.allSatisfy { $0 > 0 }
+            return hasHoleByHoleData && holeScores.count == selectedTee.holes && holeScores.allSatisfy { $0 > 0 }
         }
 
         switch inputMode {
