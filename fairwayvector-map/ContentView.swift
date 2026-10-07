@@ -58,30 +58,40 @@ struct CourseMapView: View {
     var body: some View {
         NavigationStack {
             content
-                .background(FairwayVectorColors.background)
+                .background(PureLineStyle.canvas)
                 .navigationTitle(store.reference.courseName)
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar(.hidden, for: .tabBar)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        roundMenu
-                    }
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        #if DEBUG
-                        developmentToolsMenu
-                        #endif
-                        Button("Course information", systemImage: "info.circle") { isShowingCourseInfo = true }
-                            .labelStyle(.iconOnly)
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Change course", systemImage: "arrow.left.arrow.right", action: onChangeCourse)
+                        Button("Change course", systemImage: "chevron.left", action: onChangeCourse)
                             .labelStyle(.iconOnly)
                             .frame(minWidth: 44, minHeight: 44)
                             .accessibilityLabel("Change course, club, or tee")
                     }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            roundMenu
+                            Button("Course & tee information", systemImage: "info.circle") { isShowingCourseInfo = true }
+                            Button("Terrain profile", systemImage: "mountain.2") { isShowingTerrainProfile = true }
+                                .disabled(store.course == nil)
+                            Button("Move flag", systemImage: "flag") { isShowingFlagEditor = true }
+                                .disabled(store.course == nil)
+                            #if DEBUG
+                            developmentToolsMenu
+                            #endif
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.body.weight(.semibold))
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .accessibilityLabel("Course options, scorecard and tools")
+                    }
                 }
         }
+        .tint(PureLineStyle.accent)
         .task {
             locationManager.start()
             if !resumesSnapshot { await store.load() }
@@ -263,15 +273,20 @@ struct CourseMapView: View {
                 )
                 .ignoresSafeArea()
                 .safeAreaInset(edge: .top, spacing: 0) {
-                    VStack(spacing: 4) {
+                    VStack(spacing: 0) {
                         topDistanceMenu(hole: hole, origin: origin, flag: flagPosition(for: hole))
-                        if let location = courseWeatherLocation {
-                            CourseWeatherCard(location: location, store: weatherStore, mapHeading: mapHeading)
-                                .padding(.horizontal, 12)
+                        HStack(spacing: 8) {
+                            if let location = courseWeatherLocation {
+                                CourseWeatherCard(location: location, store: weatherStore, mapHeading: mapHeading)
+                            }
+                            terrainPanel
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
                         mapStatusBadge(origin: origin)
+                            .padding(.top, 5)
                     }
-                    .padding(.bottom, 4)
+                    .padding(.bottom, 8)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     // Normal text uses ~180 pt. Large accessibility text scrolls rather
@@ -282,7 +297,6 @@ struct CourseMapView: View {
                                 CourseShotRecommendationView(terrainStore: terrainStore, weatherStore: weatherStore,
                                     weatherLocation: courseWeatherLocation, selectedTarget: tapPoint,
                                     unit: unit, model: trajectoryModel)
-                                terrainPanel
                             }
                             .background {
                                 GeometryReader { content in
@@ -291,9 +305,16 @@ struct CourseMapView: View {
                             }
                         }
                         .scrollBounceBehavior(.basedOnSize)
-                        .frame(height: min(adviceContentHeight, max(100, min(170, geometry.size.height * 0.3))))
+                        .frame(height: min(adviceContentHeight, max(100, min(210, geometry.size.height * 0.32))))
                         .onPreferenceChange(MapAdviceHeightKey.self) { adviceContentHeight = $0 }
+                        Divider().overlay(PureLineStyle.line).padding(.horizontal, 20)
                         bottomHoleMenu(hole: hole, holeCount: holes.count)
+                    }
+                    .background {
+                        UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24)
+                            .fill(PureLineStyle.canvas)
+                            .ignoresSafeArea(edges: .bottom)
+                            .shadow(color: .black.opacity(0.06), radius: 16, y: -4)
                     }
                 }
             }
@@ -458,8 +479,11 @@ struct CourseMapView: View {
     private var terrainPanel: some View {
         Button { isShowingTerrainProfile = true } label: {
             HStack(spacing: 8) {
-                Image(systemName: "mountain.2.fill").foregroundStyle(FairwayVectorColors.orange)
-                Text(terrainSummary).font(.caption.weight(.semibold))
+                Image(systemName: "mountain.2").foregroundStyle(PureLineStyle.accent)
+                Text(terrainSummary
+                    .replacingOccurrences(of: "To target · ", with: "")
+                    .replacingOccurrences(of: "Tee → flag · ", with: ""))
+                    .font(.caption.weight(.medium))
                 Spacer(minLength: 0)
                 if terrainStore.isShotLoading || terrainStore.isHoleLoading { ProgressView().controlSize(.mini) }
                 Image(systemName: "chevron.right").font(.caption2)
@@ -469,10 +493,8 @@ struct CourseMapView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(FairwayVectorColors.navy)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
+        .foregroundStyle(PureLineStyle.ink)
+        .background(PureLineStyle.canvas.opacity(0.96), in: RoundedRectangle(cornerRadius: 14))
         .accessibilityIdentifier("terrain-profile-button")
         .accessibilityLabel("Terrain details, \(terrainSummary)")
         .accessibilityHint("Opens the full chart, source, budget, errors and confirmed retry")
@@ -528,7 +550,7 @@ struct CourseMapView: View {
             Button { isShowingCourseInfo = true } label: {
                 Text("Hole \(hole.number) · Par \(hole.par.map(String.init) ?? "–") · SI \(hole.handicapIndex.map(String.init) ?? "–") · \(hole.length > 0 ? unit.format(hole.length) : "–")")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                     .frame(minHeight: 44)
             }
             .buttonStyle(.plain)
@@ -536,13 +558,12 @@ struct CourseMapView: View {
             .frame(maxWidth: .infinity)
             holeNavigationButton(isPrevious: false, count: holeCount)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 2)
-        .padding(.bottom, 2)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity)
         .background {
             Rectangle()
-                .fill(.regularMaterial)
+                .fill(PureLineStyle.canvas)
                 .ignoresSafeArea(edges: .bottom)
         }
     }
@@ -557,10 +578,10 @@ struct CourseMapView: View {
             store.errorMessage != nil ? "Update unavailable ⓘ" : nil].compactMap { $0 }
         return Text(labels.joined(separator: " · "))
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(FairwayVectorColors.navy)
+            .foregroundStyle(PureLineStyle.ink)
             .padding(.horizontal, 10)
             .padding(.vertical, labels.isEmpty ? 0 : 3)
-            .background(.regularMaterial, in: Capsule())
+            .background(PureLineStyle.canvas.opacity(0.96), in: Capsule())
             .accessibilityLabel(labels.joined(separator: ", "))
     }
 
@@ -629,49 +650,30 @@ struct CourseMapView: View {
     }
 
     private func topDistanceMenu(hole: Hole, origin: DistanceOrigin?, flag: GeoPoint?) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) {
-                DistanceCard(hole: hole, origin: origin, unit: unit)
-                Divider().frame(height: 32)
-                distanceSummary("POINT", pointDistanceText(origin: origin), color: FairwayVectorColors.orange)
-                distanceSummary("TO FLAG", flagDistanceText(flag: flag, origin: origin), color: FairwayVectorColors.flightBlue)
-            }
-            VStack(spacing: 4) {
-                DistanceCard(hole: hole, origin: origin, unit: unit)
-                HStack {
-                    distanceSummary("POINT", pointDistanceText(origin: origin), color: FairwayVectorColors.orange)
+        VStack(spacing: 10) {
+            DistanceCard(hole: hole, origin: origin, unit: unit,
+                middleTitle: tapPoint != nil ? "Target" : flag != nil ? "To flag" : "Center",
+                middlePoint: tapPoint ?? flag)
+            if tapPoint != nil {
+                HStack(spacing: 16) {
+                    if let origin, let center = hole.greenCenter {
+                        Text("Center \(unit.format(GolfGeometry.distance(origin.point, center)))")
+                    }
                     Spacer(minLength: 0)
-                    distanceSummary("TO FLAG", flagDistanceText(flag: flag, origin: origin), color: FairwayVectorColors.flightBlue)
+                    Text("Target → flag \(flagDistanceText(flag: flag, origin: origin))")
                 }
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(PureLineStyle.muted)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 4)
-        .padding(.bottom, 5)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
         .background {
             Rectangle()
-                .fill(.regularMaterial)
+                .fill(PureLineStyle.canvas)
                 .ignoresSafeArea(edges: .top)
         }
-    }
-
-    private func distanceSummary(_ title: String, _ value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
-            Text(value)
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-    }
-
-    private func pointDistanceText(origin: DistanceOrigin?) -> String {
-        guard let tapPoint, let origin else { return "–" }
-        return unit.format(GolfGeometry.distance(origin.point, tapPoint))
     }
 
     private func flagDistanceText(flag: GeoPoint?, origin: DistanceOrigin?) -> String {
@@ -736,11 +738,12 @@ struct CourseMapView: View {
             } else { holeIndex += isPrevious ? -1 : 1 }
         } label: {
             Image(systemName: isPrevious ? "chevron.left" : activeRound != nil && holeIndex == count - 1 ? "flag.checkered" : "chevron.right")
-                .font(.headline.weight(.bold))
+                .font(.body.weight(.medium))
                 .frame(minWidth: 44, minHeight: 44)
+                .background(PureLineStyle.surface, in: Circle())
         }
-        .buttonStyle(.borderedProminent)
-        .tint(FairwayVectorColors.navy)
+            .buttonStyle(.plain)
+            .foregroundStyle(unavailable ? PureLineStyle.muted.opacity(0.4) : PureLineStyle.accent)
         .disabled(unavailable)
         .accessibilityLabel(isPrevious ? "Previous hole" : activeRound == nil ? "Next hole" : holeIndex == count - 1 ? "Score hole and finish round" : "Score hole and next hole")
     }

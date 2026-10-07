@@ -5,6 +5,10 @@ struct DistanceCard: View {
     let hole: Hole
     let origin: DistanceOrigin?
     let unit: DistanceUnit
+    var middleTitle = "Center"
+    var middlePoint: GeoPoint? = nil
+    @ScaledMetric(relativeTo: .largeTitle) private var featuredDistanceSize: CGFloat = 42
+    @ScaledMetric(relativeTo: .title2) private var distanceSize: CGFloat = 27
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -14,11 +18,11 @@ struct DistanceCard: View {
                 let back = hole.greenBack.map { GolfGeometry.distance(origin.point, $0) }
                     ?? GolfGeometry.frontBack(from: origin.point, green: hole.green)?.back
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    metric("Front", front, color: FairwayVectorColors.gold)
+                    metric("Front", front, color: PureLineStyle.ink)
                     Spacer(minLength: 4)
-                    metric("Center", GolfGeometry.distance(origin.point, center), color: FairwayVectorColors.orange, prominent: true)
+                    metric(middleTitle, GolfGeometry.distance(origin.point, middlePoint ?? center), color: PureLineStyle.accent, prominent: true)
                     Spacer(minLength: 4)
-                    metric("Back", back, color: FairwayVectorColors.gold)
+                    metric("Back", back, color: PureLineStyle.ink)
                 }
 
             } else {
@@ -34,16 +38,16 @@ struct DistanceCard: View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title.uppercased())
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(meters.map { "\(unit.value($0))" } ?? "–")
-                    .font((prominent ? Font.title3.bold() : Font.subheadline.bold()).monospacedDigit())
+                    .font((prominent ? Font.system(size: featuredDistanceSize, weight: .semibold) : Font.system(size: distanceSize, weight: .medium)).monospacedDigit())
                     .foregroundStyle(color)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 Text(unit.symbol)
                     .font(.caption2)
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
             }
         }
         .accessibilityElement(children: .ignore)

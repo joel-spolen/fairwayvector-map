@@ -48,12 +48,13 @@ struct HoleMapView: View {
                         VStack(spacing: 3) {
                             Text(hasPlayerOrigin ? "TEE" : "YOU")
                                 .font(.caption2.bold())
+                                .foregroundStyle(PureLineStyle.ink)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 4)
-                                .background(FairwayVectorColors.surface, in: Capsule())
+                                .background(PureLineStyle.canvas, in: Capsule())
                             Image(systemName: "mappin.and.ellipse")
                                 .font(.title2.weight(.semibold))
-                                .foregroundStyle(hasPlayerOrigin ? FairwayVectorColors.navy : FairwayVectorColors.orange)
+                                .foregroundStyle(PureLineStyle.accent)
                                 .shadow(color: .black.opacity(0.3), radius: 2)
                         }
                     }
@@ -62,40 +63,40 @@ struct HoleMapView: View {
 
                 ForEach(Array(hole.roughs.enumerated()), id: \.offset) { _, polygon in
                     MapPolygon(coordinates: polygon.map(\.coordinate))
-                        .foregroundStyle(FairwayVectorColors.flightBlue.opacity(0.10))
+                        .foregroundStyle(PureLineStyle.accent.opacity(0.10))
                 }
 
                 ForEach(Array(hole.fairways.enumerated()), id: \.offset) { _, polygon in
                     MapPolygon(coordinates: polygon.map(\.coordinate))
-                        .foregroundStyle(FairwayVectorColors.gold.opacity(0.12))
+                        .foregroundStyle(PureLineStyle.accent.opacity(0.12))
                 }
 
                 if highlightBoundary.count >= 3 {
                     MapPolyline(coordinates: (highlightBoundary + [highlightBoundary[0]]).map(\.coordinate))
-                        .stroke(FairwayVectorColors.gold.opacity(0.42), style: StrokeStyle(lineWidth: 7, lineJoin: .round))
+                        .stroke(PureLineStyle.accent.opacity(0.42), style: StrokeStyle(lineWidth: 7, lineJoin: .round))
                     MapPolyline(coordinates: (highlightBoundary + [highlightBoundary[0]]).map(\.coordinate))
-                        .stroke(FairwayVectorColors.surface.opacity(0.92), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
+                        .stroke(PureLineStyle.canvas.opacity(0.92), style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
                 }
 
                 if hole.green.count >= 3 {
                     MapPolygon(coordinates: hole.green.map(\.coordinate))
-                        .foregroundStyle(FairwayVectorColors.gold.opacity(0.25))
-                        .stroke(FairwayVectorColors.gold, lineWidth: 2)
+                        .foregroundStyle(PureLineStyle.accent.opacity(0.25))
+                        .stroke(PureLineStyle.accent, lineWidth: 2)
                 }
 
                 if hole.usesPointOnlyGeometry {
-                    pointMarker(hole.greenFront, title: "Front", symbol: "F", color: FairwayVectorColors.gold)
-                    pointMarker(hole.greenCenterPoint, title: "Green center", symbol: "C", color: FairwayVectorColors.orange)
-                    pointMarker(hole.greenBack, title: "Back", symbol: "B", color: FairwayVectorColors.gold)
-                    pointMarker(hole.teeFront, title: "Front tee", symbol: "T", color: FairwayVectorColors.navy)
-                    pointMarker(hole.teeBack, title: "Back tee", symbol: "T", color: FairwayVectorColors.navy)
+                    pointMarker(hole.greenFront, title: "Front", symbol: "F", color: PureLineStyle.accent)
+                    pointMarker(hole.greenCenterPoint, title: "Green center", symbol: "C", color: PureLineStyle.accent)
+                    pointMarker(hole.greenBack, title: "Back", symbol: "B", color: PureLineStyle.accent)
+                    pointMarker(hole.teeFront, title: "Front tee", symbol: "T", color: PureLineStyle.accent)
+                    pointMarker(hole.teeBack, title: "Back tee", symbol: "T", color: PureLineStyle.accent)
                 }
 
                 if let flag {
                     Annotation("Flag", coordinate: flag.coordinate, anchor: .bottomLeading) {
                         Image(systemName: "flag.fill")
                             .font(.title3)
-                            .foregroundStyle(FairwayVectorColors.orange)
+                            .foregroundStyle(PureLineStyle.accent)
                             .shadow(radius: 2)
                     }
                     .annotationTitles(.hidden)
@@ -105,9 +106,9 @@ struct HoleMapView: View {
                     Annotation("Terrain profile position", coordinate: terrainInspectionPoint.coordinate) {
                         Image(systemName: "mountain.2.fill")
                             .font(.caption.bold())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(PureLineStyle.canvas)
                             .padding(7)
-                            .background(FairwayVectorColors.flightBlue, in: Circle())
+                            .background(PureLineStyle.accent, in: Circle())
                     }
                     .annotationTitles(.hidden)
                 }
@@ -115,24 +116,24 @@ struct HoleMapView: View {
                 if let tapPoint {
                     if let origin {
                         MapPolyline(coordinates: [origin.coordinate, tapPoint.coordinate])
-                            .stroke(FairwayVectorColors.orange, lineWidth: 3)
+                            .stroke(PureLineStyle.accent, lineWidth: 3)
                     }
                     if let flag {
                         MapPolyline(coordinates: [tapPoint.coordinate, flag.coordinate])
-                            .stroke(FairwayVectorColors.flightBlue, lineWidth: 3)
+                            .stroke(PureLineStyle.accent, lineWidth: 3)
                     }
                     Annotation("Target", coordinate: tapPoint.coordinate) {
                         ZStack {
                             Circle()
-                                .fill(FairwayVectorColors.navy.opacity(0.18))
+                                .fill(PureLineStyle.accent.opacity(0.18))
                                 .frame(width: 48, height: 48)
                             Circle()
-                                .fill(.white)
-                                .stroke(FairwayVectorColors.navy, lineWidth: 3)
+                                .fill(PureLineStyle.canvas)
+                                .stroke(PureLineStyle.accent, lineWidth: 3)
                                 .frame(width: 22, height: 22)
                             Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
                                 .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(FairwayVectorColors.navy)
+                                .foregroundStyle(PureLineStyle.accent)
                         }
                         .contentShape(Circle())
                     }
@@ -197,7 +198,7 @@ struct HoleMapView: View {
                 Canvas { context, size in
                     guard !visibleAreaPolygons.isEmpty else { return }
                     context.drawLayer { layer in
-                        layer.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black.opacity(0.45)))
+                        layer.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black.opacity(0.25)))
                         layer.blendMode = .destinationOut
                         for polygon in visibleAreaPolygons {
                             guard let first = polygon.first,
@@ -329,10 +330,10 @@ struct HoleMapView: View {
             Annotation(title, coordinate: point.coordinate) {
                 Text(symbol)
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(PureLineStyle.canvas)
                     .frame(width: 20, height: 20)
                     .background(color, in: Circle())
-                    .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                    .overlay(Circle().stroke(PureLineStyle.canvas, lineWidth: 1.5))
                     .shadow(color: .black.opacity(0.3), radius: 2)
             }
             .annotationTitles(.hidden)

@@ -7,6 +7,61 @@ import Charts
 import SwiftData
 import SwiftUI
 
+// Native entry and swipe actions remain intact; these modifiers only style HCP lists.
+private extension View {
+    func hcpPureLineList() -> some View {
+        self
+            .listStyle(.insetGrouped)
+            .listSectionSpacing(18)
+            .listRowSeparatorTint(PureLineStyle.line)
+            .environment(\.defaultMinListRowHeight, 52)
+            .scrollContentBackground(.hidden)
+            .background(PureLineStyle.canvas)
+            .tint(PureLineStyle.accent)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
+private struct HCPPureLineIntro: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(PureLineStyle.ink)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(PureLineStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+        .listRowBackground(PureLineStyle.canvas)
+        .listRowSeparator(.hidden)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct HCPNineHoleNotice: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Nine-hole limitation", systemImage: "exclamationmark.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text("Nine-hole HCP scores and projections here do not include the WHS expected-score conversion to an 18-hole differential. Use an official HCP score for handicap records.")
+                .font(.caption)
+                .foregroundStyle(PureLineStyle.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct HCPProjectionRootView: View {
     private enum Tab: String, CaseIterable {
         case home
@@ -17,7 +72,7 @@ struct HCPProjectionRootView: View {
             switch self {
             case .home: "Overview"
             case .predict: "Predict"
-            case .round: "Add Round"
+            case .round: "Add round"
             }
         }
     }
@@ -34,19 +89,46 @@ struct HCPProjectionRootView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Handicap tools", selection: $selectedTab) {
+            HStack(spacing: 4) {
                 ForEach(Tab.allCases, id: \.self) { tab in
-                    Text(tab.title).tag(tab)
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        Text(tab.title)
+                            .font(.subheadline.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(selectedTab == tab ? PureLineStyle.accent : PureLineStyle.muted)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .padding(.horizontal, 4)
+                            .background {
+                                if selectedTab == tab {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(PureLineStyle.canvas)
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .strokeBorder(PureLineStyle.line, lineWidth: 1)
+                                        }
+                                }
+                            }
+                            .contentShape(RoundedRectangle(cornerRadius: 16))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selectedTab == tab ? [.isSelected] : [])
+                    .accessibilityHint("Shows the \(tab.title.lowercased()) handicap tool")
                 }
             }
-            .pickerStyle(.segmented)
-            .padding(12)
-            .background(FairwayVectorColors.background)
+            .padding(4)
+            .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 20))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(PureLineStyle.canvas)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Handicap tools")
 
             Group {
                 switch selectedTab {
                 case .home:
-                    HomeView(courseCatalog: courseCatalog, rounds: rounds, profile: profiles.first, clubs: clubs, courses: courses, tees: tees, onAddRound: { selectedTab = .round })
+                    HomeView(courseCatalog: courseCatalog, rounds: rounds, profile: profiles.first, clubs: clubs, courses: courses, tees: tees, onAddRound: { selectedTab = .round }, onPredict: { selectedTab = .predict })
                 case .predict:
                     TargetCalculatorView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
                 case .round:
@@ -54,7 +136,7 @@ struct HCPProjectionRootView: View {
                 }
             }
         }
-        .tint(FairwayVectorColors.navy)
+        .tint(PureLineStyle.accent)
         .onAppear {
             SeedData.loadIfNeeded(modelContext: modelContext)
         }
@@ -74,6 +156,7 @@ private struct HomeView: View {
     var courses: [GolfCourse]
     var tees: [TeeSet]
     let onAddRound: () -> Void
+    var onPredict: (() -> Void)? = nil
 
     @State private var showSettings = false
 
@@ -96,46 +179,54 @@ private struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    Text("Plan the score or stableford points that move your handicap.")
-                        .font(.title3)
-                        .foregroundStyle(FairwayVectorColors.slate)
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Your handicap")
+                            .font(.largeTitle.weight(.semibold))
+                            .foregroundStyle(PureLineStyle.ink)
+                        Text("Track your rounds. Plan your next score.")
+                            .font(.subheadline)
+                            .foregroundStyle(PureLineStyle.muted)
+                    }
+
+                    metricLinks
+
+                    VStack(spacing: 8) {
+                        Button(action: onAddRound) {
+                            Label("Add round", systemImage: "plus")
+                        }
+                        .buttonStyle(PureLinePrimaryButtonStyle())
+
+                        if let onPredict {
+                            Button(action: onPredict) {
+                                Label("Predict your next Handicap Index", systemImage: "arrow.up.right")
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(PureLineStyle.accent)
+                        }
+                    }
 
                     HCPTrendGraphCard(
                         trendPoints: trendPoints,
                         currentHandicap: handicapIndex
                     )
 
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) {
-                            metricLinks
-                        }
-                        VStack(spacing: 12) {
-                            metricLinks
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 18) {
                         Text("Recent rounds")
-                            .font(.headline)
+                            .font(.title3.weight(.semibold))
                         if rounds.isEmpty {
                             VStack(spacing: 12) {
                                 Image(systemName: "calendar.badge.plus")
                                     .font(.title2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(PureLineStyle.accent)
                                 Text("No Rounds Yet")
                                     .font(.headline)
                                 Text("Add a round to start tracking your Handicap Index.")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                                     .multilineTextAlignment(.center)
-                                Button(action: onAddRound) {
-                                    Label("Add Round", systemImage: "plus.circle")
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 52)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(FairwayVectorColors.navy)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
@@ -143,18 +234,20 @@ private struct HomeView: View {
                             ForEach(rounds.prefix(5)) { round in
                                 NavigationLink(destination: RoundDetailView(round: round, handicapIndex: handicapIndex)) {
                                     RoundRow(round: round)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical, 8)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
                     }
-                    .padding()
-                    .background(FairwayVectorColors.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .pureLineCard()
                 }
-                .padding()
+                .padding(18)
             }
-            .background(FairwayVectorColors.background)
+            .background(PureLineStyle.canvas)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -178,20 +271,39 @@ private struct HomeView: View {
     @ViewBuilder
     private var metricLinks: some View {
         NavigationLink(destination: HandicapRoundsView(rounds: handicapRounds, handicapIndex: handicapIndex)) {
-            MetricCard(title: "Handicap Index", value: handicapIndexText, systemImage: "number")
+            MetricCard(title: "Current Handicap Index", value: handicapIndexText, systemImage: "number", subtitle: "View counting rounds")
         }
         .buttonStyle(.plain)
+        .accessibilityHint("View the rounds counting toward your Handicap Index")
 
         NavigationLink(destination: AllRoundsView(rounds: rounds, profile: profile)) {
-            MetricCard(title: "Rounds", value: "\(entries.count)", systemImage: "calendar.badge.clock")
+            HStack(spacing: 12) {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundStyle(PureLineStyle.accent)
+                Text("Rounds")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(entries.count)")
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(PureLineStyle.muted)
+            }
+            .foregroundStyle(PureLineStyle.ink)
+            .pureLineCard(padding: 16)
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Round history")
+        .accessibilityValue("\(entries.count) scoring entries")
+        .accessibilityHint("View all saved rounds")
     }
 }
 
 private struct HCPTrendGraphCard: View {
     var trendPoints: [HCPTrendPoint]
     var currentHandicap: Double?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var trendDifference: Double? {
         guard trendPoints.count >= 2,
@@ -212,9 +324,12 @@ private struct HCPTrendGraphCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
+            let headerLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))
+            headerLayout {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Handicap Trend")
+                    Text("Handicap trend")
                         .font(.headline)
                     if let currentHandicap {
                         Text("Current: \(WHSCalculator.formatHCPScore(currentHandicap))")
@@ -224,7 +339,7 @@ private struct HCPTrendGraphCard: View {
                     }
                 }
 
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
 
                 if let diff = trendDifference {
                     HStack(spacing: 4) {
@@ -234,8 +349,8 @@ private struct HCPTrendGraphCard: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(diff < 0 ? FairwayVectorColors.navy.opacity(0.12) : (diff > 0 ? FairwayVectorColors.orange.opacity(0.18) : FairwayVectorColors.slate.opacity(0.15)))
-                    .foregroundStyle(diff < 0 ? FairwayVectorColors.navy : (diff > 0 ? FairwayVectorColors.orange : FairwayVectorColors.slate))
+                    .background(PureLineStyle.canvas)
+                    .foregroundStyle(PureLineStyle.muted)
                     .clipShape(Capsule())
                 }
             }
@@ -249,7 +364,7 @@ private struct HCPTrendGraphCard: View {
                         )
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [FairwayVectorColors.orange.opacity(0.28), FairwayVectorColors.orange.opacity(0.02)],
+                                colors: [PureLineStyle.accent.opacity(0.12), PureLineStyle.accent.opacity(0.01)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -260,8 +375,8 @@ private struct HCPTrendGraphCard: View {
                             x: .value("Round", point.roundIndex),
                             y: .value("HCP", point.handicapIndex)
                         )
-                        .foregroundStyle(FairwayVectorColors.orange)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                        .foregroundStyle(PureLineStyle.accent)
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                         .interpolationMethod(.catmullRom)
 
                         if point.id == trendPoints.last?.id {
@@ -269,7 +384,7 @@ private struct HCPTrendGraphCard: View {
                                 x: .value("Round", point.roundIndex),
                                 y: .value("HCP", point.handicapIndex)
                             )
-                            .foregroundStyle(FairwayVectorColors.orange)
+                            .foregroundStyle(PureLineStyle.accent)
                             .symbolSize(45)
                         }
                     }
@@ -278,9 +393,9 @@ private struct HCPTrendGraphCard: View {
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: min(trendPoints.count, 5))) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-                            .foregroundStyle(FairwayVectorColors.slate.opacity(0.2))
+                            .foregroundStyle(PureLineStyle.line)
                         AxisTick()
-                            .foregroundStyle(FairwayVectorColors.slate.opacity(0.4))
+                            .foregroundStyle(PureLineStyle.muted.opacity(0.4))
                         AxisValueLabel {
                             if let rIndex = value.as(Int.self) {
                                 Text("R\(rIndex)")
@@ -293,7 +408,7 @@ private struct HCPTrendGraphCard: View {
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-                            .foregroundStyle(FairwayVectorColors.slate.opacity(0.2))
+                            .foregroundStyle(PureLineStyle.line)
                         AxisValueLabel {
                             if let hcp = value.as(Double.self) {
                                 Text(WHSCalculator.formatHCPScore(hcp))
@@ -308,19 +423,22 @@ private struct HCPTrendGraphCard: View {
                 .accessibilityLabel("Handicap trend chart")
                 .accessibilityValue(trendAccessibilityValue)
 
-                HStack {
+                let summaryLayout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                    : AnyLayout(HStackLayout(spacing: 8))
+                summaryLayout {
                     if let first = trendPoints.first {
                         Text("Start: \(WHSCalculator.formatHCPScore(first.handicapIndex))")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
+                    if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
                     if let lowest = trendPoints.map(\.handicapIndex).min() {
                         Text("Low: \(WHSCalculator.formatHCPScore(lowest))")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
+                    if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
                     if let last = trendPoints.last {
                         Text("Latest: \(WHSCalculator.formatHCPScore(last.handicapIndex))")
                             .font(.caption2.bold().monospacedDigit())
@@ -336,9 +454,7 @@ private struct HCPTrendGraphCard: View {
                     .padding(.vertical, 20)
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private func trendText(diff: Double) -> String {
@@ -403,9 +519,12 @@ private struct HandicapRoundsView: View {
             if let handicapIndex {
                 Section("Handicap Index") {
                     Text(WHSCalculator.formatHCPScore(handicapIndex))
+                        .font(.largeTitle.weight(.semibold))
                         .monospacedDigit()
+                        .foregroundStyle(PureLineStyle.ink)
+                        .padding(.vertical, 8)
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                .listRowBackground(PureLineStyle.surface)
             }
 
             if roundResults.isEmpty {
@@ -413,7 +532,7 @@ private struct HandicapRoundsView: View {
                     Text("No rounds count yet.")
                         .foregroundStyle(.secondary)
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                .listRowBackground(PureLineStyle.surface)
             } else {
                 Section("Counting Rounds") {
                     ForEach(roundResults, id: \.round.id) { item in
@@ -422,33 +541,35 @@ private struct HandicapRoundsView: View {
                         }
                     }
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                .listRowBackground(PureLineStyle.surface)
             }
 
             Section("How Counting Rounds Work") {
                 Text(countingRuleSummary)
                     .font(.subheadline)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("3 scores: lowest 1, minus 2.0")
-                    Text("4 scores: lowest 1, minus 1.0")
-                    Text("5 scores: lowest 1")
-                    Text("6 scores: lowest 2, minus 1.0")
-                    Text("7–8 scores: lowest 2")
-                    Text("9–11 scores: lowest 3")
-                    Text("12–14 scores: lowest 4")
-                    Text("15–16 scores: lowest 5")
-                    Text("17–18 scores: lowest 6")
-                    Text("19 scores: lowest 7")
-                    Text("20 scores: lowest 8")
+                DisclosureGroup("WHS counting rules") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("3 scores: lowest 1, minus 2.0")
+                        Text("4 scores: lowest 1, minus 1.0")
+                        Text("5 scores: lowest 1")
+                        Text("6 scores: lowest 2, minus 1.0")
+                        Text("7–8 scores: lowest 2")
+                        Text("9–11 scores: lowest 3")
+                        Text("12–14 scores: lowest 4")
+                        Text("15–16 scores: lowest 5")
+                        Text("17–18 scores: lowest 6")
+                        Text("19 scores: lowest 7")
+                        Text("20 scores: lowest 8")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(PureLineStyle.muted)
+                    .padding(.vertical, 8)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
         }
-        .scrollContentBackground(.hidden)
-        .background(FairwayVectorColors.background)
+        .hcpPureLineList()
         .navigationTitle("Handicap rounds")
     }
 }
@@ -456,25 +577,33 @@ private struct HandicapRoundsView: View {
 private struct HandicapRoundRow: View {
     var round: GolfRound
     var differential: Double
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var scoreText: String {
         round.scoreSummaryText
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+        VStack(alignment: .leading, spacing: 10) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+            layout {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(round.courseName.isEmpty ? "No Course" : round.courseName)
-                        .font(.headline)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(PureLineStyle.ink)
                     if !round.clubName.isEmpty || !round.teeName.isEmpty {
                         Text([round.clubName, round.teeName].filter { !$0.isEmpty }.joined(separator: " · "))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
                 VStack(alignment: .trailing, spacing: 4) {
+                    Text("HCP score")
+                        .font(.caption2)
+                        .foregroundStyle(PureLineStyle.muted)
                     Text(WHSCalculator.formatHCPScore(differential))
                         .font(.headline.monospacedDigit())
                     Text(round.date, format: .dateTime.year().month().day())
@@ -488,6 +617,7 @@ private struct HandicapRoundRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.vertical, 6)
     }
 }
 
@@ -540,7 +670,7 @@ private struct AllRoundsView: View {
                 } header: {
                     Text("Last 20 rounds (WHS window)")
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                .listRowBackground(PureLineStyle.surface)
             }
 
             if !olderRounds.isEmpty {
@@ -554,11 +684,10 @@ private struct AllRoundsView: View {
                 } header: {
                     Text("Older rounds (past 20-round window)")
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                .listRowBackground(PureLineStyle.surface)
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(FairwayVectorColors.background)
+        .hcpPureLineList()
         .navigationTitle("All rounds")
     }
 
@@ -603,6 +732,8 @@ private struct TargetModePicker: View {
             }
         }
         .pickerStyle(.segmented)
+        .tint(PureLineStyle.accent)
+        .padding(.vertical, 4)
     }
 }
 
@@ -624,19 +755,19 @@ private struct HoleScoreRowView: View {
     let handicapIndex: Int
     let points: Int?
     @Binding var score: Int
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            rowContent
-            VStack(alignment: .leading, spacing: 8) {
-                rowContent
-            }
-        }
+        rowContent
+            .padding(.vertical, 4)
     }
 
     @ViewBuilder
     private var rowContent: some View {
-        HStack {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 12))
+        layout {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Hole \(holeNumber)")
                     .font(.headline)
@@ -644,18 +775,19 @@ private struct HoleScoreRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
             if let points {
                 Text("\(points) pts")
                     .font(.caption.bold().monospacedDigit())
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(FairwayVectorColors.orange.opacity(0.15))
-                    .foregroundStyle(FairwayVectorColors.orange)
+                    .background(PureLineStyle.accent.opacity(0.08))
+                    .foregroundStyle(PureLineStyle.accent)
                     .clipShape(Capsule())
             }
             Stepper("\(score)", value: $score, in: 1...15)
                 .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel("Hole \(holeNumber), strokes")
         }
     }
 }
@@ -829,6 +961,10 @@ private struct TargetCalculatorView: View {
 
         NavigationStack {
             List {
+                Section {
+                    HCPPureLineIntro(title: "Plan your next round", subtitle: "Choose a course and tee to see how your score could move your Handicap Index.")
+                }
+
                 if selectedClubName.isEmpty {
                     Section {
                         HStack {
@@ -850,11 +986,11 @@ private struct TargetCalculatorView: View {
                     } header: {
                         Text("Search in \(activeCountry)")
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if !selectedClubName.isEmpty {
-                    Section("Selected Club") {
+                    Section("Course & scoring") {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(selectedClubName)
@@ -920,7 +1056,7 @@ private struct TargetCalculatorView: View {
                                 }
                         }
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
                 } else {
                     Section(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Suggested Clubs" : "Matching Clubs (\(displayedClubs.count))") {
                         if displayedClubs.isEmpty {
@@ -974,18 +1110,26 @@ private struct TargetCalculatorView: View {
                         } label: {
                             Label("Can't find your club? Add custom course", systemImage: "plus.circle")
                                 .font(.subheadline)
-                                .foregroundStyle(FairwayVectorColors.orange)
+                                .foregroundStyle(PureLineStyle.accent)
                         }
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
+                }
+
+                if let activeTee, activeTee.holes == 9 {
+                    Section {
+                        HCPNineHoleNotice()
+                    }
+                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if let calculatedHandicap, let activeTee {
-                    Section("Current") {
+                    Section("Your starting point") {
                         LabeledContent("Handicap Index", value: WHSCalculator.formatHCPScore(calculatedHandicap))
+                            .font(.headline.monospacedDigit())
                         LabeledContent("Course Handicap", value: "\(WHSCalculator.courseHandicap(handicapIndex: calculatedHandicap, tee: activeTee.snapshot))")
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if activeTee != nil {
@@ -993,7 +1137,7 @@ private struct TargetCalculatorView: View {
                         Section("Outcomes") {
                             ContentUnavailableView("No outcomes calculated", systemImage: "equal.circle", description: Text("Add at least three rounds or select another tee."))
                         }
-                        .listRowBackground(FairwayVectorColors.surface)
+                        .listRowBackground(PureLineStyle.surface)
                     } else {
                         if !improvingResults.isEmpty {
                             Section {
@@ -1009,7 +1153,7 @@ private struct TargetCalculatorView: View {
                                                 }
                                             }
                                             .buttonStyle(.bordered)
-                                            .tint(FairwayVectorColors.navy)
+                                            .tint(PureLineStyle.accent)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                         }
                                         Spacer()
@@ -1020,7 +1164,7 @@ private struct TargetCalculatorView: View {
                                                 }
                                             }
                                             .buttonStyle(.bordered)
-                                            .tint(FairwayVectorColors.navy)
+                                            .tint(PureLineStyle.accent)
                                             .frame(maxWidth: .infinity, alignment: .trailing)
                                         }
                                     }
@@ -1028,7 +1172,7 @@ private struct TargetCalculatorView: View {
                             } header: {
                                 Text("Lower Handicap Index")
                             }
-                            .listRowBackground(FairwayVectorColors.surface)
+                            .listRowBackground(PureLineStyle.surface)
                         }
 
                         if !worseningResults.isEmpty {
@@ -1044,7 +1188,7 @@ private struct TargetCalculatorView: View {
                             } header: {
                                 Text("Higher Handicap Index")
                             }
-                            .listRowBackground(FairwayVectorColors.surface)
+                            .listRowBackground(PureLineStyle.surface)
                         } else {
                             Section {
                                 Text("No score would raise your Handicap Index.")
@@ -1053,13 +1197,13 @@ private struct TargetCalculatorView: View {
                             } header: {
                                 Text("Higher Handicap Index")
                             }
-                            .listRowBackground(FairwayVectorColors.surface)
+                            .listRowBackground(PureLineStyle.surface)
                         }
                     }
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(FairwayVectorColors.background)
+            .hcpPureLineList()
+            .navigationTitle("Predict")
             .toolbar {
                 if !selectedClubName.isEmpty {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -1270,6 +1414,10 @@ private struct NewRoundView: View {
 
         NavigationStack {
             Form {
+                Section {
+                    HCPPureLineIntro(title: "Record a round", subtitle: "Select your course and tee, or enter an official HCP score without a course.")
+                }
+
                 if !isManualDifferential && selectedClubName.isEmpty {
                     Section {
                         Button {
@@ -1288,10 +1436,10 @@ private struct NewRoundView: View {
 
                             Text("Use this when the course is not available and you already know the official HCP score.")
                                 .font(.caption)
-                                .foregroundStyle(FairwayVectorColors.slate)
+                                .foregroundStyle(PureLineStyle.muted)
                                 .fixedSize(horizontal: false, vertical: true)
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
 
                     Section {
                         HStack {
@@ -1313,29 +1461,36 @@ private struct NewRoundView: View {
                     } header: {
                         Text("Search in \(activeCountry)")
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if isManualDifferential || !selectedCourseName.isEmpty {
                     Section("Round Details") {
                         DatePicker("Date", selection: $roundDate, displayedComponents: .date)
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if isManualDifferential {
                     Section("No Course") {
                         TextField("HCP score", text: $manualDifferentialText)
                             .keyboardType(.decimalPad)
+                            .font(.title2.weight(.semibold).monospacedDigit())
+                            .padding(.vertical, 4)
                         Text("Enter the official HCP score for this round.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if !manualDifferentialText.isEmpty && parsedManualDifferential == nil {
+                            Text("Enter a number between −20 and 54.")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if !isManualDifferential && !selectedClubName.isEmpty {
-                    Section("Selected Club") {
+                    Section("Course & scoring") {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(selectedClubName)
@@ -1405,7 +1560,7 @@ private struct NewRoundView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
                 } else if !isManualDifferential {
                     Section(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Suggested Clubs" : "Matching Clubs (\(displayedClubs.count))") {
                         if displayedClubs.isEmpty {
@@ -1458,13 +1613,20 @@ private struct NewRoundView: View {
                         } label: {
                             Label("Can't find your club? Add custom course", systemImage: "plus.circle")
                                 .font(.subheadline)
-                                .foregroundStyle(FairwayVectorColors.orange)
+                                .foregroundStyle(PureLineStyle.accent)
                         }
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
                 }
 
                 if !isManualDifferential, let activeTee {
+                    if activeTee.holes == 9 {
+                        Section {
+                            HCPNineHoleNotice()
+                        }
+                        .listRowBackground(PureLineStyle.surface)
+                    }
+
                     if inputMode == .holeByHole && activeHasHoleDetails {
                         let holeCount = activeTee.holes
                         let pars = activeTee.holePars
@@ -1499,10 +1661,10 @@ private struct NewRoundView: View {
                                 Text("\(holeCalc.totalStablefordPoints) pts")
                                     .monospacedDigit()
                                     .bold()
-                                    .foregroundStyle(FairwayVectorColors.orange)
+                                    .foregroundStyle(PureLineStyle.accent)
                             }
                         }
-                        .listRowBackground(FairwayVectorColors.surface)
+                        .listRowBackground(PureLineStyle.surface)
 
                         Section("Hole by Hole Scores") {
                             ForEach(0..<safeHoleCount, id: \.self) { i in
@@ -1523,26 +1685,29 @@ private struct NewRoundView: View {
                                 )
                             }
                         }
-                        .listRowBackground(FairwayVectorColors.surface)
+                        .listRowBackground(PureLineStyle.surface)
                     } else {
                         Section("Score") {
                             if inputMode == .adjustedGrossScore {
-                                HStack {
+                                VStack(alignment: .leading, spacing: 12) {
                                     InfoLabel(
                                         title: "Adjusted Gross Score",
                                         explanation: "Adjusted Gross Score is the total strokes you took after WHS maximums are applied on any hole. It is used to calculate your handicap differential and removes the effect of a few unusually bad holes."
                                     )
-                                    Spacer()
-                                    Text("\(strokes)")
-                                        .font(.body.bold())
-                                    Stepper("", value: $strokes, in: 45...160)
-                                        .labelsHidden()
+                                    HStack {
+                                        Text("\(strokes)")
+                                            .font(.title2.weight(.semibold).monospacedDigit())
+                                        Spacer()
+                                        Stepper("", value: $strokes, in: 45...160)
+                                            .labelsHidden()
+                                            .accessibilityLabel("Adjusted Gross Score")
+                                    }
                                 }
                             } else if inputMode == .stablefordPoints {
                                 Stepper("Stableford points: \(points)", value: $points, in: 0...54)
                             }
                         }
-                        .listRowBackground(FairwayVectorColors.surface)
+                        .listRowBackground(PureLineStyle.surface)
                     }
 
                     Section("Conditions & Notes") {
@@ -1556,10 +1721,11 @@ private struct NewRoundView: View {
                                 .font(.body.bold())
                             Stepper("", value: $pcc, in: -1...3, step: 1)
                                 .labelsHidden()
+                                .accessibilityLabel("PCC adjustment")
                         }
                         TextField("Notes", text: $notes)
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
 
                 }
 
@@ -1567,13 +1733,12 @@ private struct NewRoundView: View {
                     Section("Notes") {
                         TextField("Notes", text: $notes)
                     }
-                    .listRowBackground(FairwayVectorColors.surface)
+                    .listRowBackground(PureLineStyle.surface)
 
                 }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(FairwayVectorColors.background)
+            .hcpPureLineList()
+            .navigationTitle("Add round")
             .toolbar {
                 if isManualDifferential || !selectedClubName.isEmpty {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -1612,7 +1777,7 @@ private struct NewRoundView: View {
                     }
                 }
             }
-            .toolbarBackground(FairwayVectorColors.background, for: .navigationBar)
+            .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showSettings) {
                 UnifiedSettingsView()
@@ -1902,7 +2067,7 @@ private struct CustomCoursesView: View {
                 }
                 .pickerStyle(.segmented)
             }
-            .listRowBackground(Color.white)
+            .listRowBackground(PureLineStyle.surface)
 
             if showGrouped {
                 groupedRootSections
@@ -1910,8 +2075,7 @@ private struct CustomCoursesView: View {
                 allSections
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(Color.white)
+        .hcpPureLineList()
         .navigationTitle("Custom Courses")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -1947,7 +2111,7 @@ private struct CustomCoursesView: View {
                     description: Text("Add a custom course to browse by region.")
                 )
             }
-            .listRowBackground(Color.white)
+            .listRowBackground(PureLineStyle.surface)
         } else {
             if let preferred = profile?.countryOrDefault, groupedCountries.contains(preferred) {
                 Section("Your Region") {
@@ -1955,7 +2119,7 @@ private struct CustomCoursesView: View {
                         DrillRowView(title: preferred, subtitle: nil)
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
             }
 
             Section("All Countries / Regions") {
@@ -1965,7 +2129,7 @@ private struct CustomCoursesView: View {
                     }
                 }
             }
-            .listRowBackground(Color.white)
+            .listRowBackground(PureLineStyle.surface)
         }
     }
 
@@ -2003,7 +2167,7 @@ private struct CustomCoursesView: View {
                     description: Text("Add courses that are missing from the built-in database.")
                 )
             }
-            .listRowBackground(Color.white)
+            .listRowBackground(PureLineStyle.surface)
         } else {
             Section {
                 HStack {
@@ -2023,7 +2187,7 @@ private struct CustomCoursesView: View {
                     }
                 }
             }
-            .listRowBackground(Color.white)
+            .listRowBackground(PureLineStyle.surface)
 
             if filteredTees.isEmpty {
                 Section {
@@ -2033,7 +2197,7 @@ private struct CustomCoursesView: View {
                         description: Text("No custom courses match \"\(searchText)\".")
                     )
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
             } else {
                 Section("Your Custom Tees") {
                     ForEach(filteredTees) { tee in
@@ -2041,7 +2205,7 @@ private struct CustomCoursesView: View {
                     }
                     .onDelete(perform: deleteTees)
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
             }
         }
     }
@@ -2077,7 +2241,7 @@ private struct CustomCoursesView: View {
                 }
             }
         }
-        .listRowBackground(Color.white)
+        .listRowBackground(PureLineStyle.surface)
     }
 
     private func citySections(country: String) -> some View {
@@ -2097,7 +2261,7 @@ private struct CustomCoursesView: View {
                 }
             }
         }
-        .listRowBackground(Color.white)
+        .listRowBackground(PureLineStyle.surface)
     }
 
     private func clubSections(country: String, city: String) -> some View {
@@ -2117,7 +2281,7 @@ private struct CustomCoursesView: View {
                 }
             }
         }
-        .listRowBackground(Color.white)
+        .listRowBackground(PureLineStyle.surface)
     }
 
     private func courseSections(club: String) -> some View {
@@ -2137,7 +2301,7 @@ private struct CustomCoursesView: View {
                 }
             }
         }
-        .listRowBackground(Color.white)
+        .listRowBackground(PureLineStyle.surface)
     }
 
     private func teeSections(club: String, course: String) -> some View {
@@ -2152,7 +2316,7 @@ private struct CustomCoursesView: View {
                 }
             }
         }
-        .listRowBackground(Color.white)
+        .listRowBackground(PureLineStyle.surface)
     }
 
     private func deleteTees(at offsets: IndexSet) {
@@ -2242,7 +2406,7 @@ private struct CustomCourseGroupedLevelView: View {
                         }
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
             case .city(let country, let city):
                 let matchingClubs = customClubs.filter { $0.country == country && cityName($0) == city }.sorted { $0.name < $1.name }
@@ -2253,7 +2417,7 @@ private struct CustomCourseGroupedLevelView: View {
                         }
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
             case .club(let country, let city, let club):
                 let matchingCourses = courses.filter { ($0.isCustom ?? false) && $0.clubName == club }.sorted { $0.name < $1.name }
@@ -2264,7 +2428,7 @@ private struct CustomCourseGroupedLevelView: View {
                         }
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
             case .course(_, _, let club, let course):
                 let matchingTees = customTees.filter { $0.clubName == club && $0.courseName == course }.sorted { $0.name < $1.name }
@@ -2273,11 +2437,10 @@ private struct CustomCourseGroupedLevelView: View {
                         CustomTeeListRow(tee: tee, club: customClubs.first { $0.name == tee.clubName })
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(Color.white)
+        .hcpPureLineList()
         .navigationTitle(navigationTitle)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -2336,14 +2499,14 @@ private struct CustomTeeDetailView: View {
                     LabeledContent("Country", value: club.country)
                 }
             }
-            .listRowBackground(Color.white)
+            .listRowBackground(PureLineStyle.surface)
 
             Section("Course") {
                 LabeledContent("Course", value: tee.courseName)
                 LabeledContent("Tee", value: tee.name)
                 LabeledContent("Holes", value: "\(tee.holes)")
             }
-            .listRowBackground(Color.white)
+            .listRowBackground(PureLineStyle.surface)
 
             Section("WHS Ratings") {
                 LabeledContent("Rating for", value: tee.ratingSex?.label ?? "Universal")
@@ -2351,7 +2514,14 @@ private struct CustomTeeDetailView: View {
                 LabeledContent("Course Rating", value: tee.courseRating.formatted(.number.precision(.fractionLength(1))))
                 LabeledContent("Slope", value: "\(tee.slopeRating)")
             }
-            .listRowBackground(Color.white)
+            .listRowBackground(PureLineStyle.surface)
+
+            if tee.holes == 9 {
+                Section {
+                    HCPNineHoleNotice()
+                }
+                .listRowBackground(PureLineStyle.surface)
+            }
 
             if hasHoleDetails {
                 Section("Hole Details") {
@@ -2364,11 +2534,10 @@ private struct CustomTeeDetailView: View {
                         }
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(Color.white)
+        .hcpPureLineList()
         .navigationTitle(tee.courseName)
     }
 }
@@ -2485,7 +2654,8 @@ private struct AddCourseView: View {
                         .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
                 if index < titles.count - 1 {
@@ -2494,9 +2664,12 @@ private struct AddCourseView: View {
                 }
             }
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+        .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(PureLineStyle.line, lineWidth: 1)
+        }
+        .shadow(color: PureLineStyle.ink.opacity(0.06), radius: 8, x: 0, y: 3)
         .padding(.trailing, 8)
     }
 
@@ -2542,6 +2715,10 @@ private struct AddCourseView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    HCPPureLineIntro(title: "Add a custom course", subtitle: "Use the published ratings for your course, tee and rating category.")
+                }
+
                 Section("Location · Required") {
                     Picker("Country / Region", selection: countrySelection) {
                         ForEach(availableCountries, id: \.self) { countryOption in
@@ -2565,7 +2742,7 @@ private struct AddCourseView: View {
                         }
                         .zIndex(1)
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
                 Section("Course & Tee · Required") {
                     TextField("Course name", text: $courseName)
@@ -2587,8 +2764,11 @@ private struct AddCourseView: View {
                         Text("18").tag(18)
                     }
                     .pickerStyle(.segmented)
+                    if holes == 9 {
+                        HCPNineHoleNotice()
+                    }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
                 Section("WHS Ratings · Required") {
                     Picker("Tee Rating Category", selection: $selectedRatingSex) {
@@ -2618,16 +2798,23 @@ private struct AddCourseView: View {
                             .multilineTextAlignment(.trailing)
                             .frame(minWidth: 64)
                     }
+                    Text("Par 27–80 · Course Rating 25–90 · Slope Rating 55–160")
+                        .font(.caption)
+                        .foregroundStyle(PureLineStyle.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
                 Section("Hole Details · Optional") {
                     Toggle("Add hole details", isOn: $addHoleDetails)
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
                 if addHoleDetails {
                     Section("Hole Details") {
+                        Text("Each hole must have a unique HCP from 1 to \(holes).")
+                            .font(.caption)
+                            .foregroundStyle(PureLineStyle.muted)
                         ForEach(0..<holes, id: \ .self) { index in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Hole \(index + 1)")
@@ -2647,11 +2834,10 @@ private struct AddCourseView: View {
                             }
                         }
                     }
-                    .listRowBackground(Color.white)
+                    .listRowBackground(PureLineStyle.surface)
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.white)
+            .hcpPureLineList()
             .navigationTitle("Add Custom Course")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -2832,10 +3018,13 @@ private struct InfoLabel: View {
                 isShowingInfo = true
             } label: {
                 Image(systemName: "questionmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .font(.body)
+                    .foregroundStyle(PureLineStyle.accent)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("About \(title)")
             .sheet(isPresented: $isShowingInfo) {
                 NavigationStack {
                     ScrollView {
@@ -2843,23 +3032,27 @@ private struct InfoLabel: View {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: "questionmark.circle")
                                     .font(.title2)
-                                    .foregroundStyle(FairwayVectorColors.orange)
+                                    .foregroundStyle(PureLineStyle.accent)
                                     .frame(width: 34)
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: 12) {
                                     Text(title)
-                                        .font(.headline)
-                                        .foregroundStyle(FairwayVectorColors.navy)
+                                        .font(.title2.weight(.semibold))
+                                        .foregroundStyle(PureLineStyle.ink)
                                     Text(explanation)
                                         .font(.body)
-                                        .foregroundStyle(FairwayVectorColors.charcoal)
+                                        .foregroundStyle(PureLineStyle.ink)
+                                        .lineSpacing(4)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
+                            .pureLineCard()
                         }
-                        .padding()
+                        .padding(18)
                     }
-                    .background(FairwayVectorColors.background)
+                    .background(PureLineStyle.canvas)
+                    .tint(PureLineStyle.accent)
                     .navigationTitle("How It Works")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") {
@@ -2925,7 +3118,7 @@ private struct HCPSettingsView: View {
                         updateSex(to: selectedSex)
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
                 Section("Round Defaults") {
                     Picker("Default Scoring Mode", selection: $selectedScoringMode) {
@@ -2934,12 +3127,12 @@ private struct HCPSettingsView: View {
                         }
                     }
                     .pickerStyle(.navigationLink)
-                    .background(Color.white)
+                    .background(PureLineStyle.surface)
                     .onChange(of: selectedScoringMode) {
                         updateScoringMode(to: selectedScoringMode)
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
                 Section("Region") {
                     Picker("Country / Region", selection: $selectedCountry) {
@@ -2948,12 +3141,12 @@ private struct HCPSettingsView: View {
                         }
                     }
                     .pickerStyle(.navigationLink)
-                    .background(Color.white)
+                    .background(PureLineStyle.surface)
                     .onChange(of: selectedCountry) {
                         updateCountry(to: selectedCountry)
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
                 Section("Course Data") {
                     NavigationLink {
@@ -2967,11 +3160,12 @@ private struct HCPSettingsView: View {
                         }
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
 
                 Section {
                     Link("Privacy Policy", destination: URL(string: "https://fairwayvector.com/hcp-projection/privacy-policy")!)
                 }
+                .listRowBackground(PureLineStyle.surface)
 
                 #if DEBUG
                 Section("Test Data") {
@@ -2992,11 +3186,10 @@ private struct HCPSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .listRowBackground(Color.white)
+                .listRowBackground(PureLineStyle.surface)
                 #endif
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.white)
+            .hcpPureLineList()
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -3133,11 +3326,20 @@ private struct RoundDetailView: View {
                 }
                 LabeledContent("Date", value: round.date.formatted(date: .abbreviated, time: .omitted))
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
+
+            if round.holes == 9 {
+                Section {
+                    HCPNineHoleNotice()
+                }
+                .listRowBackground(PureLineStyle.surface)
+            }
 
             Section("Handicap Performance") {
                 if let differential {
                     LabeledContent("HCP Score", value: WHSCalculator.formatHCPScore(differential))
+                        .font(.title3.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(PureLineStyle.ink)
                 }
                 if let handicapIndex {
                     LabeledContent("Playing Handicap Index", value: WHSCalculator.formatHCPScore(handicapIndex))
@@ -3156,7 +3358,7 @@ private struct RoundDetailView: View {
                     }
                 }
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
 
             if !isNoCourseRound {
                 Section("Score Summary") {
@@ -3180,12 +3382,12 @@ private struct RoundDetailView: View {
                     LabeledContent("Notes", value: round.notes)
                 }
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                .listRowBackground(PureLineStyle.surface)
             } else if !round.notes.isEmpty {
                 Section("Notes") {
                     Text(round.notes)
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                .listRowBackground(PureLineStyle.surface)
             }
 
             if let holeScores = round.holeScores, !holeScores.isEmpty {
@@ -3215,8 +3417,8 @@ private struct RoundDetailView: View {
                                     .font(.caption.bold().monospacedDigit())
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(FairwayVectorColors.orange.opacity(0.15))
-                                    .foregroundStyle(FairwayVectorColors.orange)
+                                    .background(PureLineStyle.accent.opacity(0.08))
+                                    .foregroundStyle(PureLineStyle.accent)
                                     .clipShape(Capsule())
                             }
                             Text("\(holeScores[i]) strokes")
@@ -3224,11 +3426,10 @@ private struct RoundDetailView: View {
                         }
                     }
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                .listRowBackground(PureLineStyle.surface)
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(FairwayVectorColors.background)
+        .hcpPureLineList()
         .navigationTitle(isNoCourseRound ? "No Course Round" : round.courseName)
     }
 }
@@ -3237,27 +3438,33 @@ private struct MetricCard: View {
     var title: String
     var value: String
     var systemImage: String
+    var subtitle: String? = nil
+    @ScaledMetric(relativeTo: .largeTitle) private var valueSize: CGFloat = 56
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Image(systemName: systemImage)
-                    .foregroundStyle(FairwayVectorColors.orange)
+                    .foregroundStyle(PureLineStyle.accent)
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(PureLineStyle.muted)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption.bold())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PureLineStyle.muted)
             }
             Text(value)
-                .font(.title.bold().monospacedDigit())
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: valueSize, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundStyle(PureLineStyle.ink)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(PureLineStyle.accent)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(FairwayVectorColors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .pureLineCard(padding: 22)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
         .accessibilityValue(value)
@@ -3267,25 +3474,33 @@ private struct MetricCard: View {
 private struct RoundRow: View {
     var round: GolfRound
     var isCountingRound: Bool = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var differential: Double? {
         WHSCalculator.scoringEntry(for: round)?.scoreDifferential
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+        VStack(alignment: .leading, spacing: 10) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+            layout {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
+                    let titleLayout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                        : AnyLayout(HStackLayout(spacing: 6))
+                    titleLayout {
                         Text(round.courseName.isEmpty ? "No Course" : round.courseName)
-                            .font(.headline)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(PureLineStyle.ink)
                         if isCountingRound {
                             Text("Counts for HCP")
                                 .font(.caption2.bold())
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(FairwayVectorColors.orange.opacity(0.18))
-                                .foregroundStyle(FairwayVectorColors.orange)
+                                .background(PureLineStyle.accent.opacity(0.08))
+                                .foregroundStyle(PureLineStyle.accent)
                                 .clipShape(Capsule())
                         }
                     }
@@ -3295,12 +3510,15 @@ private struct RoundRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
                 VStack(alignment: .trailing, spacing: 4) {
                     if let differential {
+                        Text("HCP score")
+                            .font(.caption2)
+                            .foregroundStyle(PureLineStyle.muted)
                         Text(WHSCalculator.formatHCPScore(differential))
                             .font(.headline.monospacedDigit())
-                            .foregroundStyle(isCountingRound ? FairwayVectorColors.orange : Color.primary)
+                            .foregroundStyle(isCountingRound ? PureLineStyle.accent : PureLineStyle.ink)
                     }
                     Text(round.date, format: .dateTime.year().month().day())
                         .font(.caption)
@@ -3319,14 +3537,19 @@ private struct RoundRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.vertical, 4)
     }
 }
 
 private struct TargetResultRow: View {
     var result: TargetResult
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(alignment: .top) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+        layout {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(primaryText)
@@ -3336,8 +3559,8 @@ private struct TargetResultRow: View {
                             .font(.caption2.bold())
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(FairwayVectorColors.slate.opacity(0.18))
-                            .foregroundStyle(FairwayVectorColors.slate)
+                            .background(PureLineStyle.line.opacity(0.5))
+                            .foregroundStyle(PureLineStyle.muted)
                             .clipShape(Capsule())
                     }
                 }
@@ -3345,16 +3568,22 @@ private struct TargetResultRow: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            Spacer()
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
             VStack(alignment: .trailing, spacing: 4) {
+                Text("Projected index")
+                    .font(.caption2)
+                    .foregroundStyle(PureLineStyle.muted)
                 Text(WHSCalculator.formatHCPScore(result.projectedHandicapIndex))
-                    .font(.headline.monospacedDigit())
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(PureLineStyle.ink)
                 Text(changeText)
                     .font(.caption)
                     .foregroundStyle(changeColor)
             }
-            .fixedSize(horizontal: true, vertical: false)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
         }
+        .padding(.vertical, 8)
     }
 
     private var primaryText: String {
@@ -3376,11 +3605,11 @@ private struct TargetResultRow: View {
 
     private var changeColor: Color {
         if result.change < 0 {
-            return FairwayVectorColors.navy
+            return PureLineStyle.ink
         } else if result.change > 0 {
-            return FairwayVectorColors.orange
+            return PureLineStyle.accent
         } else {
-            return FairwayVectorColors.slate
+            return PureLineStyle.muted
         }
     }
 }
@@ -3403,4 +3632,4 @@ private extension TeeSet {
     }
 }
 
-// FairwayVectorColors is a shared app-level type (see FairwayVectorColors.swift).
+// Presentation styles are scoped to this file; shared settings remain unchanged.

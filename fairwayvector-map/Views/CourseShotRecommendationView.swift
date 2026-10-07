@@ -47,33 +47,60 @@ struct CourseShotRecommendationView: View {
 
     var body: some View {
         Button { isShowingDetails = true } label: {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 6) {
-                    Image(systemName: "figure.golf").foregroundStyle(FairwayVectorColors.orange)
-                    if let currentResult, let best = currentResult.recommendations.first {
-                        Text(best.title).font(.caption.bold())
-                        if currentResult.input.isScoring { Text("SCORING").font(.caption2.bold()) }
-                    } else {
-                        Text(compactStatus).font(.caption.weight(.semibold))
-                        if input != nil, failedInput != input { ProgressView().controlSize(.mini) }
-                    }
+                    Text("YOUR NEXT SHOT")
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(PureLineStyle.muted)
                     Spacer(minLength: 0)
-                    if DevelopmentAPIConfiguration.current.gpxz == .mock || terrainStore.metadata.contains(where: \.isSynthetic) {
-                        Text("DEMO").font(.caption2.bold())
+                    if currentResult?.input.isScoring == true {
+                        Text("Scoring")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(PureLineStyle.accent)
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .background(PureLineStyle.surface, in: Capsule())
                     }
-                    Image(systemName: "chevron.right").font(.caption2)
+                    if DevelopmentAPIConfiguration.current.gpxz == .mock || terrainStore.metadata.contains(where: \.isSynthetic) {
+                        Text("DEMO").font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(PureLineStyle.muted)
+                    }
                 }
                 if let currentResult, let best = currentResult.recommendations.first {
-                    recommendationRow(best, target: currentResult.input.distanceM)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(best.title)
+                                .font(.title2.weight(.semibold)).tracking(-0.5)
+                                .foregroundStyle(PureLineStyle.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                            recommendationRow(best, target: currentResult.input.distanceM)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.up.right")
+                            .font(.body.weight(.medium)).foregroundStyle(PureLineStyle.accent)
+                    }
                     let alternatives = currentResult.recommendations.dropFirst().prefix(2).map {
                         "\($0.title) \(CourseShotRecommendationDetail.errorText($0.recommendation, target: currentResult.input.distanceM, unit: unit))"
                     }
                     if !alternatives.isEmpty {
-                        Text("Near: " + alternatives.joined(separator: " · "))
-                            .font(.caption2)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                        Text(alternatives.joined(separator: "  /  "))
+                            .font(.caption)
+                            .foregroundStyle(PureLineStyle.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 12).padding(.vertical, 9)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 10))
                             .accessibilityLabel("Nearest alternatives: " + alternatives.joined(separator: ", "))
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        Text(compactStatus)
+                            .font(.subheadline.weight(.medium))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        if input != nil, failedInput != input { ProgressView().controlSize(.mini) }
+                        Image(systemName: "chevron.right")
+                            .font(.caption).foregroundStyle(PureLineStyle.accent)
                     }
                 }
             }
@@ -81,11 +108,11 @@ struct CourseShotRecommendationView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(FairwayVectorColors.navy)
-        .padding(10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
+        .foregroundStyle(PureLineStyle.ink)
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .padding(.bottom, 16)
+        .background(PureLineStyle.canvas)
         .accessibilityIdentifier("course-club-recommendation")
         .accessibilityHint("Opens trajectory, captured conditions, alternatives, errors and club calibration, even before advice is available")
         .task(id: input) {
@@ -233,7 +260,7 @@ struct CourseShotRecommendationView: View {
     private func recommendationRow(_ choice: CourseClubRecommendation, target: Double) -> some View {
         let recommendation = choice.recommendation
         return Text("\(unit.format(recommendation.estimatedCarryM)) carry · \(CourseShotRecommendationDetail.errorText(recommendation, target: target, unit: unit))")
-            .font(.caption).foregroundStyle(FairwayVectorColors.orange)
+            .font(.caption).foregroundStyle(PureLineStyle.muted)
     }
 }
 

@@ -9,7 +9,7 @@ struct CourseWeatherCard: View {
     var body: some View {
         Button { isShowingDetails = true } label: {
             HStack(spacing: 8) {
-                Image(systemName: "cloud.sun.fill").foregroundStyle(FairwayVectorColors.orange)
+                Image(systemName: "cloud.sun").foregroundStyle(PureLineStyle.accent)
                 if let weather = store.weather(for: location) {
                     Text(weather.temperatureC.map { String(format: "%.0f°C", $0) } ?? "–°C").fontWeight(.semibold)
                     Spacer(minLength: 0)
@@ -31,8 +31,8 @@ struct CourseWeatherCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(FairwayVectorColors.navy)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .foregroundStyle(PureLineStyle.ink)
+        .background(PureLineStyle.canvas.opacity(0.96), in: RoundedRectangle(cornerRadius: 14))
         // This is the sole automatic load. The detail sheet has no task/onAppear fetch.
         .task(id: locationKey) {
             await store.load(for: location)

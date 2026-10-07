@@ -29,24 +29,24 @@ struct CourseWindIndicator: View {
         HStack(spacing: 4) {
             ZStack {
                 Circle()
-                    .fill(FairwayVectorColors.conditionsSurface)
+                    .fill(PureLineStyle.surface)
                 if !isCalm, let bearing = windToBearing {
                     Image(systemName: "arrow.up")
                         .font(.caption.bold())
-                        .foregroundStyle(FairwayVectorColors.orange)
+                        .foregroundStyle(PureLineStyle.accent)
                         // Up represents the camera heading, not geographic north.
                         .rotationEffect(.degrees(bearing - mapHeading))
                 } else {
                     Image(systemName: isCalm ? "wind" : "questionmark")
                         .font(.caption)
-                        .foregroundStyle(FairwayVectorColors.slate)
+                        .foregroundStyle(PureLineStyle.muted)
                 }
             }
             .frame(width: 26, height: 26)
             Text(isCalm ? "Calm" : "\(speedText) → \(destination)")
                 .font(.caption.monospacedDigit())
         }
-        .foregroundStyle(FairwayVectorColors.navy)
+        .foregroundStyle(PureLineStyle.ink)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Course wind")

@@ -23,19 +23,25 @@ struct CourseSelectionView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Where to?")
+                            .font(.largeTitle.weight(.semibold)).tracking(-1)
+                        Text("Find your course. Choose your tee.")
+                            .font(.subheadline).foregroundStyle(PureLineStyle.muted)
+                    }
                     if let round = roundStore.active {
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 14) {
                             Label("Round in progress", systemImage: "flag.checkered").font(.headline)
                             Text("\(round.reference.courseName) · \(round.reference.teeName) · hole \(round.holes[round.currentHole].number)")
                             Button("Resume scorecard & map") { onResumeRound?(round) }
                                 .buttonStyle(.borderedProminent)
                             Button("Discard unsaved round", role: .destructive) { confirmDiscardRound = true }
-                        }.padding().background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .pureLineCard()
                     }
                     if let message = roundStore.errorMessage {
-                        Text(message).font(.footnote).foregroundStyle(.red)
+                        Text(message).font(.footnote).foregroundStyle(PureLineStyle.ink)
                         if roundStore.draftNeedsRetry {
                             Button("Retry saving draft") {
                                 do { try roundStore.retryDraft() } catch { roundStore.errorMessage = error.localizedDescription }
@@ -43,8 +49,19 @@ struct CourseSelectionView: View {
                         } else { Button("Retry loading round storage") { roundStore.load() } }
                     }
                     if isMock {
-                        Label("APIs paused · 0 paid requests. Saved real Hills is bundled for offline course access on fresh devices. Demo Hills is a separate invented fallback. Terrain remains explicitly synthetic; the private real terrain backup is not used by this app.", systemImage: "externaldrive")
-                            .font(.footnote).foregroundStyle(FairwayVectorColors.orange)
+                        DisclosureGroup {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("APIs paused · 0 paid requests")
+                                Text("Saved real Hills is bundled for offline course access on fresh devices. Demo Hills is a separate invented fallback. Terrain remains explicitly synthetic; the private real terrain backup is not used by this app.")
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .font(.footnote).foregroundStyle(PureLineStyle.muted)
+                            .padding(.top, 8)
+                        } label: {
+                            Label("Offline preview · synthetic terrain", systemImage: "externaldrive")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(PureLineStyle.accent)
+                        }
                     }
                     searchField
 
@@ -53,8 +70,11 @@ struct CourseSelectionView: View {
                     }
 
                     if isMock, !model.savedCourses.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("SAVED COURSES").font(.caption2.weight(.semibold))
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("SAVED COURSES")
+                                .font(.caption.weight(.semibold))
+                                .tracking(1.2)
+                                .foregroundStyle(PureLineStyle.muted)
                             ForEach(model.savedCourses, id: \.cacheKey) { reference in
                                 recentCourseShortcut(reference, title: pausedLabel(for: reference.golfAPICourseID))
                             }
@@ -64,14 +84,14 @@ struct CourseSelectionView: View {
                     if !model.isConfigured {
                         Label("Golf API key not configured. Add GOLF_API_KEY in the app target’s build settings.", systemImage: "key.horizontal")
                             .font(.footnote)
-                            .foregroundStyle(FairwayVectorColors.orange)
+                            .foregroundStyle(PureLineStyle.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if let errorMessage = model.errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
                             .font(.footnote)
-                            .foregroundStyle(FairwayVectorColors.orange)
+                            .foregroundStyle(PureLineStyle.muted)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("course-search-message")
                     }
@@ -104,7 +124,7 @@ struct CourseSelectionView: View {
                                 .frame(height: 52)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(FairwayVectorColors.navy)
+                        .tint(PureLineStyle.accent)
                         .accessibilityIdentifier("view-course-button")
                         if let onStartRound {
                             Button("Start round", systemImage: "flag.checkered") { onStartRound(selection.reference) }
@@ -112,20 +132,30 @@ struct CourseSelectionView: View {
                         }
                     }
 
-                    Text(isMock ? "Saved Hills offline and other complete saved courses appear before demo results. Real Hills provider detail, coordinates and 62/Men geometry are bundled read-only; other rated tees use the original provider payload. Valley is not bundled. Refresh never contacts Golf API. Weather and imagery are still live/cache-backed."
-                        : "Golf API search is low-cost. Opening a course downloads its detail and coordinate data once; both are cached on this device. Use the course refresh button to check for provider updates.")
-                        .font(.footnote)
-                        .foregroundStyle(FairwayVectorColors.slate)
-                        .fixedSize(horizontal: false, vertical: true)
+                    DisclosureGroup("Course data & providers") {
+                        Text(isMock ? "Saved Hills offline and other complete saved courses appear before demo results. Real Hills provider detail, coordinates and 62/Men geometry are bundled read-only; other rated tees use the original provider payload. Valley is not bundled. Refresh never contacts Golf API. Weather and imagery are still live/cache-backed."
+                            : "Golf API search is low-cost. Opening a course downloads its detail and coordinate data once; both are cached on this device. Use the course refresh button to check for provider updates.")
+                            .font(.footnote)
+                            .foregroundStyle(PureLineStyle.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 8)
+                    }
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(PureLineStyle.muted)
+                    .pureLineCard()
                 }
-                .padding()
+                .foregroundStyle(PureLineStyle.ink)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 24)
             }
-            .background(FairwayVectorColors.background)
+            .background(PureLineStyle.canvas)
             .navigationTitle("Choose Course")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar(.visible, for: .tabBar)
         }
-        .tint(FairwayVectorColors.navy)
+        .tint(PureLineStyle.accent)
         .confirmationDialog("Discard the unsaved round?", isPresented: $confirmDiscardRound, titleVisibility: .visible) {
             Button("Discard round", role: .destructive) {
                 do { try roundStore.discardDraft() } catch { roundStore.errorMessage = error.localizedDescription }
@@ -158,43 +188,45 @@ struct CourseSelectionView: View {
     }
 
     private func recentCourseShortcut(_ reference: CourseReference, title: String = "RECENTLY SELECTED") -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .font(.caption.weight(.semibold))
+                .tracking(1)
+                .foregroundStyle(PureLineStyle.muted)
 
             Button {
                 startCourse(reference)
             } label: {
-                HStack(spacing: 12) {
+                HStack(spacing: 16) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.title3)
-                        .foregroundStyle(FairwayVectorColors.orange)
-                    VStack(alignment: .leading, spacing: 4) {
+                        .foregroundStyle(PureLineStyle.accent)
+                        .frame(width: 40, height: 40)
+                        .background(PureLineStyle.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 6) {
                         Text(reference.courseName)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(FairwayVectorColors.navy)
+                            .foregroundStyle(PureLineStyle.ink)
                         if reference.clubName != reference.courseName {
                             Text(reference.clubName)
                                 .font(.caption)
-                                .foregroundStyle(FairwayVectorColors.slate)
+                                .foregroundStyle(PureLineStyle.muted)
                         }
                         Text("\(reference.teeName) tee · \(reference.teeSex == "female" ? "Women" : "Men") · \(reference.holeCount) holes")
                             .font(.caption)
-                            .foregroundStyle(FairwayVectorColors.slate)
+                            .foregroundStyle(PureLineStyle.muted)
                         if isMock, !DevelopmentAPIConfiguration.isDemoCourse(reference.golfAPICourseID ?? "") {
                             Text(model.hasSavedCourse(reference) ? pausedLabel(for: reference.golfAPICourseID) : "Downloaded data unavailable in this installation · selection preserved")
-                                .font(.caption).foregroundStyle(FairwayVectorColors.orange)
+                                .font(.caption).foregroundStyle(PureLineStyle.accent)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(FairwayVectorColors.navy)
+                        .foregroundStyle(PureLineStyle.accent)
                 }
-                .padding(14)
-                .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
-                .contentShape(RoundedRectangle(cornerRadius: 12))
+                .pureLineCard()
+                .contentShape(RoundedRectangle(cornerRadius: 18))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("recent-course-button")
@@ -206,23 +238,13 @@ struct CourseSelectionView: View {
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            FairwayVectorMark()
-                .frame(width: 62, height: 62)
-            Text("Where are you playing?")
-                .font(.title2.bold())
-                .foregroundStyle(FairwayVectorColors.navy)
-                    Text("Choose a coverage region and country, then optionally narrow results by club name.")
-                .font(.subheadline)
-                .foregroundStyle(FairwayVectorColors.slate)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private var searchField: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("FIND A COURSE")
+                .font(.caption.weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(PureLineStyle.muted)
+            HStack(spacing: 14) {
                 Menu {
                     ForEach(model.coverageRegions) { region in
                         Button(region.name) { model.selectRegion(region.name) }
@@ -237,6 +259,11 @@ struct CourseSelectionView: View {
                         .accessibilityAddTraits(.isButton)
                 }
                 .accessibilityIdentifier("golf-coverage-region-picker")
+
+                Rectangle()
+                    .fill(PureLineStyle.line)
+                    .frame(width: 1, height: 24)
+                    .accessibilityHidden(true)
 
                 Menu {
                     ForEach(model.availableCountries, id: \.self) { country in
@@ -254,10 +281,11 @@ struct CourseSelectionView: View {
                 .disabled(model.selectedRegion.isEmpty)
                 .accessibilityIdentifier("golf-country-picker")
             }
-            .padding(.horizontal, 10)
-            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+            .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 12))
 
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 TextField("Search club name", text: $model.searchText)
                     .textContentType(.organizationName)
                     .textInputAutocapitalization(.words)
@@ -281,22 +309,27 @@ struct CourseSelectionView: View {
                 .disabled(model.isSearching || model.selectedCountry.isEmpty)
                 .accessibilityLabel("Search golf clubs")
             }
-            .padding(.horizontal, 12)
-            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+            .padding(.leading, 16)
+            .padding(.trailing, 6)
+            .padding(.vertical, 6)
+            .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(PureLineStyle.line, lineWidth: 1))
 
             Button(isMock ? "Refresh saved / demo search (local)" : "Refresh search from Golf API") {
                 Task { await model.search(forceRefresh: true) }
             }
             .font(.caption.weight(.medium))
+            .padding(.vertical, 4)
             .disabled(model.isSearching || model.selectedCountry.isEmpty)
         }
     }
 
     private var clubResults: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("CLUBS · \(model.clubs.count)")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .font(.caption.weight(.semibold))
+                .tracking(1)
+                .foregroundStyle(PureLineStyle.muted)
 
             ForEach(model.clubs) { club in
                 Button {
@@ -304,25 +337,25 @@ struct CourseSelectionView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "mappin.and.ellipse")
-                            .foregroundStyle(FairwayVectorColors.orange)
-                        VStack(alignment: .leading, spacing: 3) {
+                            .foregroundStyle(PureLineStyle.accent)
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(club.clubName)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(FairwayVectorColors.navy)
+                                .foregroundStyle(PureLineStyle.ink)
                             Text([club.city, club.state].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                                 .font(.caption)
-                                .foregroundStyle(FairwayVectorColors.slate)
+                                .foregroundStyle(PureLineStyle.muted)
                         }
                         Spacer()
                         Text("\(club.courses.count) courses")
                             .font(.caption2)
-                            .foregroundStyle(FairwayVectorColors.slate)
+                            .foregroundStyle(PureLineStyle.muted)
                         Image(systemName: model.selectedClubID == club.id ? "checkmark.circle.fill" : "chevron.right")
-                            .foregroundStyle(FairwayVectorColors.navy)
+                            .foregroundStyle(PureLineStyle.accent)
                     }
-                    .padding(12)
-                    .background(model.selectedClubID == club.id ? FairwayVectorColors.conditionsSurface : FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
-                    .contentShape(RoundedRectangle(cornerRadius: 12))
+                        .pureLineCard()
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(model.selectedClubID == club.id ? PureLineStyle.accent : Color.clear, lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 18))
                 }
                 .buttonStyle(.plain)
             }
@@ -330,40 +363,41 @@ struct CourseSelectionView: View {
     }
 
     private func courseResults(for club: GolfAPIClub) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("COURSES AT \(club.clubName.uppercased())")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .font(.caption.weight(.semibold))
+                .tracking(1)
+                .foregroundStyle(PureLineStyle.muted)
 
             ForEach(club.courses) { course in
                 Button {
                     Task { await model.selectCourse(course) }
                 } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(course.courseName)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(FairwayVectorColors.navy)
+                                .foregroundStyle(PureLineStyle.ink)
                             if isMock {
                                 Text(DevelopmentAPIConfiguration.isDemoCourse(course.courseID)
                                      ? "DEMO · invented course" : pausedLabel(for: course.courseID))
-                                    .font(.caption).foregroundStyle(FairwayVectorColors.orange)
+                                    .font(.caption).foregroundStyle(PureLineStyle.accent)
                             }
                             Text("\(course.numHoles) holes · \(course.hasGPS ? "GPS available" : "No GPS data")")
                                 .font(.caption)
-                                .foregroundStyle(FairwayVectorColors.slate)
+                                .foregroundStyle(PureLineStyle.muted)
                         }
                         Spacer()
                         if model.isLoadingCourse && model.selectedCourseID == course.id {
                             ProgressView()
                         } else {
                             Image(systemName: model.selectedCourseID == course.id ? "checkmark.circle.fill" : "chevron.right")
-                                .foregroundStyle(FairwayVectorColors.navy)
+                                .foregroundStyle(PureLineStyle.accent)
                         }
                     }
-                    .padding(12)
-                    .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
-                    .contentShape(RoundedRectangle(cornerRadius: 12))
+                    .pureLineCard()
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(model.selectedCourseID == course.id ? PureLineStyle.accent : Color.clear, lineWidth: 1))
+                    .contentShape(RoundedRectangle(cornerRadius: 18))
                 }
                 .buttonStyle(.plain)
                 .disabled(!course.hasGPS || model.isLoadingCourse)
@@ -372,10 +406,11 @@ struct CourseSelectionView: View {
     }
 
     private func teeSelection(detail: GolfAPICourseDetail) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("TEE SET")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .font(.caption.weight(.semibold))
+                .tracking(1)
+                .foregroundStyle(PureLineStyle.muted)
 
             Picker("Rating category", selection: $model.selectedSex) {
                 Text("Men").tag("male")
@@ -395,48 +430,52 @@ struct CourseSelectionView: View {
             }
             .pickerStyle(.navigationLink)
             .padding(.horizontal, 12)
-            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+            .padding(.vertical, 6)
+            .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 12))
 
             Text("\(detail.numHoles) holes · \(detail.hasGPS ? "GPS data available" : "GPS data unavailable")")
                 .font(.caption)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+            .pureLineCard()
     }
 
     private func selectionSummary(_ selection: GolfAPICourseSelection) -> some View {
         let coursePars = selection.sex == "female" ? selection.details.parsWomen : selection.details.parsMen
         let pars = selection.tee.pars(for: selection.sex, fallback: coursePars)
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 12) {
             Text("SELECTED COURSE")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .font(.caption.weight(.semibold))
+                .tracking(1)
+                .foregroundStyle(PureLineStyle.muted)
             Text("\(selection.club.clubName) · \(selection.details.courseName)")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
             Text("\(selection.tee.teeName) · \(selection.sex == "female" ? "Women" : "Men")")
                 .font(.subheadline)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
+            Rectangle()
+                .fill(PureLineStyle.line)
+                .frame(height: 1)
+                .accessibilityHidden(true)
             HStack(spacing: 18) {
                 rating("COURSE RATING", selection.tee.rating(for: selection.sex).map { String(format: "%.1f", $0) } ?? "–")
                 rating("SLOPE", selection.tee.slope(for: selection.sex).map(String.init) ?? "–")
                 rating("PAR", pars.isEmpty ? "–" : "\(pars.reduce(0, +))")
             }
         }
-        .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private func rating(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(PureLineStyle.muted)
             Text(value)
-                .font(.subheadline.weight(.semibold).monospacedDigit())
-                .foregroundStyle(FairwayVectorColors.charcoal)
+                .font(.title3.weight(.semibold).monospacedDigit())
+                .foregroundStyle(PureLineStyle.ink)
         }
     }
 }
