@@ -33,7 +33,6 @@ struct TrajectoryCalculatorView: View {
     @AppStorage("trajectory.calculator.inputMode") private var inputModeRawValue = TrajectoryInputMode.simple.rawValue
     @State private var launchSource: LaunchConditionSource = .club
     @State private var showConditions = false
-    @State private var showSettings = false
     private let resultsAnchor = "trajectory-results"
 
     var body: some View {
@@ -84,16 +83,6 @@ struct TrajectoryCalculatorView: View {
                     .accessibilityLabel("Reset inputs")
                     .accessibilityHint("Resets every calculator slider to its default value")
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                }
-            }
-            .sheet(isPresented: $showSettings) {
-                UnifiedSettingsView()
             }
         }
         .onAppear {

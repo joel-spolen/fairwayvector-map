@@ -137,6 +137,8 @@ struct HCPProjectionRootView: View {
             }
         }
         .tint(PureLineStyle.accent)
+        .foregroundStyle(PureLineStyle.ink)
+        .preferredColorScheme(.light)
         .onAppear {
             SeedData.loadIfNeeded(modelContext: modelContext)
         }
@@ -157,8 +159,6 @@ private struct HomeView: View {
     var tees: [TeeSet]
     let onAddRound: () -> Void
     var onPredict: (() -> Void)? = nil
-
-    @State private var showSettings = false
 
     private var entries: [ScoringRecordEntry] {
         WHSCalculator.scoringEntries(from: rounds, lowHandicapIndex: profile?.lowHandicapIndex)
@@ -248,19 +248,6 @@ private struct HomeView: View {
             }
             .background(PureLineStyle.canvas)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("Settings")
-                }
-            }
-            .sheet(isPresented: $showSettings) {
-                UnifiedSettingsView()
-            }
         }
     }
 
@@ -331,11 +318,12 @@ private struct HCPTrendGraphCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Handicap trend")
                         .font(.headline)
+                        .foregroundStyle(PureLineStyle.ink)
                     if let currentHandicap {
                         Text("Current: \(WHSCalculator.formatHCPScore(currentHandicap))")
                             .font(.caption)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(PureLineStyle.muted)
                     }
                 }
 
@@ -400,7 +388,7 @@ private struct HCPTrendGraphCard: View {
                             if let rIndex = value.as(Int.self) {
                                 Text("R\(rIndex)")
                                     .font(.caption2.monospacedDigit())
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(PureLineStyle.muted)
                             }
                         }
                     }
@@ -413,7 +401,7 @@ private struct HCPTrendGraphCard: View {
                             if let hcp = value.as(Double.self) {
                                 Text(WHSCalculator.formatHCPScore(hcp))
                                     .font(.caption2.monospacedDigit())
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(PureLineStyle.muted)
                             }
                         }
                     }
@@ -430,26 +418,26 @@ private struct HCPTrendGraphCard: View {
                     if let first = trendPoints.first {
                         Text("Start: \(WHSCalculator.formatHCPScore(first.handicapIndex))")
                             .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(PureLineStyle.muted)
                     }
                     if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
                     if let lowest = trendPoints.map(\.handicapIndex).min() {
                         Text("Low: \(WHSCalculator.formatHCPScore(lowest))")
                             .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(PureLineStyle.muted)
                     }
                     if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
                     if let last = trendPoints.last {
                         Text("Latest: \(WHSCalculator.formatHCPScore(last.handicapIndex))")
                             .font(.caption2.bold().monospacedDigit())
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(PureLineStyle.ink)
                     }
                 }
                 .padding(.top, 2)
             } else {
                 Text("Add at least four rounds to view your Handicap Index trend.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PureLineStyle.muted)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
             }
@@ -809,7 +797,6 @@ private struct TargetCalculatorView: View {
     @State private var improvingLimit = 6
     @State private var showMoreWorsening = false
     @State private var showingAddCourse = false
-    @State private var showSettings = false
     @State private var projectionResults: [TargetResult] = []
     @State private var projectionHandicap: Double?
 
@@ -1220,17 +1207,6 @@ private struct TargetCalculatorView: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("Settings")
-                }
-            }
-            .sheet(isPresented: $showSettings) {
-                UnifiedSettingsView()
             }
             .sheet(isPresented: $showingAddCourse) {
                 AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: activeCountry)
@@ -1305,7 +1281,6 @@ private struct NewRoundView: View {
     @State private var pcc = 0.0
     @State private var notes = ""
     @State private var showingAddCourse = false
-    @State private var showSettings = false
     @State private var holeScores: [Int] = Array(repeating: 4, count: 18)
 
     private var activeCountry: String {
@@ -1755,33 +1730,14 @@ private struct NewRoundView: View {
                     }
                 }
                 if isManualDifferential || !selectedClubName.isEmpty {
-                    ToolbarItemGroup(placement: .topBarTrailing) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button("Save") { saveRound() }
                             .disabled(!canSaveRound)
-
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                        }
-                        .accessibilityLabel("Settings")
-                    }
-                } else {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                        }
-                        .accessibilityLabel("Settings")
                     }
                 }
             }
             .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .sheet(isPresented: $showSettings) {
-                UnifiedSettingsView()
-            }
             .sheet(isPresented: $showingAddCourse) {
                 AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: activeCountry)
             }

@@ -8,7 +8,6 @@ struct TrajectoryHomeView: View {
     let onOpenClub: () -> Void
     let onOpenTrajectory: () -> Void
     @State private var showHowItWorks = false
-    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
@@ -42,21 +41,8 @@ struct TrajectoryHomeView: View {
                 .padding()
             }
             .background(FairwayVectorColors.background)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("Settings")
-                }
-            }
             .sheet(isPresented: $showHowItWorks) {
                 HowItWorksView()
-            }
-            .sheet(isPresented: $showSettings) {
-                UnifiedSettingsView()
             }
         }
         .accessibilityIdentifier("home-screen")

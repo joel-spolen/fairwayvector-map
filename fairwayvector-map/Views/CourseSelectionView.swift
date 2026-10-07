@@ -35,7 +35,7 @@ struct CourseSelectionView: View {
                             Label("Round in progress", systemImage: "flag.checkered").font(.headline)
                             Text("\(round.reference.courseName) · \(round.reference.teeName) · hole \(round.holes[round.currentHole].number)")
                             Button("Resume scorecard & map") { onResumeRound?(round) }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(PureLinePrimaryButtonStyle())
                             Button("Discard unsaved round", role: .destructive) { confirmDiscardRound = true }
                         }
                         .pureLineCard()
@@ -123,12 +123,12 @@ struct CourseSelectionView: View {
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 52)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(PureLinePrimaryButtonStyle())
                         .tint(PureLineStyle.accent)
                         .accessibilityIdentifier("view-course-button")
                         if let onStartRound {
                             Button("Start round", systemImage: "flag.checkered") { onStartRound(selection.reference) }
-                                .buttonStyle(.borderedProminent).disabled(roundStore.active != nil)
+                                .buttonStyle(PureLinePrimaryButtonStyle()).disabled(roundStore.active != nil)
                         }
                     }
 
@@ -153,7 +153,6 @@ struct CourseSelectionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar(.visible, for: .tabBar)
         }
         .tint(PureLineStyle.accent)
         .confirmationDialog("Discard the unsaved round?", isPresented: $confirmDiscardRound, titleVisibility: .visible) {
@@ -305,7 +304,7 @@ struct CourseSelectionView: View {
                             .frame(width: 48, height: 44)
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PureLinePrimaryButtonStyle(fillsWidth: false, minimumHeight: 44))
                 .disabled(model.isSearching || model.selectedCountry.isEmpty)
                 .accessibilityLabel("Search golf clubs")
             }

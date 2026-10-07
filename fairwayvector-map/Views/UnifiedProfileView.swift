@@ -52,7 +52,6 @@ struct UnifiedProfileView: View {
     @Query(sort: \GolfRound.date, order: .reverse) private var rounds: [GolfRound]
     @ObservedObject var trajectoryModel: TrajectoryCalculatorViewModel
     let onOpenWedge: () -> Void
-    @State private var showSettings = false
 
     private var profile: PlayerProfile? { profiles.first }
 
@@ -62,54 +61,48 @@ struct UnifiedProfileView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Player") {
-                    TextField("Name", text: Binding(
-                        get: { profile?.name ?? "" },
-                        set: { name in updateProfile { $0.name = name } }
-                    ))
-                    Picker("Tee rating", selection: Binding(
-                        get: { profile?.sexOrDefault ?? .male },
-                        set: { sex in updateProfile { $0.sexOrDefault = sex } }
-                    )) {
-                        Text("Men").tag(PlayerSex.male)
-                        Text("Women").tag(PlayerSex.female)
-                    }
-                    LabeledContent("Handicap Index", value: handicapIndex.map { WHSCalculator.formatHCPScore($0) } ?? "Not yet calculated")
-                    LabeledContent("Rounds", value: "\(rounds.count)")
+        Form {
+            Section("Player") {
+                TextField("Name", text: Binding(
+                    get: { profile?.name ?? "" },
+                    set: { name in updateProfile { $0.name = name } }
+                ))
+                Picker("Tee rating", selection: Binding(
+                    get: { profile?.sexOrDefault ?? .male },
+                    set: { sex in updateProfile { $0.sexOrDefault = sex } }
+                )) {
+                    Text("Men").tag(PlayerSex.male)
+                    Text("Women").tag(PlayerSex.female)
                 }
-                .listRowBackground(FairwayVectorColors.surface)
+                LabeledContent("Handicap Index", value: handicapIndex.map { WHSCalculator.formatHCPScore($0) } ?? "Not yet calculated")
+                LabeledContent("Rounds", value: "\(rounds.count)")
+            }
+            .listRowBackground(PureLineStyle.surface)
 
-                Section("Your game") {
-                    NavigationLink {
-                        TrajectoryProfileSettingsView(
-                            profileStore: trajectoryModel.playerProfileStore,
-                            unitPreferences: trajectoryModel.unitPreferences
-                        )
-                        .navigationTitle("Clubs & launch profile")
-                    } label: {
-                        Label("Clubs & launch profile", systemImage: "figure.golf")
-                    }
-                    Button(action: onOpenWedge) {
-                        Label("Wedge bag & matrix", systemImage: "square.grid.3x3")
-                    }
+            Section("Your game") {
+                NavigationLink {
+                    TrajectoryProfileSettingsView(
+                        profileStore: trajectoryModel.playerProfileStore,
+                        unitPreferences: trajectoryModel.unitPreferences
+                    )
+                    .navigationTitle("Clubs & launch profile")
+                } label: {
+                    Label("Clubs & launch profile", systemImage: "figure.golf")
                 }
-                .listRowBackground(FairwayVectorColors.surface)
-            }
-            .scrollContentBackground(.hidden)
-            .background(FairwayVectorColors.background)
-            .navigationTitle("Profile")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Settings", systemImage: "gearshape") { showSettings = true }
+                Button(action: onOpenWedge) {
+                    Label("Wedge bag & matrix", systemImage: "square.grid.3x3")
                 }
             }
-            .sheet(isPresented: $showSettings) {
-                UnifiedSettingsView()
-            }
+            .listRowBackground(PureLineStyle.surface)
         }
-        .tint(FairwayVectorColors.navy)
+        .scrollContentBackground(.hidden)
+        .background(PureLineStyle.canvas)
+        .foregroundStyle(PureLineStyle.ink)
+        .navigationTitle("Profile")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .tint(PureLineStyle.accent)
     }
 
     private func updateProfile(_ edit: (PlayerProfile) -> Void) {

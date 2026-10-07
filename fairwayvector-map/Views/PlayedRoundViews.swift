@@ -396,6 +396,8 @@ struct RoundStatisticsView: View {
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
             .roundFormStyle()
+            .navigationTitle("Rounds & statistics")
+            .navigationBarTitleDisplayMode(.inline)
             .confirmationDialog("Delete saved round?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
                 Button("Delete from Statistics", role: .destructive) {
                     guard let id = deleting else { return }

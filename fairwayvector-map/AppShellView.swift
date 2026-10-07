@@ -2,20 +2,22 @@ import SwiftData
 import SwiftUI
 
 struct ContentView: View {
-    private enum Tab: Hashable {
-        case home
+    private enum Destination: String, Identifiable {
         case course
         case handicap
         case practice
-        case profile
         case statistics
+
+        var id: String { rawValue }
     }
 
     @AppStorage("map.hasSeenSplash") private var hasSeenSplash = false
     @AppStorage("distanceUnit") private var distanceUnit: DistanceUnit = .meters
     @AppStorage("wedgeMatrix.distanceUnit") private var wedgeDistanceUnit = WedgeDistanceUnit.yards.rawValue
     @State private var isShowingSplash = true
-    @State private var selectedTab: Tab = .home
+    @State private var destination: Destination?
+    @State private var showingSettings = false
+    @State private var opensWedgesAfterSettings = false
     @State private var practiceDestination: PracticeDestination = .trajectory
     @StateObject private var trajectoryModel = TrajectoryCalculatorViewModel()
     @State private var roundStore = PlayedRoundStore()
@@ -23,47 +25,21 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            TabView(selection: $selectedTab) {
-                PureLineHomeView(
-                    onOpenCourseMap: { selectedTab = .course },
-                    onStartRound: { requestStartRound = true; selectedTab = .course },
-                    onOpenHandicap: { selectedTab = .handicap },
-                    onOpenWedge: {
-                        practiceDestination = .wedge
-                        selectedTab = .practice
-                    },
-                    onOpenTrajectory: {
-                        practiceDestination = .trajectory
-                        selectedTab = .practice
-                    }
-                )
-                .tabItem { Label("Home", systemImage: "house") }
-                .tag(Tab.home)
-
-                CourseMapTabView(requestStartRound: $requestStartRound)
-                    .tabItem { Label("Course", systemImage: "map") }
-                    .tag(Tab.course)
-
-                HCPProjectionEntryView()
-                    .tabItem { Label("Handicap", systemImage: "chart.line.uptrend.xyaxis") }
-                    .tag(Tab.handicap)
-
-                RoundStatisticsView()
-                    .tabItem { Label("Statistics", systemImage: "chart.xyaxis.line") }
-                    .tag(Tab.statistics)
-
-                PracticeView(destination: $practiceDestination, trajectoryModel: trajectoryModel)
-                    .tabItem { Label("Practice", systemImage: "target") }
-                    .tag(Tab.practice)
-
-                UnifiedProfileView(trajectoryModel: trajectoryModel, onOpenWedge: {
+            PureLineHomeView(
+                onOpenCourseMap: { destination = .course },
+                onStartRound: { requestStartRound = true; destination = .course },
+                onOpenHandicap: { destination = .handicap },
+                onOpenWedge: {
                     practiceDestination = .wedge
-                    selectedTab = .practice
-                })
-                    .tabItem { Label("Profile", systemImage: "person.crop.circle") }
-                    .tag(Tab.profile)
-            }
-            .tint(selectedTab == .home || selectedTab == .course || selectedTab == .handicap ? PureLineStyle.accent : FairwayVectorColors.navy)
+                    destination = .practice
+                },
+                onOpenTrajectory: {
+                    practiceDestination = .trajectory
+                    destination = .practice
+                },
+                onOpenStatistics: { destination = .statistics },
+                onOpenSettings: { showingSettings = true }
+            )
 
             if isShowingSplash {
                 SplashView(isReturningUser: hasSeenSplash) {
@@ -81,14 +57,67 @@ struct ContentView: View {
         .environmentObject(trajectoryModel)
         .environment(roundStore)
         .modelContainer(HCPProjectionEntryView.sharedModelContainer)
+        .fullScreenCover(item: $destination, onDismiss: { requestStartRound = false }) { screen in
+            feature(screen)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    HStack {
+                        Button {
+                            destination = nil
+                        } label: {
+                            Label("Home", systemImage: "chevron.left")
+                                .font(.subheadline.weight(.medium))
+                                .frame(minHeight: 44)
+                        }
+                        .accessibilityIdentifier("return-home-button")
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .foregroundStyle(PureLineStyle.accent)
+                    .background(PureLineStyle.canvas)
+                }
+                .environmentObject(trajectoryModel)
+                .environment(roundStore)
+                .modelContainer(HCPProjectionEntryView.sharedModelContainer)
+                .preferredColorScheme(.light)
+        }
+        .sheet(isPresented: $showingSettings, onDismiss: {
+            if opensWedgesAfterSettings {
+                opensWedgesAfterSettings = false
+                practiceDestination = .wedge
+                destination = .practice
+            }
+        }) {
+            UnifiedSettingsView(onOpenWedge: {
+                opensWedgesAfterSettings = true
+                showingSettings = false
+            })
+            .environmentObject(trajectoryModel)
+            .modelContainer(HCPProjectionEntryView.sharedModelContainer)
+            .preferredColorScheme(.light)
+        }
         .onChange(of: distanceUnit, initial: true) { _, unit in
             wedgeDistanceUnit = unit == .meters ? WedgeDistanceUnit.meters.rawValue : WedgeDistanceUnit.yards.rawValue
             trajectoryModel.unitPreferences.globalDefault = unit == .meters ? .metric : .imperial
         }
+        // Unlike an environment override, this also controls presented screens.
+        .preferredColorScheme(.light)
+    }
+
+    @ViewBuilder private func feature(_ screen: Destination) -> some View {
+        switch screen {
+        case .course:
+            CourseMapFlowView(requestStartRound: $requestStartRound)
+        case .handicap:
+            HCPProjectionEntryView()
+        case .practice:
+            PracticeView(destination: $practiceDestination, trajectoryModel: trajectoryModel)
+        case .statistics:
+            RoundStatisticsView()
+        }
     }
 }
 
-private struct CourseMapTabView: View {
+private struct CourseMapFlowView: View {
     @State private var selection: CourseReference?
     @State private var resumedRound: PlayedRound?
     @Binding var requestStartRound: Bool

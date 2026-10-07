@@ -5,7 +5,6 @@ struct TrajectoryProfileSettingsView: View {
     @ObservedObject var profileStore: PlayerProfileStore
     @ObservedObject var unitPreferences: UnitPreferences
     var settingsViewModel: TrajectoryCalculatorViewModel?
-    @State private var showSettings = false
     @State private var unitRefreshID = UUID()
 
     var body: some View {
@@ -30,22 +29,9 @@ struct TrajectoryProfileSettingsView: View {
         .scrollContentBackground(.hidden)
         .background(FairwayVectorColors.background)
         .tint(FairwayVectorColors.navy)
-        .toolbar {
-            if settingsViewModel != nil {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("Settings")
-                }
-            }
-        }
-        .sheet(isPresented: $showSettings, onDismiss: {
+        // Effective units include field overrides; the global default alone is insufficient.
+        .onChange(of: [unitPreferences.unitSystem(for: .distance), unitPreferences.unitSystem(for: .ballSpeed)]) { _, _ in
             unitRefreshID = UUID()
-        }) {
-            UnifiedSettingsView()
         }
     }
 

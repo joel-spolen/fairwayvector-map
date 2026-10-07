@@ -6,6 +6,8 @@ struct PureLineHomeView: View {
     let onOpenHandicap: () -> Void
     let onOpenWedge: () -> Void
     let onOpenTrajectory: () -> Void
+    let onOpenStatistics: () -> Void
+    let onOpenSettings: () -> Void
 
     var body: some View {
         NavigationStack {
@@ -16,9 +18,16 @@ struct PureLineHomeView: View {
                             .font(.caption2.weight(.semibold))
                             .tracking(1.8)
                         Spacer()
-                        Text("PLAY / PRACTICE")
-                            .font(.system(size: 10, weight: .medium))
-                            .tracking(1)
+                        Button(action: onOpenSettings) {
+                            Image(systemName: "gearshape")
+                                .font(.body.weight(.medium))
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(PureLineStyle.accent)
+                        .accessibilityLabel("Global settings")
+                        .accessibilityIdentifier("global-settings-button")
                     }
                     .foregroundStyle(PureLineStyle.muted)
                     .padding(.top, 12)
@@ -97,6 +106,19 @@ struct PureLineHomeView: View {
                     .font(.caption)
                     .foregroundStyle(PureLineStyle.muted)
                     .padding(.bottom, 16)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("See your game")
+                            .font(.title3.weight(.semibold)).tracking(-0.4)
+                            .foregroundStyle(PureLineStyle.ink)
+                        Text("Your rounds, scorecards and progress over time.")
+                            .font(.subheadline)
+                            .foregroundStyle(PureLineStyle.muted)
+                        destination("Rounds & statistics", detail: "Review your scores and spot the trends", symbol: "chart.xyaxis.line", action: onOpenStatistics)
+                            .accessibilityIdentifier("home-rounds-statistics-button")
+                    }
+                    .pureLineCard(padding: 24)
+                    .padding(.bottom, 24)
                 }
                 .padding(.horizontal, 24)
             }

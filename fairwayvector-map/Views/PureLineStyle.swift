@@ -3,7 +3,9 @@ import SwiftUI
 /// Presentation-only palette for the experimental home, course and handicap screens.
 /// Deliberately separate from the shared Practice design system.
 enum PureLineStyle {
-    static let accent = Color(red: 0.0, green: 0.49, blue: 0.45)
+    // Opaque dark teal keeps white action labels readable (WCAG contrast > 6:1).
+    static let accent = Color(red: 0.0, green: 0.40, blue: 0.36)
+    static let pressedAccent = Color(red: 0.0, green: 0.32, blue: 0.29)
     static let ink = Color(red: 0.10, green: 0.15, blue: 0.16)
     static let muted = Color(red: 0.40, green: 0.46, blue: 0.47)
     static let canvas = Color.white
@@ -14,6 +16,7 @@ enum PureLineStyle {
 extension View {
     func pureLineCard(padding: CGFloat = 18) -> some View {
         self.padding(padding)
+            .foregroundStyle(PureLineStyle.ink)
             .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 20))
             .overlay {
                 RoundedRectangle(cornerRadius: 20)
@@ -23,12 +26,21 @@ extension View {
 }
 
 struct PureLinePrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    var fillsWidth = true
+    var minimumHeight: CGFloat = 54
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .background(PureLineStyle.accent, in: RoundedRectangle(cornerRadius: 16))
-            .opacity(configuration.isPressed ? 0.8 : 1)
+            .foregroundStyle(isEnabled ? Color.white : PureLineStyle.ink)
+            .tint(isEnabled ? Color.white : PureLineStyle.ink)
+            .frame(maxWidth: fillsWidth ? .infinity : nil, minHeight: minimumHeight)
+            .background(
+                isEnabled
+                    ? (configuration.isPressed ? PureLineStyle.pressedAccent : PureLineStyle.accent)
+                    : PureLineStyle.line,
+                in: RoundedRectangle(cornerRadius: 16)
+            )
     }
 }

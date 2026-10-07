@@ -80,7 +80,6 @@ struct TrajectoryClubView: View {
     @State private var recommendationGeneration = 0
     @State private var recommendationTask: Task<Void, Never>?
     @State private var showConditions = false
-    @State private var showSettings = false
     private let recommendationAnchor = "recommended-club"
 
     private struct RecommendationInput: Equatable {
@@ -157,14 +156,6 @@ struct TrajectoryClubView: View {
                         .accessibilityLabel("Reset inputs")
                         .accessibilityHint("Resets the club target and condition inputs to their defaults")
                     }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                        }
-                        .accessibilityLabel("Settings")
-                    }
                 }
             }
         }
@@ -172,9 +163,6 @@ struct TrajectoryClubView: View {
         .accessibilityIdentifier("club-screen")
         .onChange(of: recommendationInput) { _, _ in invalidateRecommendation() }
         .onDisappear { invalidateRecommendation() }
-        .sheet(isPresented: $showSettings) {
-            UnifiedSettingsView()
-        }
     }
 
     private var selectorCard: some View {
