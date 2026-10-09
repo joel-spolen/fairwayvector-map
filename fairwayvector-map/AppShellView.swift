@@ -7,6 +7,7 @@ struct ContentView: View {
         case handicap
         case practice
         case statistics
+        case bag
 
         var id: String { rawValue }
     }
@@ -17,7 +18,6 @@ struct ContentView: View {
     @State private var isShowingSplash = true
     @State private var destination: Destination?
     @State private var showingSettings = false
-    @State private var opensWedgesAfterSettings = false
     @State private var practiceDestination: PracticeDestination = .trajectory
     @StateObject private var trajectoryModel = TrajectoryCalculatorViewModel()
     @State private var roundStore = PlayedRoundStore()
@@ -29,6 +29,7 @@ struct ContentView: View {
                 onOpenCourseMap: { destination = .course },
                 onStartRound: { requestStartRound = true; destination = .course },
                 onOpenHandicap: { destination = .handicap },
+                onOpenBag: { destination = .bag },
                 onOpenWedge: {
                     practiceDestination = .wedge
                     destination = .practice
@@ -83,17 +84,8 @@ struct ContentView: View {
                 .modelContainer(HCPProjectionEntryView.sharedModelContainer)
                 .preferredColorScheme(.light)
         }
-        .sheet(isPresented: $showingSettings, onDismiss: {
-            if opensWedgesAfterSettings {
-                opensWedgesAfterSettings = false
-                practiceDestination = .wedge
-                destination = .practice
-            }
-        }) {
-            UnifiedSettingsView(onOpenWedge: {
-                opensWedgesAfterSettings = true
-                showingSettings = false
-            })
+        .sheet(isPresented: $showingSettings) {
+            UnifiedSettingsView()
             .environmentObject(trajectoryModel)
             .modelContainer(HCPProjectionEntryView.sharedModelContainer)
             .preferredColorScheme(.light)
@@ -116,6 +108,8 @@ struct ContentView: View {
             PracticeView(destination: $practiceDestination, trajectoryModel: trajectoryModel)
         case .statistics:
             RoundStatisticsView()
+        case .bag:
+            InTheBagView(trajectoryModel: trajectoryModel)
         }
     }
 }

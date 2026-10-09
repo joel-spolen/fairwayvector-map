@@ -25,6 +25,10 @@ struct WedgeMatrixView: View {
     @State private var showAddClub = false
     @State private var section: Section = .overview
 
+    init(startInBag: Bool = false) {
+        _section = State(initialValue: startInBag ? .bag : .overview)
+    }
+
     private var bagWedges: [Wedge] {
         wedges.filter(\.isInBag)
     }

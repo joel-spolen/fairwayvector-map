@@ -5,7 +5,6 @@ struct SharedHandicapSync: View {
     @Query private var profiles: [PlayerProfile]
     @Query(sort: \GolfRound.date, order: .reverse) private var rounds: [GolfRound]
     @ObservedObject var trajectoryModel: TrajectoryCalculatorViewModel
-
     private var handicapIndex: Double? {
         let entries = WHSCalculator.scoringEntries(from: rounds, lowHandicapIndex: profiles.first?.lowHandicapIndex)
         return WHSCalculator.handicapIndex(from: entries, lowHandicapIndex: profiles.first?.lowHandicapIndex)
@@ -50,8 +49,6 @@ struct UnifiedProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [PlayerProfile]
     @Query(sort: \GolfRound.date, order: .reverse) private var rounds: [GolfRound]
-    @ObservedObject var trajectoryModel: TrajectoryCalculatorViewModel
-    let onOpenWedge: () -> Void
 
     private var profile: PlayerProfile? { profiles.first }
 
@@ -79,21 +76,6 @@ struct UnifiedProfileView: View {
             }
             .listRowBackground(PureLineStyle.surface)
 
-            Section("Your game") {
-                NavigationLink {
-                    TrajectoryProfileSettingsView(
-                        profileStore: trajectoryModel.playerProfileStore,
-                        unitPreferences: trajectoryModel.unitPreferences
-                    )
-                    .navigationTitle("Clubs & launch profile")
-                } label: {
-                    Label("Clubs & launch profile", systemImage: "figure.golf")
-                }
-                Button(action: onOpenWedge) {
-                    Label("Wedge bag & matrix", systemImage: "square.grid.3x3")
-                }
-            }
-            .listRowBackground(PureLineStyle.surface)
         }
         .scrollContentBackground(.hidden)
         .background(PureLineStyle.canvas)

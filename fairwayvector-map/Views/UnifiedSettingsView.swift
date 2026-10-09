@@ -2,7 +2,6 @@ import SwiftData
 import SwiftUI
 
 struct UnifiedSettingsView: View {
-    var onOpenWedge: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [PlayerProfile]
@@ -21,9 +20,9 @@ struct UnifiedSettingsView: View {
             Form {
                 Section("Player & calibration") {
                     NavigationLink {
-                        UnifiedProfileView(trajectoryModel: trajectoryModel, onOpenWedge: onOpenWedge)
+                        UnifiedProfileView()
                     } label: {
-                        Label("Profile & personal club data", systemImage: "person.crop.circle")
+                        Label("Player profile", systemImage: "person.crop.circle")
                     }
                 }
                 .listRowBackground(PureLineStyle.surface)
@@ -69,9 +68,6 @@ struct UnifiedSettingsView: View {
                 .listRowBackground(PureLineStyle.surface)
 
                 Section("Equipment & courses") {
-                    NavigationLink("Clubs available for trajectory") {
-                        BagClubsView(profileStore: trajectoryModel.playerProfileStore)
-                    }
                     NavigationLink("Custom courses & tees") {
                         HCPCustomCoursesEntryView()
                     }

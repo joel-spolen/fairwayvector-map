@@ -4,6 +4,7 @@ struct PureLineHomeView: View {
     let onOpenCourseMap: () -> Void
     let onStartRound: () -> Void
     let onOpenHandicap: () -> Void
+    let onOpenBag: () -> Void
     let onOpenWedge: () -> Void
     let onOpenTrajectory: () -> Void
     let onOpenStatistics: () -> Void
@@ -90,6 +91,8 @@ struct PureLineHomeView: View {
                             .font(.title3.weight(.semibold)).tracking(-0.4)
                             .padding(.bottom, 10)
                         destination("Handicap", detail: "Round history & score projections", symbol: "chart.line.uptrend.xyaxis", action: onOpenHandicap)
+                        Divider().overlay(PureLineStyle.line)
+                        destination("In the bag", detail: "Set up your clubs and wedges", symbol: "bag", action: onOpenBag)
                         Divider().overlay(PureLineStyle.line)
                         destination("Wedge Matrix", detail: "Your distances. Every swing.", symbol: "target", action: onOpenWedge)
                         Divider().overlay(PureLineStyle.line)
