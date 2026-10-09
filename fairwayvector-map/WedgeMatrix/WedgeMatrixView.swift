@@ -427,12 +427,16 @@ private struct WedgeBagManagementList: View {
                     Label("Add Club", systemImage: "plus")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(PureLineStyle.accent)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .listRowBackground(PureLineStyle.canvas)
+                .listRowInsets(EdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18))
+                .listRowSeparator(.hidden)
             }
+            .listSectionMargins(.top, 0)
+            .listSectionMargins(.bottom, 0)
 
             Section {
                 if wedges.isEmpty {
