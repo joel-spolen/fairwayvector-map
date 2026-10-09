@@ -325,21 +325,40 @@ private struct HCPTrendGraphCard: View {
     var currentHandicap: Double?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    private var visibleTrendPoints: [HCPTrendPoint] {
+        Array(trendPoints.suffix(5))
+    }
+
     private var trendDifference: Double? {
-        guard trendPoints.count >= 2,
-              let first = trendPoints.first?.handicapIndex,
-              let last = trendPoints.last?.handicapIndex else { return nil }
+        guard visibleTrendPoints.count >= 2,
+              let first = visibleTrendPoints.first?.handicapIndex,
+              let last = visibleTrendPoints.last?.handicapIndex else { return nil }
         return WHSCalculator.roundToTenth(last - first)
     }
 
     private var yDomain: ClosedRange<Double> {
-        let values = trendPoints.map(\.handicapIndex)
+        let values = visibleTrendPoints.map(\.handicapIndex)
         guard let minVal = values.min(), let maxVal = values.max() else { return 0...20 }
-        if minVal == maxVal {
-            return max(0, minVal - 2)...(maxVal + 2)
-        }
-        let padding = max(0.5, (maxVal - minVal) * 0.15)
-        return max(0, minVal - padding)...(maxVal + padding)
+        let spread = maxVal - minVal
+        let step = spread > 6 ? 5.0 : 1.0
+        let padding = max(step, spread * 0.3)
+        let rawLower = minVal - padding
+        let lower = minVal >= 0
+            ? max(0, floor(rawLower / step) * step)
+            : floor(rawLower / step) * step
+        let upper = ceil((maxVal + padding) / step) * step
+        return lower...max(upper, lower + step)
+    }
+
+    private var yAxisValues: [Double] {
+        let step = yDomain.upperBound - yDomain.lowerBound > 12 ? 5.0 : 1.0
+        return stride(from: yDomain.lowerBound, through: yDomain.upperBound, by: step).map { $0 }
+    }
+
+    private var xDomain: ClosedRange<Int> {
+        guard let first = visibleTrendPoints.first?.roundIndex,
+              let last = visibleTrendPoints.last?.roundIndex else { return 0...1 }
+        return first...max(first + 1, last)
     }
 
     var body: some View {
@@ -376,9 +395,9 @@ private struct HCPTrendGraphCard: View {
                 }
             }
 
-            if trendPoints.count >= 2 {
+            if visibleTrendPoints.count >= 2 {
                 Chart {
-                    ForEach(trendPoints) { point in
+                    ForEach(visibleTrendPoints) { point in
                         AreaMark(
                             x: .value("Round", point.roundIndex),
                             y: .value("HCP", point.handicapIndex)
@@ -390,7 +409,7 @@ private struct HCPTrendGraphCard: View {
                                 endPoint: .bottom
                             )
                         )
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(.linear)
 
                         LineMark(
                             x: .value("Round", point.roundIndex),
@@ -398,36 +417,21 @@ private struct HCPTrendGraphCard: View {
                         )
                         .foregroundStyle(PureLineStyle.accent)
                         .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(.linear)
 
-                        if point.id == trendPoints.last?.id {
-                            PointMark(
-                                x: .value("Round", point.roundIndex),
-                                y: .value("HCP", point.handicapIndex)
-                            )
-                            .foregroundStyle(PureLineStyle.accent)
-                            .symbolSize(45)
-                        }
+                        PointMark(
+                            x: .value("Round", point.roundIndex),
+                            y: .value("HCP", point.handicapIndex)
+                        )
+                        .foregroundStyle(PureLineStyle.accent)
+                        .symbolSize(point.id == visibleTrendPoints.last?.id ? 45 : 18)
                     }
                 }
+                .chartXScale(domain: xDomain, range: .plotDimension(padding: 0))
                 .chartYScale(domain: yDomain)
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: min(trendPoints.count, 5))) { value in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-                            .foregroundStyle(PureLineStyle.line)
-                        AxisTick()
-                            .foregroundStyle(PureLineStyle.muted.opacity(0.4))
-                        AxisValueLabel {
-                            if let rIndex = value.as(Int.self) {
-                                Text("R\(rIndex)")
-                                    .font(.caption2.monospacedDigit())
-                                    .foregroundStyle(PureLineStyle.muted)
-                            }
-                        }
-                    }
-                }
+                .chartXAxis(.hidden)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                    AxisMarks(position: .leading, values: yAxisValues) { value in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
                             .foregroundStyle(PureLineStyle.line)
                         AxisValueLabel {
@@ -440,6 +444,7 @@ private struct HCPTrendGraphCard: View {
                     }
                 }
                 .frame(height: 140)
+                .clipped()
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Handicap trend chart")
                 .accessibilityValue(trendAccessibilityValue)
@@ -448,19 +453,19 @@ private struct HCPTrendGraphCard: View {
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
                     : AnyLayout(HStackLayout(spacing: 8))
                 summaryLayout {
-                    if let first = trendPoints.first {
+                    if let first = visibleTrendPoints.first {
                         Text("Start: \(WHSCalculator.formatHCPScore(first.handicapIndex))")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(PureLineStyle.muted)
                     }
                     if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
-                    if let lowest = trendPoints.map(\.handicapIndex).min() {
+                    if let lowest = visibleTrendPoints.map(\.handicapIndex).min() {
                         Text("Low: \(WHSCalculator.formatHCPScore(lowest))")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(PureLineStyle.muted)
                     }
                     if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
-                    if let last = trendPoints.last {
+                    if let last = visibleTrendPoints.last {
                         Text("Latest: \(WHSCalculator.formatHCPScore(last.handicapIndex))")
                             .font(.caption2.bold().monospacedDigit())
                             .foregroundStyle(PureLineStyle.ink)
@@ -476,6 +481,7 @@ private struct HCPTrendGraphCard: View {
             }
         }
         .pureLineCard()
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 
     private func trendText(diff: Double) -> String {
@@ -489,10 +495,10 @@ private struct HCPTrendGraphCard: View {
     }
 
     private var trendAccessibilityValue: String {
-        let latest = trendPoints.last.map { WHSCalculator.formatHCPScore($0.handicapIndex) } ?? "unavailable"
-        let lowest = trendPoints.map(\.handicapIndex).min().map { WHSCalculator.formatHCPScore($0) } ?? "unavailable"
+        let latest = visibleTrendPoints.last.map { WHSCalculator.formatHCPScore($0.handicapIndex) } ?? "unavailable"
+        let lowest = visibleTrendPoints.map(\.handicapIndex).min().map { WHSCalculator.formatHCPScore($0) } ?? "unavailable"
         let change = trendDifference.map { trendText(diff: $0) } ?? "no trend yet"
-        return "Latest handicap \(latest), lowest \(lowest), \(change), across \(trendPoints.count) rounds"
+        return "Latest handicap \(latest), lowest \(lowest), \(change), across \(visibleTrendPoints.count) trend points"
     }
 }
 
