@@ -130,10 +130,8 @@ struct WedgeMatrixView: View {
                         WedgeBagManagementList(wedges: $wedges, unit: selectedUnit) {
                             showAddClub = true
                         }
-                        .navigationTitle("")
+                        .toolbar(.hidden, for: .navigationBar)
                         .navigationBarTitleDisplayMode(.inline)
-                        .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
-                        .toolbarBackground(.visible, for: .navigationBar)
                         .sheet(isPresented: $showAddClub) {
                             WedgeAddClubView(wedges: $wedges, unit: selectedUnit)
                         }
@@ -421,7 +419,7 @@ private struct WedgeBagManagementList: View {
                 .listRowBackground(PureLineStyle.canvas)
                 .listRowSeparator(.hidden)
             }
-            .listSectionMargins(.top, 0)
+            .listSectionMargins(.top, 18)
             .listSectionMargins(.horizontal, 0)
 
             Section {
