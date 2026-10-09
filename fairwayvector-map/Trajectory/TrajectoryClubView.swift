@@ -669,7 +669,7 @@ private struct ClubElevationGraphic: View {
                     path.move(to: CGPoint(x: 8, y: baseY))
                     path.addLine(to: CGPoint(x: width - 8, y: baseY))
                 }
-                .stroke(FairwayVectorColors.charcoal.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                .stroke(PureLineStyle.ink.opacity(0.20), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
                 Ellipse()
                     .fill(
@@ -679,7 +679,7 @@ private struct ClubElevationGraphic: View {
                             endPoint: .bottom
                         )
                     )
-                    .overlay(Ellipse().strokeBorder(FairwayVectorColors.surface.opacity(0.6), lineWidth: 1.5))
+                    .overlay(Ellipse().strokeBorder(Color.white.opacity(0.6), lineWidth: 1.5))
                     .frame(width: width * 0.30, height: 28)
                     .position(x: width * 0.74, y: greenY)
 
@@ -687,7 +687,7 @@ private struct ClubElevationGraphic: View {
                     ForEach(0..<8, id: \.self) { index in
                         Image(systemName: "cloud.fill")
                             .font(.system(size: 18 + CGFloat(index % 4) * 3, weight: .semibold))
-                            .foregroundStyle(FairwayVectorColors.surface)
+                            .foregroundStyle(Color.white)
                             .position(
                                 x: width * (0.06 + CGFloat(index) / 7 * 0.88),
                                 y: 4 + CGFloat(cloudSlide) * height * 0.54 + CGFloat(index % 3) * 8
@@ -701,7 +701,7 @@ private struct ClubElevationGraphic: View {
 
                 Image(systemName: "figure.golf")
                     .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                     .position(x: width * 0.13, y: baseY - 18)
 
                 ClubFixedFlag()
@@ -709,15 +709,15 @@ private struct ClubElevationGraphic: View {
 
                 Text("Fairway")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(FairwayVectorColors.surface)
+                    .foregroundStyle(Color.white)
                     .position(x: width * 0.30, y: baseY + 18)
 
                 Text(formattedElevation)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(FairwayVectorColors.surface.opacity(0.9), in: Capsule())
+                    .background(Color.white.opacity(0.92), in: Capsule())
                     .position(x: width * 0.18, y: height * 0.16)
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -783,15 +783,15 @@ private struct ClubFixedFlag: View {
         VStack(spacing: 0) {
             Image(systemName: "flag.fill")
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(FairwayVectorColors.orange)
+                .foregroundStyle(PureLineStyle.accent)
                 .offset(x: 7)
             Rectangle()
-                .fill(FairwayVectorColors.charcoal)
+                .fill(PureLineStyle.ink)
                 .frame(width: 2, height: 22)
             Circle()
-                .fill(FairwayVectorColors.surface)
+                .fill(Color.white)
                 .frame(width: 7, height: 7)
-                .overlay(Circle().strokeBorder(FairwayVectorColors.charcoal.opacity(0.5), lineWidth: 1))
+                .overlay(Circle().strokeBorder(PureLineStyle.ink.opacity(0.35), lineWidth: 1))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -810,16 +810,16 @@ private struct TemperatureSun: View {
         ZStack {
             ForEach(0..<8, id: \.self) { index in
                 Capsule()
-                    .fill(FairwayVectorColors.gold.opacity(0.9))
+                    .fill(Color.yellow.opacity(0.9))
                     .frame(width: 2, height: 7)
                     .offset(y: -(diameter * 0.5 + 6))
                     .rotationEffect(.degrees(Double(index) * 45))
             }
 
             Circle()
-                .fill(FairwayVectorColors.gold)
+                .fill(Color.yellow)
                 .frame(width: diameter, height: diameter)
-                .overlay(Circle().stroke(FairwayVectorColors.orange.opacity(0.7), lineWidth: 1))
+                .overlay(Circle().stroke(Color.orange.opacity(0.7), lineWidth: 1))
         }
         .frame(width: diameter + 16, height: diameter + 16)
         .accessibilityHidden(true)
@@ -860,7 +860,7 @@ private struct ClubWindGraphic: View {
                         path.move(to: CGPoint(x: width * 0.5, y: height * 0.18))
                         path.addLine(to: CGPoint(x: width * 0.5, y: height * 0.82))
                     }
-                    .stroke(FairwayVectorColors.surface.opacity(0.8), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    .stroke(PureLineStyle.ink.opacity(0.16), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
                     Ellipse()
                         .fill(
@@ -870,7 +870,7 @@ private struct ClubWindGraphic: View {
                                 endPoint: .bottom
                             )
                         )
-                        .overlay(Ellipse().strokeBorder(FairwayVectorColors.surface.opacity(0.7), lineWidth: 1.5))
+                        .overlay(Ellipse().strokeBorder(Color.white.opacity(0.7), lineWidth: 1.5))
                         .frame(width: width * 0.24, height: height * 0.58)
                         .position(x: width * 0.78, y: height * 0.5)
 
@@ -880,7 +880,7 @@ private struct ClubWindGraphic: View {
 
                     Image(systemName: "figure.golf")
                         .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(FairwayVectorColors.navy)
+                        .foregroundStyle(PureLineStyle.ink)
                         .position(x: width * 0.16, y: height * 0.5)
 
                     let arrowStart = CGPoint(x: width * 0.5, y: height * 0.5)
@@ -896,7 +896,7 @@ private struct ClubWindGraphic: View {
                     let renderedDirection = Angle(radians: atan2(arrowDeltaY, arrowDeltaX))
 
                     Capsule()
-                        .fill(FairwayVectorColors.navy.opacity(arrowOpacity))
+                        .fill(PureLineStyle.accent.opacity(arrowOpacity))
                         .frame(width: renderedArrowLength, height: 5)
                         .rotationEffect(renderedDirection)
                         .position(
@@ -906,16 +906,16 @@ private struct ClubWindGraphic: View {
 
                     Image(systemName: "arrowtriangle.right.fill")
                         .font(.title3.weight(.bold))
-                        .foregroundStyle(FairwayVectorColors.navy.opacity(arrowOpacity))
+                        .foregroundStyle(PureLineStyle.accent.opacity(arrowOpacity))
                         .rotationEffect(renderedDirection)
                         .position(arrowEnd)
 
                     Text(windSummary)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(FairwayVectorColors.navy)
+                        .foregroundStyle(PureLineStyle.ink)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(FairwayVectorColors.surface.opacity(0.92), in: Capsule())
+                        .background(Color.white.opacity(0.92), in: Capsule())
                         .position(x: width * 0.22, y: height * 0.18)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 12))

@@ -37,15 +37,13 @@ struct TrajectoryChartView: View {
                     .font(.headline)
                 Text("The chart shows the modeled path. Headline values above include calibration corrections.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PureLineStyle.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             chartSection(title: "Side View (Height)", points: sideViewPoints, valueLabel: "Height")
             topDownSection
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
-        .foregroundStyle(FairwayVectorColors.charcoal)
+        .pureLineCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Golf ball trajectory charts")
         .accessibilityHint("The side view shows height and the top-down view shows lateral curvature. \(chartSummary)")
@@ -75,12 +73,12 @@ struct TrajectoryChartView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Top-Down View (Curvature)").font(.subheadline.bold())
             Text("Viewed from golfer toward target · forward ↑ · right →")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(PureLineStyle.muted)
             if let shotBearingDeg {
                 Text("↑ \(bearingLabel(shotBearingDeg)) · → \(bearingLabel(shotBearingDeg + 90)) (true)")
                     .font(.caption)
                 Text("Shot-relative view; the course map follows its camera heading (initially tee-to-green), not necessarily this shot.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(PureLineStyle.muted)
             }
             if let capturedWind {
                 let speed = hypot(capturedWind.tail, capturedWind.right)
@@ -89,7 +87,7 @@ struct TrajectoryChartView: View {
                         .rotationEffect(.degrees(speed < 1e-10 ? 0 : TrajectoryChartGeometry.windRotation(
                             tail: capturedWind.tail, right: capturedWind.right)))
                         .font(.title3.bold())
-                        .foregroundStyle(FairwayVectorColors.orange)
+                        .foregroundStyle(PureLineStyle.accent)
                         .frame(width: 32, height: 32)
                         .accessibilityHidden(true)
                     Text(String(format: "Blowing direction · captured wind %.1f m/s", speed))
@@ -133,7 +131,7 @@ struct TrajectoryChartView: View {
             .accessibilityLabel("Top-down view, forward up and golfer's right to the right")
             .accessibilityValue(topDownSummary)
             Text("Curvature includes wind and launch spin; it need not follow the wind arrow.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(PureLineStyle.muted)
         }
     }
 
