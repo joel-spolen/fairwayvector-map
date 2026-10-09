@@ -171,10 +171,15 @@ enum PlayedRoundCalculator {
             }
             if let penalties = score.penalties { result.penalties += penalties; result.penaltyHoles += 1 }
         }
-        if result.scoredHoles == round.holes.count, round.holes.count == 18,
+        if result.scoredHoles == round.holes.count,
            let adjusted = result.adjustedGross, let tee = round.tee {
-            result.differential = WHSCalculator.scoreDifferential(adjustedGrossScore: adjusted,
-                courseRating: tee.courseRating, slopeRating: tee.slopeRating, pcc: 0)
+            if round.holes.count == 18 {
+                result.differential = WHSCalculator.scoreDifferential(adjustedGrossScore: adjusted,
+                    courseRating: tee.courseRating, slopeRating: tee.slopeRating, pcc: 0)
+            } else if round.holes.count == 9, let index = player.handicapIndex {
+                result.differential = WHSCalculator.nineHoleScoreDifferential(adjustedGrossScore: adjusted,
+                    courseRating: tee.courseRating, slopeRating: tee.slopeRating, pcc: 0, handicapIndex: index)
+            }
         }
         return result
     }

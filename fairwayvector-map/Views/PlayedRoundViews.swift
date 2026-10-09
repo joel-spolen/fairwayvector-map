@@ -281,7 +281,7 @@ struct RoundReviewView: View {
                         Text("Save to Statistics first to enable the optional HCP copy.").font(.footnote)
                     }
                     if round.holes.count == 9 {
-                        Text("Nine holes: no official differential or HCP import. The existing calculator has no current-WHS expected nine-hole score method; no doubling or extrapolation is used.").font(.footnote)
+                        Text("Nine-hole scores use the WHS expected Score Differential based on the Handicap Index at play. This local estimate is not an official posted result.").font(.footnote)
                     } else if !PlayedRoundHandicapBridge.isEligible(round) {
                         Text("Needs all 18 holes, actual par / unique SI, valid rating / slope and your index. This round is not eligible for Handicap import.").font(.footnote)
                     }

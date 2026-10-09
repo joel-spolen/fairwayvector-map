@@ -81,19 +81,28 @@ struct PlayedRoundTests {
         #expect(t.stableford == 25) // hole1 zero +8*2 +9*1.
     }
 
-    @Test func nineHoleOddIndexesRankWithinSideWithoutDifferentialExtrapolation() {
+    @Test func nineHoleOddIndexesRankWithinSideAndUseExpectedDifferential() {
         let round = complete(fixture(count: 9))
         let t = PlayedRoundCalculator.totals(round: round, player: round.owner!)
         #expect(round.strokeRanks?[9] == 9)
         #expect(t.courseHandicap == 9)
         #expect(t.net == 36)
         #expect(t.stableford == 18)
-        #expect(t.differential == nil)
-        #expect(!PlayedRoundHandicapBridge.isEligible(round))
+        #expect(t.differential == 19.6)
+        #expect(PlayedRoundHandicapBridge.isEligible(round))
         let existing = WHSCalculator.calculateHoleByHole(holeScores: Array(repeating: 5, count: 9),
             holePars: Array(repeating: 4, count: 9), holeHandicapIndices: stride(from: 1, through: 17, by: 2).map { $0 },
             courseHandicap: 9)
         #expect(existing.totalStablefordPoints == 18)
+    }
+
+    @Test func whsExpectedNineHoleDifferentialMatchesPublishedValues() {
+        #expect(WHSCalculator.expectedNineHoleScoreDifferential(handicapIndex: -6.0) == -1.9)
+        #expect(WHSCalculator.expectedNineHoleScoreDifferential(handicapIndex: 14.0) == 8.5)
+        #expect(WHSCalculator.expectedNineHoleScoreDifferential(handicapIndex: 54.0) == 29.3)
+        #expect(WHSCalculator.nineHoleScoreDifferential(adjustedGrossScore: 41,
+            courseRating: 36.5, slopeRating: 113, handicapIndex: 14.0) == 13.0)
+        #expect(WHSCalculator.expectedNineHoleScoreDifferential(handicapIndex: 55.0) == nil)
     }
 
     @Test func missingAndDuplicateStrokeIndexesAndRatingsDoNotProduceNetOrHCP() {

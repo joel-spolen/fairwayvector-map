@@ -82,11 +82,14 @@ on lowest SI; plus handicaps give them back on highest SI. Net and Stableford
 use Playing Handicap; points are `max(0, 2 + par − net strokes)`. WHS adjusted gross
 uses full Course Handicap independently of the playing allowance.
 
-**Nine-hole limit:** the existing HCP calculator has no current-WHS expected-score
-method. Nine-hole gross/net/points/statistics are supported, but official differential
-and HCP import are deliberately unavailable. Scores are never doubled/extrapolated.
-18-hole differential is `(adjusted gross − CR − PCC) × 113/slope`, using shared
-rounding and PCC 0. These are local estimates, not an official submission. Demo
+**Nine-hole scores:** an established Handicap Index enables WHS expected-score
+conversion: the played nine-hole differential is combined with the expected
+nine-hole differential based on the current Index, then rounded to a tenth. The
+expected value follows the published 9-hole expected-differential table. When no
+current Handicap Index is available, a nine-hole differential cannot be estimated.
+Scores are never doubled or extrapolated. 18-hole differential is
+`(adjusted gross − CR − PCC) × 113/slope`, using shared rounding and PCC 0. These
+are local estimates, not an official submission. Demo
 course results remain visibly synthetic and cannot enter HCP history. A projected
 local index is shown only for eligible rounds with at least three existing shared
 scoring entries, using the existing chronological exceptional-score/cap rules;

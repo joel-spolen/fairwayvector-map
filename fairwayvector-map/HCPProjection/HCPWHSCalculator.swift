@@ -11,6 +11,26 @@ enum WHSCalculator {
         return roundToTenth(raw)
     }
 
+    static func expectedNineHoleScoreDifferential(handicapIndex: Double) -> Double? {
+        guard handicapIndex.isFinite, (-10...54).contains(handicapIndex) else { return nil }
+        // This reproduces the published WHS expected-differential lookup values
+        // to one decimal across the full Handicap Index range.
+        return roundToTenth(0.52 * handicapIndex + 1.2)
+    }
+
+    static func nineHoleScoreDifferential(
+        adjustedGrossScore: Int,
+        courseRating: Double,
+        slopeRating: Int,
+        pcc: Double = 0,
+        handicapIndex: Double
+    ) -> Double? {
+        guard slopeRating > 0,
+              let expected = expectedNineHoleScoreDifferential(handicapIndex: handicapIndex) else { return nil }
+        let playedNineRaw = (Double(adjustedGrossScore) - courseRating - pcc) * 113 / Double(slopeRating)
+        return roundToTenth(playedNineRaw + expected)
+    }
+
     static func stablefordAdjustedGrossScore(points: Int, par: Int, courseHandicap: Int, holes: Int) -> Int {
         let basePoints = holes == 9 ? 18 : 36
         return par + courseHandicap + basePoints - points
@@ -133,12 +153,24 @@ enum WHSCalculator {
                 )
             }
 
-            let differential = scoreDifferential(
-                adjustedGrossScore: adjustedGrossScore,
-                courseRating: tee.courseRating,
-                slopeRating: tee.slopeRating,
-                pcc: pcc
-            )
+            let differential: Double
+            if tee.holes == 9 {
+                guard let converted = nineHoleScoreDifferential(
+                    adjustedGrossScore: adjustedGrossScore,
+                    courseRating: tee.courseRating,
+                    slopeRating: tee.slopeRating,
+                    pcc: pcc,
+                    handicapIndex: currentHandicap
+                ) else { return nil }
+                differential = converted
+            } else {
+                differential = scoreDifferential(
+                    adjustedGrossScore: adjustedGrossScore,
+                    courseRating: tee.courseRating,
+                    slopeRating: tee.slopeRating,
+                    pcc: pcc
+                )
+            }
             let newEntry = ScoringRecordEntry(date: .now, scoreDifferential: differential)
             let projectedEntries = applyExceptionalScoreAdjustment(
                 to: currentEntries + [newEntry],
@@ -184,14 +216,29 @@ enum WHSCalculator {
             }
         }
 
-        return ScoringRecordEntry(
-            date: round.date,
-            scoreDifferential: scoreDifferential(
+        let differential: Double
+        if round.holes == 9 {
+            guard let currentHandicapIndex,
+                  let converted = nineHoleScoreDifferential(
+                    adjustedGrossScore: adjustedGrossScore,
+                    courseRating: round.courseRating,
+                    slopeRating: round.slopeRating,
+                    pcc: round.pcc,
+                    handicapIndex: currentHandicapIndex
+                  ) else { return nil }
+            differential = converted
+        } else {
+            differential = scoreDifferential(
                 adjustedGrossScore: adjustedGrossScore,
                 courseRating: round.courseRating,
                 slopeRating: round.slopeRating,
                 pcc: round.pcc
             )
+        }
+
+        return ScoringRecordEntry(
+            date: round.date,
+            scoreDifferential: differential
         )
     }
 

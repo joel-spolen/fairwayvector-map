@@ -52,6 +52,9 @@ struct ContentView: View {
                 .zIndex(1)
             }
         }
+        .background {
+            KeyboardDismissOnTap()
+        }
         .environment(\.colorScheme, .light)
         .overlay { SharedHandicapSync(trajectoryModel: trajectoryModel).allowsHitTesting(false) }
         .environmentObject(trajectoryModel)

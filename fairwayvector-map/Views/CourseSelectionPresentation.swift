@@ -257,12 +257,14 @@ struct CourseSelectionSummaryCard: View {
 
 struct CourseSelectionStatus: View {
     let model: GolfAPICourseSelectionModel
+    var suppressNoMatches = false
 
     var body: some View {
         if !model.isConfigured {
             message("Golf API key not configured. Add GOLF_API_KEY in the app target’s build settings.", image: "key.horizontal")
         }
-        if let error = model.errorMessage {
+        if let error = model.errorMessage,
+           !(suppressNoMatches && error.hasPrefix("No golf clubs matched")) {
             message(error, image: "exclamationmark.triangle").accessibilityIdentifier("course-search-message")
         }
     }

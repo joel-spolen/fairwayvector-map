@@ -91,7 +91,7 @@ struct HCPProviderCourseSelectionView: View {
 
                     customResults
 
-                    if let recent {
+                    if model.selectedClubID == nil, customMatch == nil, let recent {
                         VStack(alignment: .leading, spacing: 12) {
                             CourseSelectionHeading(title: "RECENTLY SELECTED")
                             Button {
@@ -105,7 +105,7 @@ struct HCPProviderCourseSelectionView: View {
                             .accessibilityHint("Revalidates this course and tee for the selected rating category")
                         }
                     }
-                    CourseSelectionStatus(model: model)
+                    CourseSelectionStatus(model: model, suppressNoMatches: !customMatches.isEmpty)
                     if !model.clubs.isEmpty {
                         CourseClubCards(clubs: model.clubs, selectedClubID: model.selectedClubID,
                                         title: "CLUBS · \(model.clubs.count)", onSelect: { club in

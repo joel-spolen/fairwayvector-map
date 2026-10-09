@@ -68,12 +68,16 @@ private struct HCPPureLineIntro: View {
 }
 
 private struct HCPNineHoleNotice: View {
+    var currentHandicap: Double?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Nine-hole limitation", systemImage: "exclamationmark.circle")
+            Label("Nine-hole WHS estimate", systemImage: "info.circle")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.orange)
-            Text("Nine-hole HCP scores and projections here do not include the WHS expected-score conversion to an 18-hole differential. Use an official HCP score for handicap records.")
+                .foregroundStyle(PureLineStyle.accent)
+            Text(currentHandicap == nil
+                 ? "The WHS expected 9-hole differential requires an established Handicap Index. Until one is available, this round cannot contribute an estimated differential."
+                 : "The 9-hole Score Differential is combined with the WHS expected 9-hole differential based on your current Handicap Index. This is a local estimate; confirm official posting with your handicap provider.")
                 .font(.caption)
                 .foregroundStyle(PureLineStyle.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1395,9 +1399,9 @@ private struct NewRoundView: View {
                 }
 
                 if !isManualDifferential, let activeTee {
-                    if activeTee.holes == 9 {
+                    if activeTee.holes == 9, calculatedHandicap == nil {
                         Section {
-                            HCPNineHoleNotice()
+                            HCPNineHoleNotice(currentHandicap: nil)
                         }
                         .listRowBackground(PureLineStyle.surface)
                     }
@@ -1617,6 +1621,7 @@ private struct NewRoundView: View {
 
         let finalAdjustedScore: Int
         let finalPoints: Int?
+        let finalDifferential: Double?
         let recordedHoleScores: [Int]?
         let recordedHolePars: [Int]?
         let recordedHoleIndices: [Int]?
@@ -1625,6 +1630,11 @@ private struct NewRoundView: View {
         case .adjustedGrossScore:
             finalAdjustedScore = strokes
             finalPoints = nil
+            finalDifferential = selectedTee.holes == 9
+                ? WHSCalculator.nineHoleScoreDifferential(adjustedGrossScore: strokes,
+                    courseRating: selectedTee.courseRating, slopeRating: selectedTee.slopeRating,
+                    pcc: pcc, handicapIndex: currentHandicap ?? .nan)
+                : nil
             recordedHoleScores = nil
             recordedHolePars = nil
             recordedHoleIndices = nil
@@ -1637,6 +1647,11 @@ private struct NewRoundView: View {
                 holes: selectedTee.holes
             )
             finalPoints = points
+            finalDifferential = selectedTee.holes == 9
+                ? WHSCalculator.nineHoleScoreDifferential(adjustedGrossScore: finalAdjustedScore,
+                    courseRating: selectedTee.courseRating, slopeRating: selectedTee.slopeRating,
+                    pcc: pcc, handicapIndex: currentHandicap ?? .nan)
+                : nil
             recordedHoleScores = nil
             recordedHolePars = nil
             recordedHoleIndices = nil
@@ -1654,6 +1669,11 @@ private struct NewRoundView: View {
             )
             finalAdjustedScore = calc.netDoubleBogeyAdjustedScore
             finalPoints = calc.totalStablefordPoints
+            finalDifferential = selectedTee.holes == 9
+                ? WHSCalculator.nineHoleScoreDifferential(adjustedGrossScore: finalAdjustedScore,
+                    courseRating: selectedTee.courseRating, slopeRating: selectedTee.slopeRating,
+                    pcc: pcc, handicapIndex: currentHandicap ?? .nan)
+                : nil
             recordedHoleScores = currentScores
             recordedHolePars = pars
             recordedHoleIndices = indices
@@ -1669,6 +1689,7 @@ private struct NewRoundView: View {
                 inputMode: inputMode,
                 adjustedGrossScore: finalAdjustedScore,
                 stablefordPoints: finalPoints,
+                handicapDifferential: finalDifferential,
                 par: selectedTee.par,
                 courseRating: selectedTee.courseRating,
                 slopeRating: selectedTee.slopeRating,
@@ -2235,7 +2256,6 @@ private struct CustomCourseGroupedLevelView: View {
                 tees: tees,
                 initialClubName: prefill.club,
                 initialCountry: prefill.country,
-                initialCity: prefill.city,
                 initialCourseName: prefill.course,
                 sourceTee: sourceTee
             )
@@ -2330,15 +2350,13 @@ private struct AddCourseView: View {
 
     var initialClubName: String = ""
     var initialCountry: String = ""
-    var initialCity: String = ""
     var initialCourseName: String = ""
     var sourceTee: TeeSet? = nil
 
     @State private var addHoleDetails = false
     @State private var clubName = ""
-    @State private var city = ""
     @State private var country = ""
-    @State private var isEnteringNewCountry = false
+    @State private var selectedRegion = "Europe"
     @State private var courseName = ""
     @State private var teeName = ""
     @State private var holes = 18
@@ -2352,24 +2370,12 @@ private struct AddCourseView: View {
     @State private var showDuplicateWarning = false
     @State private var isApplyingPrefill = false
 
-    private var availableCountries: [String] {
-        let customCountries = clubs.map(\.country).filter { !$0.isEmpty }
-        return Array(Set(courseCatalog.countries + customCountries)).sorted()
+    private var availableRegions: [GolfAPICoverageRegion] {
+        GolfAPICoverage.regions
     }
 
-    private var countrySelection: Binding<String> {
-        Binding(
-            get: { isEnteringNewCountry ? "__new_country__" : country },
-            set: { selection in
-                if selection == "__new_country__" {
-                    isEnteringNewCountry = true
-                    country = ""
-                } else {
-                    isEnteringNewCountry = false
-                    country = selection
-                }
-            }
-        )
+    private var availableCountries: [String] {
+        availableRegions.first { $0.name == selectedRegion }?.countries ?? []
     }
 
     private var matchingClubs: [CourseClubInfo] {
@@ -2495,17 +2501,48 @@ private struct AddCourseView: View {
                 }
 
                 Section("Location · Required") {
-                    Picker("Country / Region", selection: countrySelection) {
-                        ForEach(availableCountries, id: \.self) { countryOption in
-                            Text(countryOption).tag(countryOption)
+                    HStack(spacing: 14) {
+                        Menu {
+                            ForEach(availableRegions) { region in
+                                Button(region.name) {
+                                    selectedRegion = region.name
+                                    if !region.countries.contains(where: { $0.localizedCaseInsensitiveCompare(country) == .orderedSame }) {
+                                        country = region.countries.first ?? ""
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label(selectedRegion.isEmpty ? "Region" : selectedRegion, systemImage: "globe")
+                                .font(.subheadline.weight(.medium))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
                         }
-                        Text("New country / region…").tag("__new_country__")
+                        .accessibilityIdentifier("custom-course-region-picker")
+
+                        Rectangle()
+                            .fill(PureLineStyle.line)
+                            .frame(width: 1, height: 24)
+                            .accessibilityHidden(true)
+
+                        Menu {
+                            ForEach(availableCountries, id: \.self) { countryOption in
+                                Button(countryOption) { country = countryOption }
+                            }
+                        } label: {
+                            Label(country.isEmpty ? "Country" : country, systemImage: "mappin.and.ellipse")
+                                .font(.subheadline.weight(.medium))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .disabled(selectedRegion.isEmpty)
+                        .accessibilityIdentifier("custom-course-country-picker")
                     }
-                    if isEnteringNewCountry {
-                        TextField("New country / region", text: $country)
-                            .textInputAutocapitalization(.words)
-                    }
-                    TextField("City", text: $city)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4)
+                    .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 12))
+
                     TextField("Club name", text: $clubName)
                         .overlay(alignment: .topLeading) {
                             if !matchingClubs.isEmpty {
@@ -2539,9 +2576,6 @@ private struct AddCourseView: View {
                         Text("18").tag(18)
                     }
                     .pickerStyle(.segmented)
-                    if holes == 9 {
-                        HCPNineHoleNotice()
-                    }
                 }
                 .listRowBackground(PureLineStyle.surface)
 
@@ -2553,7 +2587,12 @@ private struct AddCourseView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    LabeledContent("Par") {
+                    HStack {
+                        InfoLabel(
+                            title: "Par",
+                            explanation: "Par is the expected number of strokes for a scratch golfer on this course or tee. Enter the total par across the selected 9 or 18 holes."
+                        )
+                        Spacer()
                         TextField("Par", value: $par, format: .number)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
@@ -2561,22 +2600,28 @@ private struct AddCourseView: View {
                     }
                     .disabled(addHoleDetails)
                     .opacity(addHoleDetails ? 0.45 : 1)
-                    LabeledContent("Course Rating") {
+                    HStack {
+                        InfoLabel(
+                            title: "Course Rating",
+                            explanation: "Course Rating estimates the score a scratch golfer is expected to make on this tee under normal playing conditions. Lower values represent easier courses for a scratch golfer; higher values represent harder ones."
+                        )
+                        Spacer()
                         TextField("Course Rating", value: $courseRating, format: .number.precision(.fractionLength(1)))
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(minWidth: 72)
                     }
-                    LabeledContent("Slope Rating") {
+                    HStack {
+                        InfoLabel(
+                            title: "Slope Rating",
+                            explanation: "Slope Rating describes how much more difficult this tee is for a bogey golfer than for a scratch golfer. It is used with Course Rating to adjust the course handicap for different playing abilities."
+                        )
+                        Spacer()
                         TextField("Slope Rating", value: $slopeRating, format: .number)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .frame(minWidth: 64)
                     }
-                    Text("Par 27–80 · Course Rating 25–90 · Slope Rating 55–160")
-                        .font(.caption)
-                        .foregroundStyle(PureLineStyle.muted)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .listRowBackground(PureLineStyle.surface)
 
@@ -2627,16 +2672,17 @@ private struct AddCourseView: View {
                 if !initialClubName.isEmpty {
                     clubName = initialClubName
                 }
-                if !initialCity.isEmpty {
-                    city = initialCity
-                }
                 if !initialCourseName.isEmpty {
                     courseName = initialCourseName
                 }
-                country = initialCountry.isEmpty ? (profile?.countryOrDefault ?? "Sweden") : initialCountry
-                if country.isEmpty || !availableCountries.contains(country) {
-                    country = availableCountries.first ?? "Sweden"
-                }
+                let preferredCountry = initialCountry.isEmpty ? (profile?.countryOrDefault ?? "Sweden") : initialCountry
+                let region = availableRegions.first { region in
+                    region.countries.contains { $0.localizedCaseInsensitiveCompare(preferredCountry) == .orderedSame }
+                } ?? availableRegions.first { $0.name == "Europe" }
+                selectedRegion = region?.name ?? "Europe"
+                country = region?.countries.first(where: { $0.localizedCaseInsensitiveCompare(preferredCountry) == .orderedSame })
+                    ?? region?.countries.first
+                    ?? "Sweden"
                 selectedRatingSex = profile?.sexOrDefault ?? .male
                 if sourceTee == nil {
                     resetHoleDetails()
@@ -2752,14 +2798,13 @@ private struct AddCourseView: View {
         }
 
         let cleanClubName = clubName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanCity = city.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanCountry = country.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanCourseName = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanTeeName = teeName.trimmingCharacters(in: .whitespacesAndNewlines)
         let savedHolePars: [Int]? = addHoleDetails ? Array(holePars.prefix(holes)) : nil
         let savedHoleHandicapIndices: [Int]? = addHoleDetails ? Array(holeHandicapIndices.prefix(holes)) : nil
 
-        modelContext.insert(GolfClub(name: cleanClubName, city: cleanCity, country: cleanCountry, isCustom: true))
+        modelContext.insert(GolfClub(name: cleanClubName, city: "", country: cleanCountry, isCustom: true))
         modelContext.insert(GolfCourse(clubName: cleanClubName, name: cleanCourseName, isCustom: true))
         modelContext.insert(
             TeeSet(

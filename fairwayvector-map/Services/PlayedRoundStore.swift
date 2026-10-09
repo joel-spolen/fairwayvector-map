@@ -128,7 +128,7 @@ enum RoundStorageError: LocalizedError {
         case .invalidArchive: "Round data is unavailable or invalid. Existing storage has not been replaced."
         case .activeDraft: "Resume or discard your existing round before starting another."
         case .incomplete: "Record valid strokes for every player on every hole before finishing."
-        case .unavailableHandicap: "HCP import needs a completed, genuinely rated 18-hole round, a Handicap Index, par and all stroke indexes. Nine-hole expected-score support is not available. Demo rounds cannot enter handicap history."
+        case .unavailableHandicap: "HCP import needs a completed, genuinely rated 9- or 18-hole round, a Handicap Index, par and all stroke indexes. Demo rounds cannot enter handicap history."
         }
     }
 }
