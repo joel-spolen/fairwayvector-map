@@ -13,7 +13,10 @@ struct TrajectoryHomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    brandHeader
+                    TrajectoryPageHeader(
+                        title: "Know which club to hit.",
+                        subtitle: "Personalized club recommendations and realistic shot trajectories for your game."
+                    )
                     primaryActions
 
                     if viewModel.prediction == nil {
@@ -34,30 +37,22 @@ struct TrajectoryHomeView: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(FairwayVectorColors.navy)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(PureLineStyle.accent)
                     .frame(height: 52)
                 }
-                .padding()
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
             }
-            .background(FairwayVectorColors.background)
+            .background(PureLineStyle.canvas)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            .tint(PureLineStyle.accent)
             .sheet(isPresented: $showHowItWorks) {
                 HowItWorksView()
             }
         }
         .accessibilityIdentifier("home-screen")
-    }
-
-    private var brandHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Know which club to hit.")
-                .font(.title.bold())
-                .foregroundStyle(FairwayVectorColors.navy)
-            Text("Personalized club recommendations and realistic shot trajectories for your game.")
-                .font(.subheadline)
-                .foregroundStyle(FairwayVectorColors.slate)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 
     private var primaryActions: some View {
@@ -68,22 +63,24 @@ struct TrajectoryHomeView: View {
                 Label("Suggest a Club", systemImage: "figure.golf")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+                    .frame(height: 54)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(FairwayVectorColors.navy)
+            .buttonStyle(PureLinePrimaryButtonStyle())
 
-            HStack(spacing: 10) {
-                Button {
-                    onOpenTrajectory()
-                } label: {
+            Button {
+                onOpenTrajectory()
+            } label: {
+                HStack {
                     Label("Calculate Trajectory", systemImage: "chart.xyaxis.line")
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
                 }
-                .buttonStyle(.bordered)
-                .tint(FairwayVectorColors.navy)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(PureLineStyle.ink)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
         }
     }
 
@@ -92,7 +89,7 @@ struct TrajectoryHomeView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 170)
             .padding()
-            .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+            .pureLineCard()
             .accessibilityLabel(viewModel.prediction == nil ? "Example flight path" : "Latest flight path")
     }
 
@@ -100,24 +97,24 @@ struct TrajectoryHomeView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Latest Calculation")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
             HStack {
                 VStack(alignment: .leading) {
                     Text("Carry Distance")
                         .font(.caption)
-                        .foregroundStyle(FairwayVectorColors.slate)
+                        .foregroundStyle(PureLineStyle.muted)
                     Text(Units.formattedDistance(meters: prediction.hybrid["carry_m"] ?? 0, system: viewModel.unitPreferences.unitSystem(for: .distance)))
                         .font(.largeTitle.bold())
-                        .foregroundStyle(FairwayVectorColors.orange)
+                        .foregroundStyle(PureLineStyle.accent)
                 }
                 Spacer()
                 VStack(alignment: .trailing) {
                     Text("Ball Speed")
                         .font(.caption)
-                        .foregroundStyle(FairwayVectorColors.slate)
+                        .foregroundStyle(PureLineStyle.muted)
                     Text(Units.formattedSpeed(mps: viewModel.lastCalculationBallSpeedMps ?? 0, system: viewModel.unitPreferences.unitSystem(for: .ballSpeed)))
                         .font(.headline)
-                        .foregroundStyle(FairwayVectorColors.charcoal)
+                        .foregroundStyle(PureLineStyle.ink)
                 }
             }
             Button {
@@ -127,12 +124,11 @@ struct TrajectoryHomeView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
-            .tint(FairwayVectorColors.navy)
+            .buttonStyle(.plain)
+            .foregroundStyle(PureLineStyle.accent)
         }
-        .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
         .accessibilityIdentifier("home-latest-calculation")
     }
 
@@ -141,10 +137,10 @@ struct TrajectoryHomeView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Ready when you are")
                     .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                 Text("Try an example shot or set your own launch conditions in the Trajectory tab.")
                     .font(.subheadline)
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
             }
             Button {
                 onExampleShot()
@@ -154,13 +150,10 @@ struct TrajectoryHomeView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(FairwayVectorColors.navy)
-            .frame(height: 52)
+            .buttonStyle(PureLinePrimaryButtonStyle())
         }
-        .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
         .accessibilityIdentifier("home-empty-state")
     }
 }
@@ -248,7 +241,7 @@ struct HowItWorksView: View {
                 }
                 .padding()
             }
-            .background(FairwayVectorColors.background)
+            .background(PureLineStyle.canvas)
             .navigationTitle("How It Works")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -262,15 +255,15 @@ struct HowItWorksView: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(FairwayVectorColors.orange)
+                .foregroundStyle(PureLineStyle.accent)
                 .frame(width: 34)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                 Text(text)
                     .font(.body)
-                    .foregroundStyle(FairwayVectorColors.charcoal)
+                    .foregroundStyle(PureLineStyle.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -9,7 +9,7 @@ struct TrajectoryResultsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Results")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
 
             ResultCard(
                 title: "Carry Distance",
@@ -39,9 +39,7 @@ struct TrajectoryResultsView: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
-        .foregroundStyle(FairwayVectorColors.charcoal)
+        .pureLineCard()
         .accessibilityIdentifier("trajectory-results-card")
     }
 }
@@ -69,12 +67,13 @@ private struct ResultCard: View {
         .padding(prominence == .compact ? 10 : 14)
         .background(
             prominence == .primary
-                ? FairwayVectorColors.orange.opacity(0.16)
+                ? PureLineStyle.accent.opacity(0.10)
                 : prominence == .secondary
-                    ? FairwayVectorColors.gold.opacity(0.16)
-                    : FairwayVectorColors.navy.opacity(0.07),
-            in: RoundedRectangle(cornerRadius: 12)
+                    ? PureLineStyle.line.opacity(0.55)
+                    : PureLineStyle.canvas,
+            in: RoundedRectangle(cornerRadius: 16)
         )
+        .foregroundStyle(PureLineStyle.ink)
         .accessibilityElement(children: .combine)
         .accessibilityValue(value)
     }

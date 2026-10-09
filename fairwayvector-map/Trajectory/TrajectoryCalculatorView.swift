@@ -40,6 +40,11 @@ struct TrajectoryCalculatorView: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     VStack(spacing: 20) {
+                        TrajectoryPageHeader(
+                            title: "Plan your shot",
+                            subtitle: "Enter launch conditions and course factors to estimate carry and flight.",
+                            onReset: { viewModel.resetInputs() }
+                        )
                         launchConditionsCard
                         environmentCard
                         calculateButton
@@ -65,26 +70,19 @@ struct TrajectoryCalculatorView: View {
                                 .padding(.horizontal, 4)
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 18)
                 }
-                .background(FairwayVectorColors.background)
+                .background(PureLineStyle.canvas)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .navigationBar)
                 .onChange(of: viewModel.isCalculating) { wasCalculating, isCalculating in
                     guard wasCalculating, !isCalculating, viewModel.prediction != nil else { return }
                     scrollToResults(using: scrollProxy)
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        viewModel.resetInputs()
-                    } label: {
-                        Text("Reset")
-                    }
-                    .accessibilityLabel("Reset inputs")
-                    .accessibilityHint("Resets every calculator slider to its default value")
-                }
-            }
         }
+        .tint(PureLineStyle.accent)
         .onAppear {
             ensureActiveClubIsAvailable()
         }
@@ -118,7 +116,7 @@ struct TrajectoryCalculatorView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Launch Conditions")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
 
             Picker("Launch Source", selection: $launchSource) {
                 ForEach(LaunchConditionSource.allCases) { source in
@@ -139,38 +137,36 @@ struct TrajectoryCalculatorView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "figure.golf")
                             .font(.title3)
-                            .foregroundStyle(FairwayVectorColors.navy)
+                            .foregroundStyle(PureLineStyle.accent)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Club")
                                 .font(.caption)
-                                .foregroundStyle(FairwayVectorColors.slate)
+                                .foregroundStyle(PureLineStyle.muted)
                             Text(viewModel.activeClub.label)
                                 .font(.headline)
-                                .foregroundStyle(FairwayVectorColors.navy)
+                                .foregroundStyle(PureLineStyle.ink)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(FairwayVectorColors.slate)
+                            .foregroundStyle(PureLineStyle.muted)
                     }
-                    .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
                     .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
+                .pureLineCard(padding: 14)
             } else if launchSource == .club {
                 Label("Set up a profile to use club defaults.", systemImage: "person.crop.circle")
                     .font(.subheadline)
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
             }
 
             if launchSource == .custom {
                 customLaunchFields
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private var customLaunchFields: some View {
@@ -257,10 +253,9 @@ struct TrajectoryCalculatorView: View {
         } label: {
             Label("Conditions", systemImage: "slider.horizontal.3")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
         }
-        .padding()
-        .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private var inputMode: TrajectoryInputMode {
@@ -379,8 +374,7 @@ struct TrajectoryCalculatorView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 52)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(FairwayVectorColors.navy)
+        .buttonStyle(PureLinePrimaryButtonStyle())
         .frame(height: 52)
         .disabled(viewModel.isCalculating)
         .accessibilityIdentifier("calculate-trajectory-button")
@@ -406,7 +400,7 @@ struct ClubCarouselView: View {
             VStack(spacing: 18) {
                 Text("Choose the club to use for launch conditions.")
                     .font(.subheadline)
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
 
@@ -457,15 +451,19 @@ struct ClubCarouselView: View {
 
                 Text(centeredClubLabel)
                     .font(.title2.bold())
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                     .multilineTextAlignment(.center)
                     .frame(height: 32)
 
                 Spacer(minLength: 0)
             }
             .padding(.top, 8)
-            .background(FairwayVectorColors.background.ignoresSafeArea())
+            .background(PureLineStyle.canvas.ignoresSafeArea())
             .navigationTitle("Club Selector")
+            .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .tint(PureLineStyle.accent)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Select") {
@@ -597,16 +595,16 @@ private struct AtmosphereField: View {
                     explanation: "Pressure is the weight of the air around the ball. Site elevation is the height of the course above sea level. Air pressure generally decreases as site elevation increases."
                 )
                     .padding()
-                    .background(FairwayVectorColors.navy.ignoresSafeArea())
+                    .background(PureLineStyle.canvas.ignoresSafeArea())
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { showExplanation = false }
                         }
                     }
-                    .toolbarBackground(FairwayVectorColors.navy, for: .navigationBar)
+                    .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
-                    .toolbarColorScheme(.dark, for: .navigationBar)
-                    .tint(.white)
+                    .toolbarColorScheme(.light, for: .navigationBar)
+                    .tint(PureLineStyle.accent)
             }
             .presentationDetents([.height(420)])
         }

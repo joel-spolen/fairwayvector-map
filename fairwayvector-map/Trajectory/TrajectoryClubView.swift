@@ -104,6 +104,11 @@ struct TrajectoryClubView: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
+                        TrajectoryPageHeader(
+                            title: "Find your club",
+                            subtitle: "Set a target and conditions to see the best-matching club and flight.",
+                            onReset: resetInputs
+                        )
                         selectorCard
                         conditionsCard
                         suggestClubButton
@@ -133,9 +138,12 @@ struct TrajectoryClubView: View {
                                 .foregroundStyle(.red)
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 18)
                 }
-                .background(FairwayVectorColors.background)
+                .background(PureLineStyle.canvas)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .navigationBar)
                 .onChange(of: isCalculating) { wasCalculating, isCalculating in
                     guard wasCalculating, !isCalculating, !recommendations.isEmpty else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -144,21 +152,9 @@ struct TrajectoryClubView: View {
                         }
                     }
                 }
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button {
-                            invalidateRecommendation()
-                            targetCarryMetersValue = Units.metersFromYards(150)
-                            clubConditions.reset()
-                        } label: {
-                            Text("Reset")
-                        }
-                        .accessibilityLabel("Reset inputs")
-                        .accessibilityHint("Resets the club target and condition inputs to their defaults")
-                    }
-                }
             }
         }
+        .tint(PureLineStyle.accent)
         .navigationTitle("Club")
         .accessibilityIdentifier("club-screen")
         .onChange(of: recommendationInput) { _, _ in invalidateRecommendation() }
@@ -170,16 +166,16 @@ struct TrajectoryClubView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Distance To Target")
                     .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                 Spacer()
                 Text(formattedWholeDistance(targetCarryMetersValue))
                     .font(.title.bold())
                     .monospacedDigit()
-                    .foregroundStyle(FairwayVectorColors.charcoal)
+                    .foregroundStyle(PureLineStyle.accent)
             }
 
             Slider(value: targetCarryBinding, in: targetDistanceRange, step: targetDistanceStep)
-                .tint(FairwayVectorColors.navy)
+                .tint(PureLineStyle.accent)
 
             HStack {
                 Text(formattedWholeDistance(targetDistanceRange.lowerBound))
@@ -187,7 +183,7 @@ struct TrajectoryClubView: View {
                 Text(formattedWholeDistance(targetDistanceRange.upperBound))
             }
             .font(.caption)
-            .foregroundStyle(FairwayVectorColors.slate)
+            .foregroundStyle(PureLineStyle.muted)
 
             ClubElevationGraphic(
                 elevationMeters: $clubConditions.elevationDeltaM,
@@ -199,7 +195,7 @@ struct TrajectoryClubView: View {
 
             Text("Drag the fairway up or down to set the target elevation.")
                 .font(.caption)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
 
             ClubWindGraphic(
                 tailwindMps: $clubConditions.tailwindMps,
@@ -210,11 +206,10 @@ struct TrajectoryClubView: View {
 
             Text("Drag the wind arrow to set the combined headwind, tailwind, and crosswind.")
                 .font(.caption)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
 
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private var suggestClubButton: some View {
@@ -238,8 +233,7 @@ struct TrajectoryClubView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 52)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(FairwayVectorColors.navy)
+        .buttonStyle(PureLinePrimaryButtonStyle())
         .frame(height: 52)
         .disabled(isCalculating)
         .accessibilityIdentifier("suggest-club-button")
@@ -252,10 +246,9 @@ struct TrajectoryClubView: View {
         } label: {
             Label("Conditions", systemImage: "slider.horizontal.3")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
         }
-        .padding()
-        .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private var advancedConditions: some View {
@@ -311,19 +304,19 @@ struct TrajectoryClubView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Recommended Club")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
             Text(recommendation.club.label)
                 .font(.largeTitle.bold())
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
             Text("Estimated Carry Distance: \(formattedDistance(recommendation.estimatedCarryM))")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.orange)
+                .foregroundStyle(PureLineStyle.accent)
             Text("Difference from target: \(formattedDistance(recommendation.differenceM))")
                 .font(.subheadline)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
             Label(aimAdvice(for: recommendation), systemImage: "scope")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
             if let warning = elevationWarning(for: recommendation) {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote.weight(.semibold))
@@ -340,13 +333,11 @@ struct TrajectoryClubView: View {
                 Label("View Trajectory", systemImage: "chart.xyaxis.line")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
-            .tint(FairwayVectorColors.navy)
+            .buttonStyle(PureLinePrimaryButtonStyle(minimumHeight: 48))
             .accessibilityIdentifier("view-recommended-trajectory-button")
         }
-        .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
         .accessibilityIdentifier("recommended-club-card")
     }
 
@@ -354,11 +345,11 @@ struct TrajectoryClubView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Club Trajectories")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
 
             Text("Recommended and closest alternatives")
                 .font(.subheadline)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
 
             Chart {
                 ForEach(trajectoryChartPoints) { point in
@@ -377,7 +368,7 @@ struct TrajectoryClubView: View {
 
             Text("Top-Down View")
                 .font(.subheadline.bold())
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
 
             Chart {
                 ForEach(lateralChartPoints) { point in
@@ -400,12 +391,11 @@ struct TrajectoryClubView: View {
                         .frame(width: 8, height: 8)
                     Text(recommendation.club.label)
                         .font(.caption)
-                        .foregroundStyle(FairwayVectorColors.charcoal)
+                        .foregroundStyle(PureLineStyle.ink)
                 }
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private struct TrajectoryChartPoint: Identifiable {
@@ -521,13 +511,13 @@ struct TrajectoryClubView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Closest Alternatives")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
             ForEach(Array(recommendations.dropFirst().prefix(3))) { recommendation in
                 HStack {
                     Text(recommendation.club.label)
                     Spacer()
                     Text(formattedDistance(recommendation.estimatedCarryM))
-                        .foregroundStyle(FairwayVectorColors.charcoal)
+                        .foregroundStyle(PureLineStyle.ink)
                 }
                 .font(.subheadline)
                 if let warning = elevationWarning(for: recommendation) {
@@ -538,9 +528,8 @@ struct TrajectoryClubView: View {
                 }
             }
         }
-        .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private var distanceUnit: String {
@@ -596,6 +585,12 @@ struct TrajectoryClubView: View {
         isCalculating = false
         recommendations = []
         errorMessage = nil
+    }
+
+    private func resetInputs() {
+        invalidateRecommendation()
+        targetCarryMetersValue = Units.metersFromYards(150)
+        clubConditions.reset()
     }
 
     private func calculateRecommendation() {

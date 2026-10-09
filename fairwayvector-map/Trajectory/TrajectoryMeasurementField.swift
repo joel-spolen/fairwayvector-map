@@ -77,14 +77,14 @@ struct TrajectoryMeasurementField: View {
             HStack {
                 Text(title)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PureLineStyle.muted)
                 Button {
                     showExplanation = true
                 } label: {
                     Image(systemName: "info.circle")
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(PureLineStyle.muted)
                 .accessibilityLabel("About \(title)")
                 .accessibilityHint("Shows an explanation of this input")
                 Spacer()
@@ -93,11 +93,12 @@ struct TrajectoryMeasurementField: View {
                     isEditingValue = true
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.primary)
+                .foregroundStyle(PureLineStyle.ink)
                     .font(.subheadline.monospacedDigit().bold())
                         .accessibilityHint("Double-tap to type a value")
             }
             Slider(value: displayBinding, in: displayRange)
+                .tint(PureLineStyle.accent)
                 .accessibilityLabel(title)
                 .accessibilityValue(formattedValue)
                 .accessibilityHint(explanation)
@@ -164,6 +165,10 @@ struct TrajectoryMeasurementField: View {
                     }
                 }
             }
+            .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .tint(PureLineStyle.accent)
         }
         .presentationDetents([.height(220)])
     }
@@ -235,7 +240,7 @@ struct TrajectoryMeasurementField: View {
     private func imageExplanationSheet(imageName: String, sheetHeight: CGFloat) -> some View {
         NavigationStack {
             ZStack {
-                FairwayVectorColors.navy
+                PureLineStyle.canvas
                     .ignoresSafeArea()
 
                 InfoImagePanel(imageName: imageName, explanation: explanation)
@@ -246,10 +251,10 @@ struct TrajectoryMeasurementField: View {
                     Button("Done") { showExplanation = false }
                 }
             }
-            .toolbarBackground(FairwayVectorColors.navy, for: .navigationBar)
+            .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .tint(.white)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .tint(PureLineStyle.accent)
         }
         .presentationDetents([.height(sheetHeight)])
     }
