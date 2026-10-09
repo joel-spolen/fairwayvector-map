@@ -38,9 +38,6 @@ struct RoundSetupView: View {
                         Label("Some par, stroke indexes or applicable tee ratings are missing. Gross scoring is available; net, points and HCP calculations need complete course data.", systemImage: "info.circle")
                             .font(.footnote)
                     }
-                    if DevelopmentAPIConfiguration.isDemoCourse(selectedCourseReference.golfAPICourseID ?? "") {
-                        Text("DEMO course · invented ratings. Local scoring only; no HCP history import.").font(.footnote)
-                    }
                 }
                 Section("Your round") {
                     Picker("Game", selection: $game) {
@@ -286,7 +283,7 @@ struct RoundReviewView: View {
                     if round.holes.count == 9 {
                         Text("Nine holes: no official differential or HCP import. The existing calculator has no current-WHS expected nine-hole score method; no doubling or extrapolation is used.").font(.footnote)
                     } else if !PlayedRoundHandicapBridge.isEligible(round) {
-                        Text("Needs all 18 holes, actual par / unique SI, valid rating / slope and your index. Demo rounds are excluded.").font(.footnote)
+                        Text("Needs all 18 holes, actual par / unique SI, valid rating / slope and your index. This round is not eligible for Handicap import.").font(.footnote)
                     }
                     if let importMessage { Text(importMessage).font(.footnote) }
                 }

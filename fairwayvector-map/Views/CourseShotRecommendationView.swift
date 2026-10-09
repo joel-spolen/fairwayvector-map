@@ -61,10 +61,6 @@ struct CourseShotRecommendationView: View {
                             .padding(.horizontal, 9).padding(.vertical, 4)
                             .background(PureLineStyle.surface, in: Capsule())
                     }
-                    if DevelopmentAPIConfiguration.current.gpxz == .mock || terrainStore.metadata.contains(where: \.isSynthetic) {
-                        Text("DEMO").font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(PureLineStyle.muted)
-                    }
                 }
                 if let currentResult, let best = currentResult.recommendations.first {
                     HStack(spacing: 12) {
@@ -185,9 +181,6 @@ struct CourseShotRecommendationView: View {
                             if let message = errorMessage { Text(message) }
                             if let message = terrainStore.shotMessage { Text(message) }
                             if let message = weatherStore.errorMessage { Text("Weather: \(message)") }
-                            if DevelopmentAPIConfiguration.current.gpxz == .mock {
-                                Text("DEMO terrain · synthetic development elevations · estimates not for play.")
-                            }
                             Text("Advice requires a selected target, complete course-associated weather, matching committed terrain endpoints and an eligible profile. No calm/flat-ground or stock scoring-range fallback is used. Tap weather or terrain on the map for full provider status and manual retry.")
                         }
                         Section("Clubs & calibration") {
@@ -288,17 +281,13 @@ private struct CourseShotRecommendationDetail: View {
                         Button("Practice / Profile", action: onConfigureProfile)
                     }
                     .font(.subheadline)
-                    if DevelopmentAPIConfiguration.isDemoCourse(input.request.courseID) || input.originSample.provenance.contains(where: \.isSynthetic) {
-                        Text("Synthetic development terrain or demo course · real Open-Meteo weather at selected course · not for play")
-                            .font(.caption.bold())
-                    }
                     Text("\(unit.format(input.distanceM)) horizontal target · \(input.request.originLabel)")
                         .font(.headline)
                     Text("Advice uses the committed origin, not your live GPS position. Release a map target or confirm Refresh terrain to capture a new origin.")
                         .font(.caption).foregroundStyle(.secondary)
                     if input.isScoring, let range = input.scoringPlan.maxFullCarryM {
                         Label("Scoring mode · ≤ \(unit.format(range)) personal full wedge range", systemImage: "scope").font(.headline)
-                        Text("Inclusive horizontal-distance threshold, unchanged by weather. \(input.request.isSimulatedOrigin ? "Simulated development origin, not device GPS or a claim of golfer proximity." : input.request.usesGPS ? "Captured GPS origin." : "Tee-fallback preview allowed for testing, not a claim of golfer proximity.")")
+                        Text("Inclusive horizontal-distance threshold, unchanged by weather. \(input.request.isSimulatedOrigin ? "Simulated origin, not device GPS or a claim of golfer proximity." : input.request.usesGPS ? "Captured GPS origin." : "Tee-fallback preview allowed for testing, not a claim of golfer proximity.")")
                             .font(.caption)
                     }
                     if !input.scoringPlan.guidance.isEmpty { Text(input.scoringPlan.guidance).font(.caption) }
@@ -411,14 +400,12 @@ private struct CourseShotRecommendationDetail: View {
             LabeledContent("Wind (meteorological FROM)", value: String(format: "%.1f m/s (%.1f km/h) from %.0f°", input.weather.windSpeedMps!, input.weather.windSpeedMps! * 3.6, input.weather.windDirectionDegrees!))
             LabeledContent(input.conditions.tailwindMps >= 0 ? "Tailwind" : "Headwind", value: String(format: "%.1f m/s", abs(input.conditions.tailwindMps)))
             LabeledContent("Crosswind toward \(input.conditions.crosswindMps >= 0 ? "right" : "left")", value: String(format: "%.1f m/s", abs(input.conditions.crosswindMps)))
-            LabeledContent(input.originSample.provenance.contains(where: \.isSynthetic) ? "Synthetic terrain origin / target" : "Terrain origin / target (EGM2008)", value: String(format: "%.1f / %.1f m", input.originSample.elevationMeters!, input.targetSample.elevationMeters!))
+            LabeledContent("Terrain origin / target", value: String(format: "%.1f / %.1f m", input.originSample.elevationMeters!, input.targetSample.elevationMeters!))
             LabeledContent("Target minus origin", value: String(format: "%+.1f m", input.conditions.elevationDeltaM))
             Text("Open-Meteo course weather snapshot: \(input.weather.observedAt) (\(input.weather.timezone ?? "provider local time")). This may be cached; course-level surface pressure and 10 m wind are used unchanged, not measured at the ball. Absolute terrain height is provenance only: pressure is supplied directly, not altitude-compensated again. Gusts are not used.")
             Text(String(format: "Weather location: %.5f, %.5f · origin: %.5f, %.5f · target: %.5f, %.5f", input.weatherLocation.lat, input.weatherLocation.lon, input.originSample.point.lat, input.originSample.point.lon, input.targetSample.point.lat, input.targetSample.point.lon))
             ForEach(Array(Set(input.originSample.provenance + input.targetSample.provenance)).sorted { $0.dataSource < $1.dataSource }, id: \.self) { record in
-                if record.isSynthetic {
-                    Text("Synthetic development terrain · analytical surface · no surveyed datum/resolution or capture date · generated/saved \(record.fetchedAt.formatted())")
-                } else {
+                if !record.isSynthetic {
                     Text("GPXZ · \(record.dataSource) · source resolution \(record.resolutionMeters.formatted()) m · captured \(record.captureDateMin ?? "unknown")–\(record.captureDateMax ?? "unknown") · dataset \(record.datasetVersion ?? "unknown") · saved \(record.fetchedAt.formatted())")
                 }
             }

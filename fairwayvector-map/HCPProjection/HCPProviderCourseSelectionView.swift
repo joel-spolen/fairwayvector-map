@@ -17,15 +17,16 @@ struct HCPProviderCourseSelectionView: View {
     @State private var customCourseName = ""
     @State private var customTeeID: PersistentIdentifier?
     let confirmedCourseID: String?
+    let title: String
+    let onAddCustom: ((String, String) -> Void)?
     let onSelect: (HCPProviderCourse) -> Void
     let onSelectCustom: (CourseTeeInfo) -> Void
-    let onAddCustom: (String, String) -> Void
 
     init(profile: PlayerProfile?, clubs: [GolfClub], courses: [GolfCourse], tees: [TeeSet],
-         country: String, confirmedCourseID: String? = nil,
+         country: String, confirmedCourseID: String? = nil, title: String = "Where to?",
+         onAddCustom: ((String, String) -> Void)? = nil,
          confirmedCustomTeeID: Binding<PersistentIdentifier?>,
          onSelectCustom: @escaping (CourseTeeInfo) -> Void,
-         onAddCustom: @escaping (String, String) -> Void,
          onSelect: @escaping (HCPProviderCourse) -> Void) {
         let sex = profile?.sexOrDefault ?? .male
         let model = GolfAPICourseSelectionModel(purpose: .handicap, sex: sex.rawValue)
@@ -40,12 +41,13 @@ struct HCPProviderCourseSelectionView: View {
         self.tees = tees
         _confirmedCustomTeeID = confirmedCustomTeeID
         self.confirmedCourseID = confirmedCourseID
+        self.title = title
+        self.onAddCustom = onAddCustom
         self.onSelect = onSelect
         self.onSelectCustom = onSelectCustom
-        self.onAddCustom = onAddCustom
     }
 
-    private var sex: PlayerSex { profile?.sexOrDefault ?? .male }
+    private var sex: PlayerSex { PlayerSex(rawValue: model.selectedSex) ?? profile?.sexOrDefault ?? .male }
     private var customMatches: [HCPCustomCourseSearch.Match] {
         HCPCustomCourseSearch.matches(clubs: clubs, courses: courses, tees: tees,
             query: model.searchText, country: model.selectedCountry, region: model.selectedRegion, sex: sex)
@@ -69,38 +71,23 @@ struct HCPProviderCourseSelectionView: View {
             sex: selection.sex, clubName: selection.club.clubName)
     }
 
-    private var isMock: Bool { DevelopmentAPIConfiguration.current.golfAPI == .mock }
-
     var body: some View {
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Where to?").font(.largeTitle.weight(.semibold)).tracking(-1)
+                        Text(title).font(.largeTitle.weight(.semibold)).tracking(-1)
                         Text("Find your course. Choose your tee.")
                             .font(.subheadline).foregroundStyle(PureLineStyle.muted)
                     }
-                    if isMock {
-                        DisclosureGroup {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("APIs paused · 0 paid requests")
-                                Text("Only saved real provider courses are available while APIs are paused. Demo courses are excluded. Handicap uses ratings and hole pars; GPS is not required.")
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .font(.footnote).foregroundStyle(PureLineStyle.muted)
-                            .padding(.top, 8)
+                    CourseSearchControls(model: model)
+
+                    if let onAddCustom {
+                        Button {
+                            onAddCustom(model.searchText.trimmingCharacters(in: .whitespacesAndNewlines), model.selectedCountry)
                         } label: {
-                            Label("APIs paused · saved real courses", systemImage: "externaldrive")
-                                .font(.caption.weight(.medium)).foregroundStyle(PureLineStyle.accent)
+                            Label("Add custom course", systemImage: "plus.circle")
                         }
+                        .font(.subheadline).foregroundStyle(PureLineStyle.accent)
                     }
-
-                    CourseSearchControls(model: model, refreshTitle: isMock ? "Refresh saved search (local)" : "Refresh search from Golf API")
-
-                    Button {
-                        onAddCustom(model.searchText.trimmingCharacters(in: .whitespacesAndNewlines), model.selectedCountry)
-                    } label: {
-                        Label("Add custom course", systemImage: "plus.circle")
-                    }
-                    .font(.subheadline).foregroundStyle(PureLineStyle.accent)
 
                     customResults
 
@@ -111,13 +98,11 @@ struct HCPProviderCourseSelectionView: View {
                                 clearCustomDraft()
                                 Task { await model.selectReference(recent) }
                             } label: {
-                                CourseRecentCard(reference: recent, status: "Revalidate this course and exact tee")
+                                CourseRecentCard(reference: recent, status: nil, showsTeeAndRating: false)
                             }
                             .buttonStyle(.plain).disabled(model.isLoadingCourse)
                             .accessibilityIdentifier("recent-course-button")
-                            .accessibilityHint("Revalidates this course and tee for your profile rating category")
-                            Text("Recent courses are revalidated. A different rating category requires you to choose a tee.")
-                                .font(.caption).foregroundStyle(PureLineStyle.muted)
+                            .accessibilityHint("Revalidates this course and tee for the selected rating category")
                         }
                     }
                     CourseSelectionStatus(model: model)
@@ -130,7 +115,7 @@ struct HCPProviderCourseSelectionView: View {
                                         isDisabled: model.isLoadingCourse)
                     }
                     if customMatch == nil, let club = model.selectedClub {
-                        CourseResultCards(model: model, club: club, isMock: isMock)
+                        CourseResultCards(model: model, club: club)
                     }
                     if model.isLoadingCourse { CourseSelectionLoading() }
                     if customMatch == nil, let detail = model.courseDetail {
@@ -159,8 +144,8 @@ struct HCPProviderCourseSelectionView: View {
                 // Avoid Form/List automatic button behavior applying an entire row action.
                 .buttonStyle(.borderless)
                 .tint(PureLineStyle.accent)
-                .onChange(of: sex) {
-                    model.selectedSex = sex.rawValue
+                .onChange(of: profile?.sexOrDefault ?? .male) { _, newSex in
+                    model.selectedSex = newSex.rawValue
                     model.selectedTeeID = nil
                     customTeeID = nil
                 }
@@ -221,7 +206,9 @@ struct HCPProviderCourseSelectionView: View {
                                 }
                             }
                             if customTees.isEmpty {
-                                Text("No saved tees available for your profile rating category. Add a custom course or tee.")
+                                  Text(onAddCustom == nil
+                                      ? "No saved tees are available for your profile rating category."
+                                      : "No saved tees are available for your profile rating category. Add a custom course or tee.")
                                     .font(.caption).foregroundStyle(PureLineStyle.muted)
                             }
                         }

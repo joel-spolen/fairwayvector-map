@@ -73,12 +73,8 @@ struct HoleElevationProfileView: View {
                     // Show both pipelines' errors even when inspecting the other chart.
                     if let message = store.holeMessage { Label("Hole: \(message)", systemImage: "info.circle").font(.footnote) }
                     if let message = store.shotMessage { Label("Shot: \(message)", systemImage: "info.circle").font(.footnote) }
-                    if DevelopmentAPIConfiguration.current.gpxz == .mock {
-                        Text("Mock · 0 paid requests. Live quota and history unchanged.").font(.footnote)
-                    } else if let quota = store.quota {
+                    if DevelopmentAPIConfiguration.current.gpxz == .live, let quota = store.quota {
                         Text("GPXZ local budget: \(quota.used)/100 used · \(quota.remaining) remaining · \(store.plannedCalls) uncovered spans planned · \(quota.month) UTC.").font(.footnote)
-                    } else {
-                        Text("Local quota unavailable; no paid request without a valid ledger.").font(.footnote)
                     }
                     if onRetry != nil {
                         Button("Retry / refresh terrain", systemImage: "arrow.clockwise") { isConfirmingRetry = true }
@@ -163,7 +159,7 @@ struct HoleElevationProfileView: View {
             .font(.subheadline)
 
             if mode == .shot && store.committedRequest?.isSimulatedOrigin == true {
-                Text("Simulated golfer · Development. This committed coordinate is not device GPS; incoming GPS fixes do not move it. Live GPXZ uses saved terrain only for this origin.")
+                Text("This profile begins at a simulated position rather than device GPS.")
                     .font(.footnote).foregroundStyle(.secondary)
             } else if mode == .shot && !usesGPS {
                 Text("The committed shot starts at the captured tee fallback, not your live GPS position. Its endpoint is the selected target.")
@@ -197,17 +193,7 @@ struct HoleElevationProfileView: View {
     private func sourceDetails(_ records: [TerrainProvenance], sourceProfile: TerrainProfile?, title: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.headline)
-            if records.contains(where: \.isSynthetic) || DevelopmentAPIConfiguration.current.gpxz == .mock {
-                Text("DEMO DATA · Synthetic development terrain").fontWeight(.bold)
-                Text("Local analytical rolling hills, not GPXZ measurements or an actual Hills survey. Synthetic height datum; no real source resolution, licence catalogue or capture dates. Generated/saved dates are not survey dates.")
-                if let profile = sourceProfile {
-                    LabeledContent("Displayed maximum sample interval", value: "\(profile.maximumSpacingMeters.formatted()) m")
-                    if profile.samples.contains(where: \.locallyInterpolated) {
-                        Text("Includes local interpolation along saved synthetic coverage.")
-                    }
-                }
-                Text("Mock · 0 paid requests. Live quota, failed-request locks and cache are untouched. Sample spacing is not real terrain accuracy.")
-            } else {
+            if !records.contains(where: \.isSynthetic) && DevelopmentAPIConfiguration.current.gpxz == .live {
                 Link("Elevation profiles by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
                 LabeledContent("Coordinates / heights", value: "WGS84 / EGM2008")
                 if let profile = sourceProfile {

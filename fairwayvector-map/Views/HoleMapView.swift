@@ -32,7 +32,7 @@ struct HoleMapView: View {
 
                 #if DEBUG
                 if let simulatedUserLocation {
-                    Annotation("Simulated golfer · Development", coordinate: simulatedUserLocation.coordinate) {
+                    Annotation("Simulated golfer", coordinate: simulatedUserLocation.coordinate) {
                         Label("DEV YOU", systemImage: "figure.golf")
                             .font(.caption2.bold())
                             .padding(6)

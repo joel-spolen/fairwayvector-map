@@ -945,10 +945,6 @@ private struct TargetCalculatorView: View {
                                 projectionHandicap = nil
                                 improvingLimit = 6
                                 showMoreWorsening = false
-                            }, onAddCustom: { query, country in
-                                searchText = query
-                                addCourseCountry = country
-                                showingAddCourse = true
                             }) { selection in
                             providerCourse = selection
                             showingCustomCourses = false
@@ -1243,6 +1239,7 @@ private struct NewRoundView: View {
             return pars.count == $0.holes && indices.count == $0.holes && !pars.isEmpty && !indices.isEmpty
         } ?? false
         let calculatedHandicap = activeTee == nil ? nil : currentHandicap
+        let canShowStablefordPoints = rounds.count >= 3
 
         NavigationStack {
             Form {
@@ -1257,7 +1254,12 @@ private struct NewRoundView: View {
                 if !isManualDifferential {
                     Section {
                         HCPProviderCourseSelectionView(profile: profile, clubs: clubs, courses: courses, tees: tees,
-                            country: activeCountry, confirmedCourseID: providerCourse?.id,
+                            country: activeCountry, confirmedCourseID: providerCourse?.id, title: "What did you play?",
+                            onAddCustom: { query, country in
+                                searchText = query
+                                addCourseCountry = country
+                                showingAddCourse = true
+                            },
                             confirmedCustomTeeID: $selectedCustomTeeID, onSelectCustom: { tee in
                                 providerCourse = nil
                                 showingCustomCourses = true
@@ -1266,10 +1268,6 @@ private struct NewRoundView: View {
                                 selectedTeeName = tee.name
                                 if !hasHoleByHoleData && inputMode == .holeByHole { inputMode = .adjustedGrossScore }
                                 resetHoleScores()
-                            }, onAddCustom: { query, country in
-                                searchText = query
-                                addCourseCountry = country
-                                showingAddCourse = true
                             }) { selection in
                             providerCourse = selection
                             showingCustomCourses = false
@@ -1426,13 +1424,15 @@ private struct NewRoundView: View {
                                     .monospacedDigit()
                                     .bold()
                             }
-                            HStack {
-                                Text("Stableford Points")
-                                Spacer()
-                                Text("\(holeCalc.totalStablefordPoints) pts")
-                                    .monospacedDigit()
-                                    .bold()
-                                    .foregroundStyle(PureLineStyle.accent)
+                            if canShowStablefordPoints {
+                                HStack {
+                                    Text("Stableford Points")
+                                    Spacer()
+                                    Text("\(holeCalc.totalStablefordPoints) pts")
+                                        .monospacedDigit()
+                                        .bold()
+                                        .foregroundStyle(PureLineStyle.accent)
+                                }
                             }
                         }
                         .listRowBackground(PureLineStyle.surface)
@@ -1451,7 +1451,8 @@ private struct NewRoundView: View {
                                     holeNumber: i + 1,
                                     par: pars[i],
                                     handicapIndex: hcpIndices[i],
-                                    points: i < holeCalc.holePoints.count ? holeCalc.holePoints[i] : nil,
+                                    points: canShowStablefordPoints && i < holeCalc.holePoints.count
+                                        ? holeCalc.holePoints[i] : nil,
                                     score: scoreBinding
                                 )
                             }
@@ -1474,7 +1475,7 @@ private struct NewRoundView: View {
                                             .accessibilityLabel("Adjusted Gross Score")
                                     }
                                 }
-                            } else if inputMode == .stablefordPoints {
+                            } else if inputMode == .stablefordPoints && canShowStablefordPoints {
                                 Stepper("Stableford points: \(points)", value: $points, in: 0...54)
                             }
                         }
@@ -1549,6 +1550,11 @@ private struct NewRoundView: View {
                     inputMode = .adjustedGrossScore
                 }
                 resetHoleScores()
+            }
+            .onChange(of: rounds.count) {
+                if rounds.count < 3 && inputMode == .stablefordPoints {
+                    inputMode = .adjustedGrossScore
+                }
             }
             .onChange(of: isManualDifferential) {
                 if isManualDifferential {

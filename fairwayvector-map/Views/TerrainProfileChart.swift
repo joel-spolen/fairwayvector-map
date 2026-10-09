@@ -57,13 +57,6 @@ struct TerrainProfileChart: View {
         .chartYAxisLabel(height > 100 ? "Terrain elevation (\(unit.symbol))" : "")
         .chartXSelection(value: $selectedDistance)
         .frame(height: height)
-        .overlay(alignment: .topLeading) {
-            if profile.metadata.contains(where: \.isSynthetic) {
-                Text("Synthetic development terrain")
-                    .font(.system(size: 8, weight: .bold))
-                    .padding(3).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
-            }
-        }
         .accessibilityLabel("Terrain profile; independently fitted vertical scale, gaps are unavailable heights")
         .accessibilityValue("\(unit.format(profile.distanceMeters)) horizontal distance")
     }

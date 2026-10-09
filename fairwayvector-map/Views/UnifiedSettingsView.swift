@@ -85,49 +85,11 @@ struct UnifiedSettingsView: View {
                 }
                 .listRowBackground(PureLineStyle.surface)
 
-                Section("Development API mode (build-time)") {
-                    LabeledContent("Golf API", value: DevelopmentAPIConfiguration.current.golfAPI.status)
-                    LabeledContent("GPXZ", value: DevelopmentAPIConfiguration.current.gpxz.status)
-                    if DevelopmentAPIConfiguration.current.gpxz == .mock {
-                        Text("Synthetic development terrain · not surveyed")
-                            .font(.footnote)
-                            .foregroundStyle(PureLineStyle.muted)
-                    }
-                    DisclosureGroup("Build-mode details") {
-                        Text("Mock modes ignore existing keys. Saved real Hills is bundled read-only for fresh devices, alongside complete downloaded courses. Real IDs and tee ratings are retained; Demo Hills is separate invented data. Terrain remains synthetic in a separate mock namespace. The full real Hills terrain export is a private ignored local backup, not an app resource. Live caches and GPXZ budget/history remain unchanged. Activation requires an explicit per-provider build setting and rebuild; there is no runtime toggle.")
-                            .font(.footnote)
-                            .foregroundStyle(PureLineStyle.muted)
-                        Text("Weather remains Open-Meteo (live/cache); Apple Maps imagery is unchanged. This is not an entirely offline app.")
-                            .font(.footnote)
-                            .foregroundStyle(PureLineStyle.muted)
-                    }
-                }
-                .listRowBackground(PureLineStyle.surface)
-
                 Section("About") {
                     Link("Handicap privacy", destination: URL(string: "https://fairwayvector.com/hcp-projection/privacy-policy")!)
                     Link("Trajectory privacy", destination: URL(string: "https://fairwayvector.com/trajectory/privacy-policy")!)
                     Link("Wedge Matrix privacy", destination: URL(string: "https://fairwayvector.com/wedge-matrix/privacy-policy")!)
-                    Text(DevelopmentAPIConfiguration.current.golfAPI == .mock
-                        ? "Course/GPS: saved downloaded Golf API/OpenStreetMap data when available, otherwise separately labelled invented Demo Hills. Satellite imagery provided by Apple Maps."
-                        : "Course and GPS data provided by Golf API. Satellite imagery provided by Apple Maps.")
-                        .font(.footnote)
-                        .foregroundStyle(PureLineStyle.muted)
                     Link("Weather data by Open-Meteo", destination: URL(string: "https://open-meteo.com/")!)
-                    if DevelopmentAPIConfiguration.current.gpxz == .mock {
-                        Text("Terrain: Synthetic development terrain. Analytical local surface with no survey dates, real source resolution or surveyed height datum. No coordinates sent to GPXZ; no paid quota spent.")
-                            .font(.footnote)
-                            .foregroundStyle(PureLineStyle.muted)
-                    } else {
-                        Link("Terrain profiles by GPXZ", destination: URL(string: "https://www.gpxz.io/")!)
-                        Link("Terrain source credits and licences", destination: URL(string: "https://api.gpxz.io/v1/elevation/sources")!)
-                        Text("The profile shows returned source identifiers for both origin→target and target→flag. Source-specific attribution records and full licence texts have not been downloaded or bundled; the link opens the GPXZ catalogue for review.")
-                            .font(.footnote)
-                            .foregroundStyle(PureLineStyle.muted)
-                        Text("Committed terrain profiles can send path coordinates, including your captured GPS position, to GPXZ. Source resolution and survey dates vary; sample spacing is not guaranteed accuracy. Saved data has no automatic expiry, prefetch, or retries. The local 100-call UTC monthly ledger is a device safeguard, not cross-device account enforcement.")
-                            .font(.footnote)
-                            .foregroundStyle(PureLineStyle.muted)
-                    }
                 }
                 .listRowBackground(PureLineStyle.surface)
             }

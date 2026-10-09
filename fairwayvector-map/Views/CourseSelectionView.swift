@@ -48,22 +48,7 @@ struct CourseSelectionView: View {
                             }
                         } else { Button("Retry loading round storage") { roundStore.load() } }
                     }
-                    if isMock {
-                        DisclosureGroup {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("APIs paused · 0 paid requests")
-                                Text("Saved real Hills is bundled for offline course access on fresh devices. Demo Hills is a separate invented fallback. Terrain remains explicitly synthetic; the private real terrain backup is not used by this app.")
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .font(.footnote).foregroundStyle(PureLineStyle.muted)
-                            .padding(.top, 8)
-                        } label: {
-                            Label("Offline preview · synthetic terrain", systemImage: "externaldrive")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(PureLineStyle.accent)
-                        }
-                    }
-                    CourseSearchControls(model: model, refreshTitle: isMock ? "Refresh saved / demo search (local)" : "Refresh search from Golf API")
+                    CourseSearchControls(model: model)
 
                     if let recentCourse {
                         recentCourseShortcut(recentCourse)
@@ -77,7 +62,7 @@ struct CourseSelectionView: View {
                     }
 
                     if let club = model.selectedClub {
-                        CourseResultCards(model: model, club: club, isMock: isMock)
+                        CourseResultCards(model: model, club: club)
                     }
 
                     if model.isLoadingCourse {
@@ -107,17 +92,6 @@ struct CourseSelectionView: View {
                         }
                     }
 
-                    DisclosureGroup("Course data & providers") {
-                        Text(isMock ? "Saved Hills offline and other complete saved courses appear before demo results. Real Hills provider detail, coordinates and 62/Men geometry are bundled read-only; other rated tees use the original provider payload. Valley is not bundled. Refresh never contacts Golf API. Weather and imagery are still live/cache-backed."
-                            : "Golf API search is low-cost. Opening a course downloads its detail and coordinate data once; both are cached on this device. Use the course refresh button to check for provider updates.")
-                            .font(.footnote)
-                            .foregroundStyle(PureLineStyle.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 8)
-                    }
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(PureLineStyle.muted)
-                    .pureLineCard()
                 }
                 .foregroundStyle(PureLineStyle.ink)
                 .padding(.horizontal, 20)
@@ -157,10 +131,6 @@ struct CourseSelectionView: View {
         onStartCourse(reference)
     }
 
-    private func pausedLabel(for id: String?) -> String {
-        id == BundledSavedCourseStore.hillsCourseID ? "Saved Hills offline · APIs paused" : "Saved course · APIs paused"
-    }
-
     private func recentCourseShortcut(_ reference: CourseReference, title: String = "RECENTLY SELECTED") -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
@@ -171,10 +141,7 @@ struct CourseSelectionView: View {
             Button {
                 startCourse(reference)
             } label: {
-                CourseRecentCard(reference: reference, status:
-                    isMock && !DevelopmentAPIConfiguration.isDemoCourse(reference.golfAPICourseID ?? "")
-                    ? (model.hasSavedCourse(reference) ? pausedLabel(for: reference.golfAPICourseID)
-                       : "Downloaded data unavailable in this installation · selection preserved") : nil)
+                CourseRecentCard(reference: reference, status: nil)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("recent-course-button")

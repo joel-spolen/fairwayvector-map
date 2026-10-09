@@ -3,7 +3,6 @@ import SwiftUI
 /// Shared Pure Line presentation only. Eligibility and provider access stay in the selection model.
 struct CourseSearchControls: View {
     @Bindable var model: GolfAPICourseSelectionModel
-    let refreshTitle: String
 
     private var searchDisabled: Bool {
         model.isSearching || model.selectedCountry.isEmpty
@@ -78,10 +77,6 @@ struct CourseSearchControls: View {
             .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(PureLineStyle.line, lineWidth: 1))
 
-            Button(refreshTitle) { Task { await model.search(forceRefresh: true) } }
-                .font(.caption.weight(.medium))
-                .padding(.vertical, 4)
-                .disabled(searchDisabled)
         }
     }
 }
@@ -133,7 +128,6 @@ struct CourseClubCards: View {
 struct CourseResultCards: View {
     let model: GolfAPICourseSelectionModel
     let club: GolfAPIClub
-    let isMock: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -143,13 +137,6 @@ struct CourseResultCards: View {
                     HStack(spacing: 16) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(course.courseName).font(.subheadline.weight(.semibold)).foregroundStyle(PureLineStyle.ink)
-                            if isMock {
-                                Text(DevelopmentAPIConfiguration.isDemoCourse(course.courseID)
-                                     ? "DEMO · invented course"
-                                     : course.courseID == BundledSavedCourseStore.hillsCourseID
-                                        ? "Saved Hills offline · APIs paused" : "Saved course · APIs paused")
-                                    .font(.caption).foregroundStyle(PureLineStyle.accent)
-                            }
                             Text(model.purpose == .handicap
                                  ? "\(course.numHoles) holes · GPS not required"
                                  : "\(course.numHoles) holes · \(course.hasGPS ? "GPS available" : "No GPS data")")
@@ -177,26 +164,41 @@ struct CourseResultCards: View {
 struct CourseTeeSelectionCard: View {
     @Bindable var model: GolfAPICourseSelectionModel
     let detail: GolfAPICourseDetail
+    @State private var showingRatingCategoryInfo = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             CourseSelectionHeading(title: "TEE SET")
-            if model.purpose == .map {
+            if model.purpose == .handicap {
+                HStack {
+                    Text("Rating category")
+                    Spacer()
+                    Text(model.selectedSex == "female" ? "Women" : "Men")
+                        .fontWeight(.medium)
+                    Button {
+                        showingRatingCategoryInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(PureLineStyle.accent)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Rating category information")
+                }
+                .font(.subheadline)
+                .foregroundStyle(PureLineStyle.muted)
+                .alert("Rating category", isPresented: $showingRatingCategoryInfo) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("The Men/Women rating category follows your player settings. Change it in Settings.")
+                }
+            } else {
                 Picker("Rating category", selection: $model.selectedSex) {
                     Text("Men").tag("male")
                     Text("Women").tag("female")
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: model.selectedSex) { model.selectedTeeID = model.ratedTees.first?.teeID }
-            } else {
-                HStack {
-                    Text("Rating category")
-                    Spacer()
-                    Text(model.selectedSex == "female" ? "Women" : "Men").fontWeight(.medium)
-                }
-                .font(.subheadline).foregroundStyle(PureLineStyle.muted)
-                Text("From your profile · choose the exact tee below.")
-                    .font(.caption).foregroundStyle(PureLineStyle.muted)
+                .accessibilityIdentifier("golf-rating-category-picker")
             }
             Picker("Tee", selection: Binding(
                 get: { model.selectedTeeID ?? "" },
@@ -214,7 +216,7 @@ struct CourseTeeSelectionCard: View {
             .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 12))
 
             Text(model.purpose == .handicap
-                 ? "\(detail.numHoles) holes · GPS not required for Handicap"
+                  ? "\(detail.numHoles) holes"
                  : "\(detail.numHoles) holes · \(detail.hasGPS ? "GPS data available" : "GPS data unavailable")")
                 .font(.caption).foregroundStyle(PureLineStyle.muted)
         }
@@ -280,6 +282,7 @@ struct CourseSelectionLoading: View {
 struct CourseRecentCard: View {
     let reference: CourseReference
     let status: String?
+    var showsTeeAndRating = true
 
     var body: some View {
         HStack(spacing: 16) {
@@ -292,7 +295,9 @@ struct CourseRecentCard: View {
                 if reference.clubName != reference.courseName {
                     Text(reference.clubName).font(.caption).foregroundStyle(PureLineStyle.muted)
                 }
-                Text("\(reference.teeName) tee · \(reference.teeSex == "female" ? "Women" : "Men") · \(reference.holeCount) holes")
+                 Text(showsTeeAndRating
+                     ? "\(reference.teeName) tee · \(reference.teeSex == "female" ? "Women" : "Men") · \(reference.holeCount) holes"
+                     : "\(reference.holeCount) holes")
                     .font(.caption).foregroundStyle(PureLineStyle.muted)
                 if let status { Text(status).font(.caption).foregroundStyle(PureLineStyle.accent) }
             }

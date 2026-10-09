@@ -140,7 +140,7 @@ final class GolfAPICourseSelectionModel {
     func selectCourse(_ course: GolfAPICourseSummary) async {
         guard !isLoadingCourse else { return }
         guard purpose != .handicap || !DevelopmentAPIConfiguration.isDemoCourse(course.courseID) else {
-            errorMessage = "Demo courses cannot be used for Handicap. Choose a real provider course or an explicitly custom course."
+            errorMessage = "This course cannot be used for Handicap. Choose a rated course or an explicitly custom course."
             return
         }
         guard purpose != .map || course.hasGPS else {

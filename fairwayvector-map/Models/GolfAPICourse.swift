@@ -267,7 +267,7 @@ enum GolfAPIError: LocalizedError, Equatable {
         case .noRatedTees(let course):
             return "No rated tee sets were found for \(course)."
         case .savedCourseUnavailable(let course):
-            return "APIs paused: downloaded data for \(course) is not available in this installation. Your real course selection has been preserved; Demo Hills is a separate invented course, not a replacement."
+            return "Previously downloaded course data for \(course) is not available on this device. Your course selection has been preserved."
         }
     }
 }

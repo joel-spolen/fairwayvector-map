@@ -79,9 +79,6 @@ struct CourseMapView: View {
                                 .disabled(store.course == nil)
                             Button("Move flag", systemImage: "flag") { isShowingFlagEditor = true }
                                 .disabled(store.course == nil)
-                            #if DEBUG
-                            developmentToolsMenu
-                            #endif
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(.body.weight(.semibold))
@@ -283,8 +280,6 @@ struct CourseMapView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 10)
-                        mapStatusBadge(origin: origin)
-                            .padding(.top, 5)
                     }
                     .padding(.bottom, 8)
                 }
@@ -535,7 +530,7 @@ struct CourseMapView: View {
         distanceOrigin(for: hole)?.isSimulated == true && DevelopmentAPIConfiguration.current.gpxz == .live
             ? "Simulated golfer: reload saved terrain only. No live requests, failure-lock changes or paid reservations. Missing heights remain unavailable."
             : DevelopmentAPIConfiguration.current.gpxz == .mock
-            ? "Recompute from local synthetic terrain. No GPXZ requests or changes to the live ledger, failure locks or quota."
+            ? "Retry terrain using the data available for this course."
             : "Correct the reported cause first. Saved terrain is reused, but uncovered paths may spend additional calls. This clears failed-request locks only; used calls are not reset or refunded, and provider backoff still applies."
     }
 
@@ -569,23 +564,6 @@ struct CourseMapView: View {
         }
     }
 
-    private func mapStatusBadge(origin: DistanceOrigin?) -> some View {
-        let demo = DevelopmentAPIConfiguration.isDemoCourse(store.reference.golfAPICourseID ?? "")
-        let saved = DevelopmentAPIConfiguration.current.golfAPI == .mock
-        let synthetic = DevelopmentAPIConfiguration.current.gpxz == .mock
-        let labels = [origin?.isSimulated == true ? "Simulated position" : nil,
-            demo ? "DEMO course" : saved ? (store.reference.golfAPICourseID == BundledSavedCourseStore.hillsCourseID ? "Saved Hills" : "Saved course") : nil,
-            synthetic ? "DEMO terrain" : nil,
-            store.errorMessage != nil ? "Update unavailable ⓘ" : nil].compactMap { $0 }
-        return Text(labels.joined(separator: " · "))
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(PureLineStyle.ink)
-            .padding(.horizontal, 10)
-            .padding(.vertical, labels.isEmpty ? 0 : 3)
-            .background(PureLineStyle.canvas.opacity(0.96), in: Capsule())
-            .accessibilityLabel(labels.joined(separator: ", "))
-    }
-
     private var courseInformation: some View {
         NavigationStack {
             Form {
@@ -607,34 +585,15 @@ struct CourseMapView: View {
                         if let origin = distanceOrigin(for: hole) {
                             switch origin.source {
                             case .gps(let accuracy): Text("Distances use device GPS · accuracy ±\(Int(accuracy.rounded())) m.")
-                            case .simulated: Text("Distances use a simulated development position, not device GPS.")
+                            case .simulated: Text("Distances use a simulated position, not device GPS.")
                             case .teeNoFix: Text("No usable GPS fix: distances preview from the tee.")
                             case .teeFarAway: Text("GPS is outside the hole corridor: distances preview from the tee.")
                             }
                         }
                         Text("Recommendations and terrain use the committed position, not incoming GPS fixes. Release a target or confirm Retry terrain to recapture it.")
                     }
-                    #if DEBUG
-                    Section("Development tools · dice / DEV menu") {
-                        if let message = simulationError ?? simulationIssue(hole: hole, plan: developmentScoringPlan) { Text(message) }
-                        if let threshold = developmentScoringPlan.maxFullCarryM { Text("Personal Mid/Stock 100% wedge range: \(unit.format(threshold)).") }
-                        if let simulatedGolfer, let target = tapPoint ?? flagPosition(for: hole) {
-                            Text("Simulated position: \(unit.format(GolfGeometry.distance(simulatedGolfer, target))) to target.")
-                        }
-                        Text("Choose Configure wedge calibration & matrix or Configure Practice / Profile in the dice menu. Random placement requires personal carry calibration and valid hole geometry. It is temporarily disabled during loading or a held target gesture, not merely when cached advice is invalidated.")
-                        Text("Simulation never changes device GPS or Practice. Live GPXZ uses saved terrain only, with no paid calls or failure-lock changes. Missing endpoint heights still block advice.")
-                    }
-                    #endif
                 }
-                Section("Availability & sources") {
-                    if DevelopmentAPIConfiguration.isDemoCourse(store.reference.golfAPICourseID ?? "") {
-                        Text("DEMO HILLS · invented GPS layout and ratings · not for play.")
-                    } else if DevelopmentAPIConfiguration.current.golfAPI == .mock {
-                        Text("Saved course geometry · Golf API paused. No live update check in mock mode.")
-                    }
-                    if DevelopmentAPIConfiguration.current.gpxz == .mock {
-                        Text("DEMO terrain · synthetic analytical elevations, not a surveyed course. Estimates are not for play. Live terrain, budget and history are untouched.")
-                    }
+                Section("Sources") {
                     Text("Course data © \(store.reference.golfAPICourseID == nil ? "OpenStreetMap contributors" : "Golf API") · Imagery © Apple Maps · Weather © Open-Meteo.")
                     if let error = store.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle")

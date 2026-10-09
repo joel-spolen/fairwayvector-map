@@ -34,15 +34,17 @@ struct HCPProviderCourseTests {
         #expect(men.tee.courseRating == 73.2 && men.tee.slopeRating == 132)
         #expect(women.tee.courseRating == 76.8 && women.tee.slopeRating == 144)
         #expect(men.tee.ratingSex == .male && women.tee.ratingSex == .female)
-        #expect(men.tee.par == 72 && women.tee.par == 90)
+        #expect(men.tee.par == 72 && women.tee.par == 72)
         #expect(men.tee.holeParsData == detail.parsMen)
-        #expect(women.tee.holeHandicapIndicesData == detail.indexesWomen)
+        #expect(women.tee.holeParsData == detail.parsMen)
+        #expect(men.tee.holeHandicapIndicesData == detail.indexesMen)
+        #expect(women.tee.holeHandicapIndicesData == detail.indexesMen)
         #expect(men.id != women.id)
         #expect(!detail.hasGPS)
         #expect(men.tee.snapshot.courseRating == 73.2)
     }
 
-    @Test func teeSpecificParsAndIndicesTakePrecedenceWithoutFabrication() throws {
+    @Test func courseHoleDataIsSharedAcrossTeeAndRatingCategory() throws {
         var raw = json()
         var tees = raw["tees"] as! [[String: Any]]
         tees[0]["pars"] = Array(repeating: 3, count: 18)
@@ -50,9 +52,9 @@ struct HCPProviderCourseTests {
         raw["tees"] = tees
         let detail = try GolfAPICourseDetail(json: raw)
         let result = try HCPProviderCourse.convert(detail: detail, tee: detail.tees[0], sex: "male")
-        #expect(result.tee.par == 54)
-        #expect(result.tee.holeParsData == Array(repeating: 3, count: 18))
-        #expect(result.tee.holeHandicapIndicesData == Array((1...18).reversed()))
+        #expect(result.tee.par == 72)
+        #expect(result.tee.holeParsData == detail.parsMen)
+        #expect(result.tee.holeHandicapIndicesData == detail.indexesMen)
     }
 
     @Test func nineHolesRetainActualFullCourseStrokeIndices() throws {

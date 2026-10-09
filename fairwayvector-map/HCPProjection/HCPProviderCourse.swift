@@ -17,8 +17,10 @@ struct HCPProviderCourse: Hashable {
               let slope = tee.slope(for: sex), (55...155).contains(slope) else {
             throw GolfAPIError.invalidResponse("A real 9- or 18-hole course and valid rating for the selected category are required.")
         }
-        let pars = tee.pars(for: sex, fallback: sex == "female" ? detail.parsWomen : detail.parsMen)
-        let indices = tee.indexes(for: sex, fallback: sex == "female" ? detail.indexesWomen : detail.indexesMen)
+        let pars = sharedHoleData(detail: detail, men: \.parsMen, women: \.parsWomen,
+                      courseMen: detail.parsMen, courseWomen: detail.parsWomen)
+        let indices = sharedHoleData(detail: detail, men: \.indexesMen, women: \.indexesWomen,
+                         courseMen: detail.indexesMen, courseWomen: detail.indexesWomen)
         // Par must be complete to calculate a total. Missing SI disables hole-by-hole;
         // incomplete/invalid supplied SI is never replaced with invented sequential indices.
         guard pars.count == detail.numHoles, pars.allSatisfy({ (3...6).contains($0) }) else {
@@ -31,5 +33,20 @@ struct HCPProviderCourse: Hashable {
                 name: tee.teeName, holes: detail.numHoles, par: pars.reduce(0, +),
                 courseRating: rating, slopeRating: slope, ratingSex: category,
                 holeParsData: pars, holeHandicapIndicesData: validIndices ? indices : nil))
+    }
+
+    private static func sharedHoleData(
+        detail: GolfAPICourseDetail,
+        men: KeyPath<GolfAPITee, [Int]>,
+        women: KeyPath<GolfAPITee, [Int]>,
+        courseMen: [Int],
+        courseWomen: [Int]
+    ) -> [Int] {
+        if courseMen.count == detail.numHoles { return courseMen }
+        if courseWomen.count == detail.numHoles { return courseWomen }
+        if let teeData = detail.tees.lazy.map({ $0[keyPath: men] }).first(where: { $0.count == detail.numHoles }) {
+            return teeData
+        }
+        return detail.tees.lazy.map({ $0[keyPath: women] }).first(where: { $0.count == detail.numHoles }) ?? []
     }
 }
