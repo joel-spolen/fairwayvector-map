@@ -162,16 +162,14 @@ struct HCPProjectionRootView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Handicap tools")
 
-            HCPPageHeader(title: selectedTab.pageTitle, subtitle: selectedTab.pageSubtitle)
-
             Group {
                 switch selectedTab {
                 case .home:
-                    HomeView(courseCatalog: courseCatalog, rounds: rounds, profile: profiles.first, clubs: clubs, courses: courses, tees: tees, onAddRound: { selectedTab = .round }, onPredict: { selectedTab = .predict })
+                    HomeView(courseCatalog: courseCatalog, rounds: rounds, profile: profiles.first, clubs: clubs, courses: courses, tees: tees, onAddRound: { selectedTab = .round }, onPredict: { selectedTab = .predict }, pageTitle: selectedTab.pageTitle, pageSubtitle: selectedTab.pageSubtitle)
                 case .predict:
-                    TargetCalculatorView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
+                    TargetCalculatorView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first, pageTitle: selectedTab.pageTitle, pageSubtitle: selectedTab.pageSubtitle)
                 case .round:
-                    NewRoundView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first)
+                    NewRoundView(courseCatalog: courseCatalog, clubs: clubs, courses: courses, tees: tees, rounds: rounds, profile: profiles.first, pageTitle: selectedTab.pageTitle, pageSubtitle: selectedTab.pageSubtitle)
                 }
             }
         }
@@ -198,6 +196,8 @@ private struct HomeView: View {
     var tees: [TeeSet]
     let onAddRound: () -> Void
     var onPredict: (() -> Void)? = nil
+    var pageTitle = "Your handicap"
+    var pageSubtitle = "Track your rounds. Plan your next score."
 
     private var entries: [ScoringRecordEntry] {
         WHSCalculator.scoringEntries(from: rounds, lowHandicapIndex: profile?.lowHandicapIndex)
@@ -218,6 +218,8 @@ private struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                VStack(spacing: 0) {
+                    HCPPageHeader(title: pageTitle, subtitle: pageSubtitle)
                 VStack(alignment: .leading, spacing: 24) {
                     metricLinks
 
@@ -275,6 +277,7 @@ private struct HomeView: View {
                     .pureLineCard()
                 }
                 .padding(18)
+                }
             }
             .background(PureLineStyle.canvas)
             .navigationBarTitleDisplayMode(.inline)
@@ -818,6 +821,8 @@ private struct TargetCalculatorView: View {
     var tees: [TeeSet]
     var rounds: [GolfRound]
     var profile: PlayerProfile?
+    var pageTitle = "Plan your next round"
+    var pageSubtitle = "Choose a course and tee to see how your score could move your Handicap Index."
 
     @State private var searchText = ""
     @State private var selectedClubName = ""
@@ -919,6 +924,14 @@ private struct TargetCalculatorView: View {
 
         NavigationStack {
             List {
+                Section {
+                    HCPPageHeader(title: pageTitle, subtitle: pageSubtitle)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(PureLineStyle.canvas)
+                        .listRowSeparator(.hidden)
+                }
+                .listSectionMargins(.top, 0)
+                .listSectionMargins(.horizontal, 0)
                 Section {
                     HCPProviderCourseSelectionView(profile: profile, clubs: clubs, courses: courses, tees: tees,
                             country: activeCountry, confirmedCourseID: providerCourse?.id,
@@ -1087,7 +1100,7 @@ private struct TargetCalculatorView: View {
                 }
             }
             .hcpPureLineList()
-            .contentMargins(.top, 18, for: .scrollContent)
+            .contentMargins(.top, 0, for: .scrollContent)
             .toolbar {
                 if !selectedClubName.isEmpty {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -1108,6 +1121,7 @@ private struct TargetCalculatorView: View {
                     }
                 }
             }
+            .toolbar(selectedClubName.isEmpty ? .hidden : .visible, for: .navigationBar)
             .sheet(isPresented: $showingAddCourse) {
                 AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees, initialClubName: searchText, initialCountry: addCourseCountry)
             }
@@ -1167,6 +1181,8 @@ private struct NewRoundView: View {
     var tees: [TeeSet]
     var rounds: [GolfRound]
     var profile: PlayerProfile?
+    var pageTitle = "Record a round"
+    var pageSubtitle = "Select your course and tee, or enter an official HCP score without a course."
 
     @State private var searchText = ""
     @State private var selectedClubName = ""
@@ -1230,6 +1246,14 @@ private struct NewRoundView: View {
 
         NavigationStack {
             Form {
+                Section {
+                    HCPPageHeader(title: pageTitle, subtitle: pageSubtitle)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(PureLineStyle.canvas)
+                        .listRowSeparator(.hidden)
+                }
+                .listSectionMargins(.top, 0)
+                .listSectionMargins(.horizontal, 0)
                 if !isManualDifferential {
                     Section {
                         HCPProviderCourseSelectionView(profile: profile, clubs: clubs, courses: courses, tees: tees,
@@ -1485,7 +1509,7 @@ private struct NewRoundView: View {
                 }
             }
             .hcpPureLineList()
-            .contentMargins(.top, 18, for: .scrollContent)
+            .contentMargins(.top, 0, for: .scrollContent)
             .toolbar {
                 if isManualDifferential || !selectedClubName.isEmpty {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -1511,6 +1535,7 @@ private struct NewRoundView: View {
                     }
                 }
             }
+            .toolbar(isManualDifferential || !selectedClubName.isEmpty ? .visible : .hidden, for: .navigationBar)
             .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showingAddCourse) {
