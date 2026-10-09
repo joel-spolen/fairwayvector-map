@@ -8,6 +8,8 @@ struct WedgeClubSelectorView: View {
     @Binding var targetDistance: Double
     @Binding var elevationMeters: Double
     @Binding var pinFraction: Double
+    var pageTitle: String
+    var pageSubtitle: String
 
     private var flagPosition: FlagPosition {
         FlagPosition(fraction: pinFraction)
@@ -24,6 +26,7 @@ struct WedgeClubSelectorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                WedgePageHeader(title: pageTitle, subtitle: pageSubtitle, horizontalInset: 0)
                 DistanceSliderCard(targetDistance: $targetDistance, unit: unit)
 
                 GreenLayoutCard(
@@ -61,38 +64,39 @@ struct WedgeClubSelectorView: View {
                         systemImage: "bag.badge.questionmark",
                         description: Text("Add wedges in the Bag tab to get a recommendation.")
                     )
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
                     .padding(.vertical, 24)
                 }
             }
-            .padding()
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 18)
         }
-        .background(FairwayVectorColors.background)
+        .background(PureLineStyle.canvas)
     }
 }
 
 private struct DistanceSliderCard: View {
     @Binding var targetDistance: Double
     var unit: WedgeDistanceUnit
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Distance To Flag")
                     .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                 Spacer()
                 Text(unit.format(targetDistance))
                     .font(.title.bold())
                     .monospacedDigit()
-                    .foregroundStyle(FairwayVectorColors.charcoal)
+                    .foregroundStyle(PureLineStyle.ink)
                 Text(unit.abbreviation)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
             }
 
             Slider(value: $targetDistance, in: 20...160, step: 1)
-                .tint(FairwayVectorColors.navy)
+                .tint(PureLineStyle.accent)
 
             HStack {
                 Text(unit.format(20) + " " + unit.abbreviation)
@@ -100,10 +104,9 @@ private struct DistanceSliderCard: View {
                 Text(unit.format(160) + " " + unit.abbreviation)
             }
             .font(.caption)
-            .foregroundStyle(FairwayVectorColors.slate)
+            .foregroundStyle(PureLineStyle.muted)
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
@@ -122,7 +125,7 @@ private struct GreenLayoutCard: View {
             HStack {
                 Text("Green & Pin")
                     .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                 Spacer()
                 Button("Level") {
                     withAnimation(.snappy) {
@@ -132,12 +135,12 @@ private struct GreenLayoutCard: View {
                 }
                 .font(.caption.weight(.semibold))
                 .buttonStyle(.bordered)
-                .tint(FairwayVectorColors.navy)
+                .tint(PureLineStyle.accent)
             }
 
             Text("Drag the green up or down to set elevation. Drag the flag along the green to set the pin.")
                 .font(.caption)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
 
             GreenProfilePad(elevationMeters: $elevationMeters, pinFraction: $pinFraction, unit: unit)
                 .frame(height: 240)
@@ -155,8 +158,7 @@ private struct GreenLayoutCard: View {
                 )
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
@@ -204,14 +206,14 @@ private struct GreenProfilePad: View {
                     path.move(to: CGPoint(x: 8, y: baseY))
                     path.addLine(to: CGPoint(x: width - 8, y: baseY))
                 }
-                .stroke(FairwayVectorColors.charcoal.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                .stroke(PureLineStyle.ink.opacity(0.20), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
                 if abs(elevationMeters) > 0.2 {
                     ElevationRuler(x: greenLeft - 10, baseY: baseY, greenY: greenY)
                 }
 
                 BallFlightPath(from: CGPoint(x: width * 0.13, y: baseY - 10), to: CGPoint(x: pinX, y: greenY - 2))
-                    .stroke(FairwayVectorColors.surface.opacity(0.9), style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [5, 5]))
+                    .stroke(Color.white.opacity(0.9), style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [5, 5]))
 
                 Ellipse()
                     .fill(
@@ -221,7 +223,7 @@ private struct GreenProfilePad: View {
                             endPoint: .bottom
                         )
                     )
-                    .overlay(Ellipse().strokeBorder(FairwayVectorColors.surface.opacity(0.55), lineWidth: 1.5))
+                    .overlay(Ellipse().strokeBorder(Color.white.opacity(0.55), lineWidth: 1.5))
                     .frame(width: width - greenLeft - 8, height: 34)
                     .position(x: (greenLeft + width - 8) / 2, y: greenY)
                     .contentShape(Ellipse())
@@ -236,7 +238,7 @@ private struct GreenProfilePad: View {
 
                 Text("You")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(FairwayVectorColors.surface)
+                    .foregroundStyle(Color.white)
                     .position(x: width * 0.13, y: baseY + 14)
 
                 PinZoneLabels(greenLeft: greenLeft, width: width, y: baseY + 34)
@@ -323,7 +325,7 @@ private struct ElevationRuler: View {
             path.move(to: CGPoint(x: x - 5, y: greenY))
             path.addLine(to: CGPoint(x: x + 5, y: greenY))
         }
-        .stroke(FairwayVectorColors.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        .stroke(PureLineStyle.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
     }
 }
 
@@ -331,7 +333,7 @@ private struct GolferMark: View {
     var body: some View {
         Image(systemName: "figure.golf")
             .font(.system(size: 30, weight: .semibold))
-            .foregroundStyle(FairwayVectorColors.navy)
+            .foregroundStyle(PureLineStyle.ink)
     }
 }
 
@@ -342,15 +344,15 @@ private struct FlagMark: View {
         VStack(spacing: 0) {
             Image(systemName: "flag.fill")
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(FairwayVectorColors.orange)
+                .foregroundStyle(PureLineStyle.accent)
                 .offset(x: 7)
             Rectangle()
-                .fill(FairwayVectorColors.charcoal)
+                .fill(PureLineStyle.ink)
                 .frame(width: 2, height: 22)
             Circle()
-                .fill(FairwayVectorColors.surface)
+                .fill(Color.white)
                 .frame(width: 7, height: 7)
-                .overlay(Circle().strokeBorder(FairwayVectorColors.charcoal.opacity(0.5), lineWidth: 1))
+                .overlay(Circle().strokeBorder(PureLineStyle.ink.opacity(0.35), lineWidth: 1))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -373,7 +375,7 @@ private struct PinZoneLabels: View {
             Text("Long")
         }
         .font(.caption2.weight(.semibold))
-        .foregroundStyle(FairwayVectorColors.surface.opacity(0.85))
+        .foregroundStyle(Color.white.opacity(0.9))
         .frame(width: max(width - greenLeft - 16, 1))
         .position(x: (greenLeft + width - 8) / 2, y: y)
     }
@@ -387,19 +389,19 @@ private struct ReadoutChip: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.caption.bold())
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
                 Text(value)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(FairwayVectorColors.charcoal)
+                    .foregroundStyle(PureLineStyle.ink)
             }
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+        .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -414,16 +416,16 @@ private struct PlaysLikeCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Plays Like")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(unit.format(playsLike))
                     .font(.system(size: 42, weight: .bold))
                     .monospacedDigit()
-                    .foregroundStyle(FairwayVectorColors.charcoal)
+                    .foregroundStyle(PureLineStyle.ink)
                 Text(unit.abbreviation)
                     .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
             }
 
             AdjustmentRow(label: "Measured", value: unit.format(targetDistance) + " " + unit.abbreviation)
@@ -436,8 +438,7 @@ private struct PlaysLikeCard: View {
                 value: signed(ClubSelector.pinAdjustment(pin), unit: unit)
             )
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private func signed(_ yards: Double, unit: WedgeDistanceUnit) -> String {
@@ -456,12 +457,12 @@ private struct AdjustmentRow: View {
         HStack {
             Text(label)
                 .font(.subheadline)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
             Spacer()
             Text(value)
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(FairwayVectorColors.charcoal)
+                .foregroundStyle(PureLineStyle.ink)
         }
     }
 }
@@ -478,20 +479,20 @@ private struct RecommendationCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Play This Shot")
                 .font(.caption.bold())
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
 
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(suggestion.wedge.name)
                     .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(suggestion.swing.title) swing · \(suggestion.trajectory.title) flight")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(FairwayVectorColors.charcoal)
+                        .foregroundStyle(PureLineStyle.ink)
                     if let brand = suggestion.wedge.brandDisplay {
                         Text(brand)
                             .font(.caption)
-                            .foregroundStyle(FairwayVectorColors.slate)
+                            .foregroundStyle(PureLineStyle.muted)
                     }
                 }
                 Spacer(minLength: 0)
@@ -510,7 +511,7 @@ private struct RecommendationCard: View {
                 )
             }
 
-            Divider().overlay(FairwayVectorColors.slate.opacity(0.3))
+            Divider().overlay(PureLineStyle.line)
 
             DisclosureGroup(isExpanded: $showReasoning) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -518,11 +519,11 @@ private struct RecommendationCard: View {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption)
-                                .foregroundStyle(FairwayVectorColors.gold)
+                                .foregroundStyle(PureLineStyle.accent)
                                 .padding(.top, 2)
                             Text(reason)
                                 .font(.subheadline)
-                                .foregroundStyle(FairwayVectorColors.charcoal)
+                                .foregroundStyle(PureLineStyle.ink)
                         }
                     }
                 }
@@ -530,12 +531,11 @@ private struct RecommendationCard: View {
             } label: {
                 Label("Why this shot?", systemImage: "text.badge.checkmark")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
             }
-            .tint(FairwayVectorColors.navy)
+            .tint(PureLineStyle.accent)
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 
     private var deltaText: String {
@@ -609,29 +609,28 @@ private struct AlternativesCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Other Options")
                     .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
 
                 ForEach(suggestions) { suggestion in
                     HStack {
                         Text(suggestion.wedge.name)
                             .font(.subheadline.bold())
-                            .foregroundStyle(FairwayVectorColors.navy)
+                            .foregroundStyle(PureLineStyle.ink)
                             .frame(width: 44, alignment: .leading)
                         Text("\(suggestion.swing.title) · \(suggestion.trajectory.title)")
                             .font(.subheadline)
-                            .foregroundStyle(FairwayVectorColors.slate)
+                            .foregroundStyle(PureLineStyle.muted)
                         Spacer()
                         Text("\(unit.format(suggestion.carry)) \(unit.abbreviation)")
                             .font(.subheadline.weight(.semibold))
                             .monospacedDigit()
-                            .foregroundStyle(FairwayVectorColors.charcoal)
+                            .foregroundStyle(PureLineStyle.ink)
                     }
                     .padding(10)
-                    .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+                    .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
-            .padding()
-            .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+            .pureLineCard()
         }
     }
 }

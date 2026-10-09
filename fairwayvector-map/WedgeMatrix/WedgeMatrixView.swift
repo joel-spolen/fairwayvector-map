@@ -39,77 +39,110 @@ struct WedgeMatrixView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Wedge tools", selection: $section) {
+            HStack(spacing: 4) {
                 ForEach(Section.allCases, id: \.self) { item in
-                    Text(item.title).tag(item)
+                    Button {
+                        section = item
+                    } label: {
+                        Text(item.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(section == item ? PureLineStyle.accent : PureLineStyle.muted)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background {
+                                if section == item {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(PureLineStyle.canvas)
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .strokeBorder(PureLineStyle.line, lineWidth: 1)
+                                        }
+                                }
+                            }
+                            .contentShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(section == item ? [.isSelected] : [])
                 }
             }
-            .pickerStyle(.segmented)
-            .padding(12)
-            .background(FairwayVectorColors.background)
+            .padding(4)
+            .background(PureLineStyle.surface, in: RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(PureLineStyle.canvas)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Wedge tools")
 
-            switch section {
-            case .overview:
-                NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        WedgeHomeOverviewCard(wedges: wedges, bagWedges: bagWedges)
-                        WedgeCurrentBagCard(wedges: bagWedges, unit: selectedUnit)
-                        WedgeBagNotesCard()
-                    }
-                    .padding()
-                }
-                .background(FairwayVectorColors.background)
-                .navigationTitle("Wedge Matrix")
-                .navigationBarTitleDisplayMode(.inline)
-                }
-
-            case .selector:
-                NavigationStack {
-                WedgeClubSelectorView(
-                    wedges: bagWedges,
-                    unit: selectedUnit,
-                    targetDistance: $targetDistance,
-                    elevationMeters: $selectorElevationMeters,
-                    pinFraction: $selectorPinFraction
-                )
-                .navigationTitle("Club Selector")
-                .navigationBarTitleDisplayMode(.inline)
-                }
-
-            case .matrix:
-                NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        WedgeTrajectoryPicker(selectedTrajectory: $selectedTrajectory)
-                        WedgeMatrixCard(wedges: bagWedges, trajectory: selectedTrajectory, unit: selectedUnit)
-                    }
-                    .padding()
-                }
-                .background(FairwayVectorColors.background)
-                .navigationTitle("Matrix")
-                .navigationBarTitleDisplayMode(.inline)
-                }
-
-            case .bag:
-                NavigationStack {
-                WedgeBagManagementList(wedges: $wedges, unit: selectedUnit)
-                    .navigationTitle("Bag")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Add Club", systemImage: "plus") { showAddClub = true }
-                                .labelStyle(.iconOnly)
-                                .accessibilityLabel("Add Club")
+            Group {
+                switch section {
+                case .overview:
+                    NavigationStack {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 18) {
+                                WedgePageHeader(title: "Your wedge setup", subtitle: "Review your carry numbers and the wedges currently in your bag.", horizontalInset: 0)
+                                WedgeHomeOverviewCard(wedges: wedges, bagWedges: bagWedges)
+                                WedgeCurrentBagCard(wedges: bagWedges, unit: selectedUnit)
+                                WedgeBagNotesCard()
+                            }
+                            .padding(.horizontal, 18)
+                            .padding(.top, 18)
+                            .padding(.bottom, 18)
                         }
+                        .background(PureLineStyle.canvas)
+                        .toolbar(.hidden, for: .navigationBar)
+                        .navigationBarTitleDisplayMode(.inline)
                     }
-                    .sheet(isPresented: $showAddClub) {
-                        WedgeAddClubView(wedges: $wedges, unit: selectedUnit)
+
+                case .selector:
+                    NavigationStack {
+                        WedgeClubSelectorView(
+                            wedges: bagWedges,
+                            unit: selectedUnit,
+                            targetDistance: $targetDistance,
+                            elevationMeters: $selectorElevationMeters,
+                            pinFraction: $selectorPinFraction,
+                            pageTitle: "Choose a wedge",
+                            pageSubtitle: "Set the distance, green elevation and pin position to find a club and swing."
+                        )
+                        .background(PureLineStyle.canvas)
+                        .toolbar(.hidden, for: .navigationBar)
+                        .navigationBarTitleDisplayMode(.inline)
+                    }
+
+                case .matrix:
+                    NavigationStack {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 18) {
+                                WedgePageHeader(title: "Wedge matrix", subtitle: "Compare carry distances across swing lengths and trajectories.", horizontalInset: 0)
+                                WedgeTrajectoryPicker(selectedTrajectory: $selectedTrajectory)
+                                WedgeMatrixCard(wedges: bagWedges, trajectory: selectedTrajectory, unit: selectedUnit)
+                            }
+                            .padding(.horizontal, 18)
+                            .padding(.top, 18)
+                            .padding(.bottom, 18)
+                        }
+                        .background(PureLineStyle.canvas)
+                        .toolbar(.hidden, for: .navigationBar)
+                        .navigationBarTitleDisplayMode(.inline)
+                    }
+
+                case .bag:
+                    NavigationStack {
+                        WedgeBagManagementList(wedges: $wedges, unit: selectedUnit) {
+                            showAddClub = true
+                        }
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+                        .toolbarBackground(.visible, for: .navigationBar)
+                        .sheet(isPresented: $showAddClub) {
+                            WedgeAddClubView(wedges: $wedges, unit: selectedUnit)
+                        }
                     }
                 }
             }
         }
-        .tint(FairwayVectorColors.navy)
+        .background(PureLineStyle.canvas)
+        .tint(PureLineStyle.accent)
         .onAppear(perform: loadStoredWedges)
         .onChange(of: wedges) { _, newValue in
             guard let data = try? JSONEncoder().encode(newValue),
@@ -127,31 +160,41 @@ struct WedgeMatrixView: View {
     }
 }
 
+struct WedgePageHeader: View {
+    let title: String
+    let subtitle: String
+    var horizontalInset: CGFloat = 18
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.largeTitle.weight(.semibold))
+                .foregroundStyle(PureLineStyle.ink)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(PureLineStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, horizontalInset)
+        .padding(.vertical, 18)
+        .background(PureLineStyle.canvas)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct WedgeHomeOverviewCard: View {
     var wedges: [Wedge]
     var bagWedges: [Wedge]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-                FairwayVectorMark()
-                    .frame(width: 58, height: 58)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Wedge Matrix")
-                        .font(.title2.bold())
-                        .foregroundStyle(FairwayVectorColors.navy)
-                    Text("Build a personal partial-shot chart from the wedges you carry and the numbers you trust.")
-                        .font(.subheadline)
-                        .foregroundStyle(FairwayVectorColors.slate)
-                }
-            }
             HStack(spacing: 12) {
                 WedgeMetricCard(title: "Wedges", value: "\(wedges.count)", systemImage: "list.bullet")
                 WedgeMetricCard(title: "In Bag", value: "\(bagWedges.count)", systemImage: "bag")
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
@@ -167,7 +210,7 @@ private struct WedgeCurrentBagCard: View {
             if wedges.isEmpty {
                 Text("No wedges selected for the bag.")
                     .font(.subheadline)
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
             } else {
@@ -176,26 +219,25 @@ private struct WedgeCurrentBagCard: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(wedge.name)
                                 .font(.subheadline.bold())
-                                .foregroundStyle(FairwayVectorColors.navy)
+                                .foregroundStyle(PureLineStyle.ink)
                             if let brand = wedge.brandDisplay {
                                 Text(brand)
                                     .font(.caption)
-                                    .foregroundStyle(FairwayVectorColors.slate)
+                                    .foregroundStyle(PureLineStyle.muted)
                             }
                         }
                         Spacer()
                         Text(unit.format(wedge.fullCarry))
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(FairwayVectorColors.charcoal)
+                            .foregroundStyle(PureLineStyle.ink)
                             .monospacedDigit()
                     }
                     .padding(12)
-                    .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+                    .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
@@ -204,15 +246,14 @@ private struct WedgeBagNotesCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Matrix notes", systemImage: "note.text")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
             VStack(alignment: .leading, spacing: 10) {
                 WedgeNoteRow(value: "50%", text: "Clock-face or waist-high swings")
                 WedgeNoteRow(value: "75%", text: "Controlled three-quarter tempo")
                 WedgeNoteRow(value: "Full", text: "Stock full carry, not total distance")
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
@@ -224,13 +265,13 @@ private struct WedgeNoteRow: View {
         HStack(spacing: 10) {
             Text(value)
                 .font(.caption.bold())
-                .foregroundStyle(FairwayVectorColors.surface)
+                .foregroundStyle(Color.white)
                 .frame(width: 48)
                 .padding(.vertical, 6)
-                .background(FairwayVectorColors.navy, in: Capsule())
+                .background(PureLineStyle.accent, in: Capsule())
             Text(text)
                 .font(.subheadline)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
             Spacer()
         }
     }
@@ -245,24 +286,23 @@ private struct WedgeMetricCard: View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
                 .font(.title3)
-                .foregroundStyle(FairwayVectorColors.orange)
+                .foregroundStyle(PureLineStyle.accent)
                 .frame(width: 34, height: 34)
-                .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+                .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.caption)
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
                 Text(value)
                     .font(.headline)
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
             Spacer(minLength: 0)
         }
-        .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
@@ -280,8 +320,7 @@ private struct WedgeTrajectoryPicker: View {
             }
             .pickerStyle(.segmented)
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
@@ -298,24 +337,24 @@ private struct WedgeMatrixCard: View {
                         .font(.headline)
                     Text("Carry distances adjusted for \(trajectory.title.lowercased()) shots")
                         .font(.caption)
-                        .foregroundStyle(FairwayVectorColors.slate)
+                        .foregroundStyle(PureLineStyle.muted)
                 }
                 Spacer()
                 Image(systemName: "flag.checkered")
                     .font(.title3)
-                    .foregroundStyle(FairwayVectorColors.orange)
+                    .foregroundStyle(PureLineStyle.accent)
             }
 
             if wedges.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "bag.badge.questionmark")
                         .font(.title2)
-                        .foregroundStyle(FairwayVectorColors.slate)
+                        .foregroundStyle(PureLineStyle.muted)
                     Text("No Wedges In Bag")
                         .font(.headline)
                     Text("Open Bag and add clubs to your bag.")
                         .font(.subheadline)
-                        .foregroundStyle(FairwayVectorColors.slate)
+                        .foregroundStyle(PureLineStyle.muted)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
@@ -325,12 +364,12 @@ private struct WedgeMatrixCard: View {
                     HStack(spacing: 8) {
                         Text("Club")
                             .font(.caption.bold())
-                            .foregroundStyle(FairwayVectorColors.slate)
+                            .foregroundStyle(PureLineStyle.muted)
                             .frame(width: 72, alignment: .leading)
                         ForEach(SwingLength.allCases) { swing in
                             Text(swing.title)
                                 .font(.caption.bold())
-                                .foregroundStyle(FairwayVectorColors.slate)
+                                .foregroundStyle(PureLineStyle.muted)
                                 .frame(maxWidth: .infinity)
                         }
                     }
@@ -339,7 +378,7 @@ private struct WedgeMatrixCard: View {
                         HStack(spacing: 8) {
                             Text(wedge.name)
                                 .font(.subheadline.bold())
-                                .foregroundStyle(FairwayVectorColors.navy)
+                                .foregroundStyle(PureLineStyle.ink)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                                 .frame(width: 72, alignment: .leading)
@@ -348,30 +387,55 @@ private struct WedgeMatrixCard: View {
                                 let carry = wedge.carry(for: trajectory, swing: swing)
                                 Text("\(unit.format(carry)) \(unit.abbreviation)")
                                     .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(FairwayVectorColors.charcoal)
+                                    .foregroundStyle(PureLineStyle.ink)
                                     .monospacedDigit()
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.72)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 10)
-                                    .background(swing.background, in: RoundedRectangle(cornerRadius: 12))
+                                    .background(swing == .full ? PureLineStyle.accent.opacity(0.1) : PureLineStyle.canvas,
+                                                in: RoundedRectangle(cornerRadius: 12))
                             }
                         }
                     }
                 }
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
 private struct WedgeBagManagementList: View {
     @Binding var wedges: [Wedge]
     var unit: WedgeDistanceUnit
+    let onAddClub: () -> Void
 
     var body: some View {
         List {
+            Section {
+                WedgePageHeader(
+                    title: "Your wedge bag",
+                    subtitle: "Manage the clubs you carry. Tap a club to edit its distances."
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(PureLineStyle.canvas)
+                .listRowSeparator(.hidden)
+            }
+            .listSectionMargins(.top, 0)
+            .listSectionMargins(.horizontal, 0)
+
+            Section {
+                Button(action: onAddClub) {
+                    Label("Add Club", systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(PureLineStyle.accent)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(PureLineStyle.canvas)
+            }
+
             Section {
                 if wedges.isEmpty {
                     ContentUnavailableView(
@@ -379,7 +443,7 @@ private struct WedgeBagManagementList: View {
                         systemImage: "bag.badge.questionmark",
                         description: Text("Tap plus to add the clubs you own.")
                     )
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
                 } else {
                     ForEach(wedges) { wedge in
                         if let wedgeBinding = binding(for: wedge) {
@@ -391,7 +455,7 @@ private struct WedgeBagManagementList: View {
                                 }
                                 Toggle("In Bag", isOn: wedgeBinding.isInBag)
                                     .labelsHidden()
-                                    .tint(FairwayVectorColors.navy)
+                                    .tint(PureLineStyle.accent)
                             }
                         }
                     }
@@ -405,10 +469,11 @@ private struct WedgeBagManagementList: View {
                         .font(.caption.weight(.semibold))
                 }
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
         }
         .scrollContentBackground(.hidden)
-        .background(FairwayVectorColors.background)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .background(PureLineStyle.canvas)
     }
 
     private func binding(for wedge: Wedge) -> Binding<Wedge>? {
@@ -435,15 +500,15 @@ private struct WedgeClubInventoryRow: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(wedge.name)
                 .font(.subheadline.bold())
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
             if let brand = wedge.brandDisplay {
                 Text(brand)
                     .font(.caption)
-                    .foregroundStyle(FairwayVectorColors.slate)
+                    .foregroundStyle(PureLineStyle.muted)
             }
             Text("Stock: \(unit.format(wedge.fullCarry)) \(unit.abbreviation)")
                 .font(.caption)
-                .foregroundStyle(FairwayVectorColors.slate)
+                .foregroundStyle(PureLineStyle.muted)
         }
     }
 }
@@ -471,8 +536,10 @@ private struct WedgeClubDetailView: View {
             }
             .padding()
         }
-        .background(FairwayVectorColors.background)
+        .background(PureLineStyle.canvas)
         .navigationTitle(draft.name.isEmpty ? "Club" : draft.name)
+        .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
@@ -494,20 +561,20 @@ private struct WedgeClubDistancesCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Distances")
                 .font(.headline)
-                .foregroundStyle(FairwayVectorColors.navy)
+                .foregroundStyle(PureLineStyle.ink)
 
             ForEach(WedgeTrajectory.allCases) { trajectory in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(trajectory.title)
                         .font(.subheadline.bold())
-                        .foregroundStyle(FairwayVectorColors.slate)
+                        .foregroundStyle(PureLineStyle.muted)
 
                     HStack(spacing: 8) {
                         ForEach(SwingLength.allCases) { swing in
                             VStack(spacing: 4) {
                                 Text(swing.title)
                                     .font(.caption)
-                                    .foregroundStyle(FairwayVectorColors.slate)
+                                    .foregroundStyle(PureLineStyle.muted)
                                 WedgeDoneAccessoryNumberField(
                                     placeholder: "\(unit.format(wedge.carry(for: trajectory, swing: swing)))",
                                     text: draftBinding(for: trajectory, swing: swing),
@@ -515,19 +582,19 @@ private struct WedgeClubDistancesCard: View {
                                 )
                                 .frame(height: 20)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(FairwayVectorColors.charcoal)
+                                .foregroundStyle(PureLineStyle.ink)
                                 .monospacedDigit()
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(swing.background, in: RoundedRectangle(cornerRadius: 12))
+                                .background(swing == .full ? PureLineStyle.accent.opacity(0.1) : PureLineStyle.canvas,
+                                            in: RoundedRectangle(cornerRadius: 12))
                             }
                         }
                     }
                 }
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
         .onAppear(perform: loadDrafts)
         .onChange(of: unit) { _, _ in loadDrafts() }
     }
@@ -595,26 +662,27 @@ private struct WedgeAddClubView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Stock distance")
                             .font(.headline)
-                            .foregroundStyle(FairwayVectorColors.navy)
+                            .foregroundStyle(PureLineStyle.ink)
                         HStack {
                             WedgeDoneAccessoryNumberField(placeholder: "100% stock carry", text: $stockDistanceText)
                                 .padding(10)
-                                .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+                                .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
                             Text(unit.abbreviation)
-                                .foregroundStyle(FairwayVectorColors.slate)
+                                .foregroundStyle(PureLineStyle.muted)
                         }
                     }
-                    .padding()
-                    .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+                    .pureLineCard()
 
                     Text("You can fine-tune 50%, 75%, and low/high carries later from the club's detail page in Bag.")
                         .font(.caption)
-                        .foregroundStyle(FairwayVectorColors.slate)
+                        .foregroundStyle(PureLineStyle.muted)
                 }
-                .padding()
+                .padding(18)
             }
-            .background(FairwayVectorColors.background)
+            .background(PureLineStyle.canvas)
             .navigationTitle("Add Club")
+            .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -658,21 +726,19 @@ private struct WedgeClubFormCard: View {
             }
 
             Toggle("In Bag", isOn: $isInBag)
-                .tint(FairwayVectorColors.navy)
+                .tint(PureLineStyle.accent)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Notes")
                     .font(.subheadline.bold())
-                    .foregroundStyle(FairwayVectorColors.navy)
+                    .foregroundStyle(PureLineStyle.ink)
                 TextEditor(text: $notes)
                     .frame(minHeight: 100)
-                    .padding(8)
                     .scrollContentBackground(.hidden)
-                    .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+                    .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
             }
         }
-        .padding()
-        .background(FairwayVectorColors.surface, in: RoundedRectangle(cornerRadius: 12))
+        .pureLineCard()
     }
 }
 
@@ -683,9 +749,9 @@ private struct WedgeStyledTextField: View {
     var body: some View {
         TextField(title, text: $text)
             .font(.subheadline)
-            .foregroundStyle(FairwayVectorColors.charcoal)
+            .foregroundStyle(PureLineStyle.ink)
             .padding(12)
-            .background(FairwayVectorColors.conditionsSurface, in: RoundedRectangle(cornerRadius: 12))
+            .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

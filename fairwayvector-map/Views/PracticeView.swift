@@ -17,16 +17,7 @@ struct PracticeView: View {
     @ObservedObject var trajectoryModel: TrajectoryCalculatorViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Practice area", selection: $destination) {
-                ForEach(PracticeDestination.allCases, id: \.self) { section in
-                    Text(section.title).tag(section)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(12)
-            .background(FairwayVectorColors.background)
-
+        Group {
             switch destination {
             case .trajectory:
                 TrajectoryRootView(viewModel: trajectoryModel)
@@ -34,6 +25,6 @@ struct PracticeView: View {
                 WedgeMatrixView()
             }
         }
-        .tint(FairwayVectorColors.navy)
+        .tint(destination == .wedge ? PureLineStyle.accent : FairwayVectorColors.navy)
     }
 }
