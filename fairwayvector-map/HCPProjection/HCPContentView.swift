@@ -1760,35 +1760,16 @@ private struct DrillRowView: View {
                 }
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
     }
 }
 
-private struct CustomTeeListRow: View {
-    var tee: TeeSet
-    var club: GolfClub?
+private struct CustomCourseSearchResult: Identifiable {
+    let club: GolfClub
+    let courseName: String
 
-    private var summary: String {
-        let rating = tee.courseRating.formatted(.number.precision(.fractionLength(1)))
-        let category = tee.ratingSex?.label ?? "Universal"
-        return "Tee: \(tee.name) · \(category) · Par \(tee.par) · CR \(rating) · Slope \(tee.slopeRating)"
-    }
-
-    var body: some View {
-        NavigationLink {
-            CustomTeeDetailView(tee: tee, club: club)
-        } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(tee.clubName) · \(tee.courseName)")
-                    .font(.headline)
-                Text(summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
+    var id: String {
+        "\(club.country.lowercased())|\(club.city.lowercased())|\(club.name.lowercased())|\(courseName.lowercased())"
     }
 }
 
@@ -1801,12 +1782,7 @@ private struct CustomCoursesView: View {
     var tees: [TeeSet]
 
     @State private var showingAddCourse = false
-    @State private var showGrouped = false
     @State private var searchText = ""
-    @State private var selectedCountry: String?
-    @State private var selectedCity: String?
-    @State private var selectedClub: String?
-    @State private var selectedCourse: String?
 
     private var customTees: [TeeSet] {
         tees.filter { $0.isCustom ?? false }
@@ -1816,38 +1792,48 @@ private struct CustomCoursesView: View {
         clubs.filter { $0.isCustom ?? false }
     }
 
-    private var filteredTees: [TeeSet] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return customTees }
-        return customTees.filter { tee in
-            if tee.clubName.localizedCaseInsensitiveContains(query)
-                || tee.courseName.localizedCaseInsensitiveContains(query)
-                || tee.name.localizedCaseInsensitiveContains(query) {
-                return true
+    private var uniqueCustomClubs: [GolfClub] {
+        let groups = Dictionary(grouping: customClubs) { club in
+            [club.country, club.city, club.name]
+                .map(HCPCustomCourseSearch.normalizedCountry)
+                .joined(separator: "|")
+        }
+        return groups.values.compactMap(\.first)
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private var searchQuery: String { searchText.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var filteredClubs: [GolfClub] {
+        guard !searchQuery.isEmpty else { return uniqueCustomClubs }
+        return uniqueCustomClubs.filter {
+            $0.name.localizedCaseInsensitiveContains(searchQuery)
+                || $0.city.localizedCaseInsensitiveContains(searchQuery)
+                || $0.country.localizedCaseInsensitiveContains(searchQuery)
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private var filteredCourses: [CustomCourseSearchResult] {
+        return uniqueCustomClubs.flatMap { club in
+            courseNames(for: club.name).compactMap { courseName in
+                guard searchQuery.isEmpty
+                        || courseName.localizedCaseInsensitiveContains(searchQuery)
+                        || club.name.localizedCaseInsensitiveContains(searchQuery)
+                        || club.city.localizedCaseInsensitiveContains(searchQuery)
+                        || club.country.localizedCaseInsensitiveContains(searchQuery) else { return nil }
+                return CustomCourseSearchResult(club: club, courseName: courseName)
             }
-            guard let club = clubs.first(where: { $0.name == tee.clubName }) else { return false }
-            return club.city.localizedCaseInsensitiveContains(query) || club.country.localizedCaseInsensitiveContains(query)
+        }.sorted {
+            if $0.club.name == $1.club.name {
+                return $0.courseName.localizedStandardCompare($1.courseName) == .orderedAscending
+            }
+            return $0.club.name.localizedStandardCompare($1.club.name) == .orderedAscending
         }
     }
 
-    private var groupedCountries: [String] {
-        Array(Set(customClubs.map(\.country).filter { !$0.isEmpty })).sorted()
-    }
-
-    private func cityTitle(for club: GolfClub) -> String {
-        club.city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Unknown City" : club.city
-    }
-
-    private func cities(in country: String) -> [String] {
-        Array(Set(customClubs.filter { $0.country == country }.map { cityTitle(for: $0) })).sorted()
-    }
-
-    private func clubsIn(country: String, city: String) -> [GolfClub] {
-        customClubs.filter { $0.country == country && cityTitle(for: $0) == city }.sorted { $0.name < $1.name }
-    }
-
-    private func coursesIn(club: String) -> [GolfCourse] {
-        courses.filter { ($0.isCustom ?? false) && $0.clubName == club }.sorted { $0.name < $1.name }
+    private func courseNames(for club: String) -> [String] {
+        Array(Set(courses.filter { ($0.isCustom ?? false) && $0.clubName == club }.map(\.name)
+            + customTees.filter { $0.clubName == club }.map(\.courseName))).sorted()
     }
 
     private func teesIn(club: String, course: String) -> [TeeSet] {
@@ -1857,18 +1843,52 @@ private struct CustomCoursesView: View {
     var body: some View {
         List {
             Section {
-                Picker("View", selection: $showGrouped) {
-                    Text("All").tag(false)
-                    Text("Grouped").tag(true)
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(PureLineStyle.muted)
+                    TextField("Search courses or clubs", text: $searchText)
+                        .textInputAutocapitalization(.never)
+                        .disableAutocorrection(true)
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(PureLineStyle.muted)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear search")
+                    }
                 }
-                .pickerStyle(.segmented)
             }
             .listRowBackground(PureLineStyle.surface)
 
-            if showGrouped {
-                groupedRootSections
-            } else {
-                allSections
+            if filteredCourses.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        searchQuery.isEmpty ? "No Custom Courses" : "No Matches",
+                        systemImage: searchQuery.isEmpty ? "flag.badge.ellipsis" : "magnifyingglass",
+                        description: Text(searchQuery.isEmpty
+                            ? "Add a custom course to see it listed here."
+                            : "No courses match \"\(searchQuery)\".")
+                    )
+                }
+                .listRowBackground(PureLineStyle.surface)
+            }
+
+            if !filteredCourses.isEmpty {
+                Section(searchQuery.isEmpty ? "All Courses" : "Matching Courses") {
+                    ForEach(filteredCourses) { result in
+                        NavigationLink {
+                            CustomCourseSummaryView(courseName: result.courseName, club: result.club,
+                                tees: customTees.filter { $0.clubName == result.club.name && $0.courseName == result.courseName })
+                        } label: {
+                            DrillRowView(title: result.courseName, subtitle: result.club.name)
+                        }
+                    }
+                    .onDelete(perform: deleteCourses)
+                }
+                .listRowBackground(PureLineStyle.surface)
             }
         }
         .hcpPureLineList()
@@ -1885,455 +1905,89 @@ private struct CustomCoursesView: View {
         .sheet(isPresented: $showingAddCourse) {
             AddCourseView(courseCatalog: courseCatalog, profile: profile, clubs: clubs, courses: courses, tees: tees)
         }
-        .navigationDestination(for: CustomCourseGroupLevel.self) { level in
-            CustomCourseGroupedLevelView(
-                level: level,
-                courseCatalog: courseCatalog,
-                profile: profile,
-                clubs: clubs,
-                courses: courses,
-                tees: tees
-            )
-        }
     }
 
-    @ViewBuilder
-    private var groupedRootSections: some View {
-        if groupedCountries.isEmpty {
-            Section {
-                ContentUnavailableView(
-                    "No Custom Courses",
-                    systemImage: "flag.badge.ellipsis",
-                    description: Text("Add a custom course to browse by region.")
-                )
+    private func deleteCourses(at offsets: IndexSet) {
+        let selectedCourses = offsets.compactMap { index in
+            filteredCourses.indices.contains(index) ? filteredCourses[index] : nil
+        }
+
+        for result in selectedCourses {
+            let clubName = result.club.name
+            let courseName = result.courseName
+
+            for tee in customTees where tee.clubName == clubName && tee.courseName == courseName {
+                modelContext.delete(tee)
             }
-            .listRowBackground(PureLineStyle.surface)
-        } else {
-            if let preferred = profile?.countryOrDefault, groupedCountries.contains(preferred) {
-                Section("Your Region") {
-                    NavigationLink(value: CustomCourseGroupLevel.country(preferred)) {
-                        DrillRowView(title: preferred, subtitle: nil)
-                    }
+            for course in courses where (course.isCustom ?? false)
+                    && course.clubName == clubName && course.name == courseName {
+                modelContext.delete(course)
+            }
+
+            let clubStillHasCourses = courses.contains {
+                ($0.isCustom ?? false) && $0.clubName == clubName && $0.name != courseName
+            } || customTees.contains {
+                $0.clubName == clubName && $0.courseName != courseName
+            }
+            if !clubStillHasCourses {
+                for club in customClubs where club.name == clubName {
+                    modelContext.delete(club)
                 }
-                .listRowBackground(PureLineStyle.surface)
-            }
-
-            Section("All Countries / Regions") {
-                ForEach(groupedCountries, id: \.self) { country in
-                    NavigationLink(value: CustomCourseGroupLevel.country(country)) {
-                        DrillRowView(title: country, subtitle: nil)
-                    }
-                }
-            }
-            .listRowBackground(PureLineStyle.surface)
-        }
-    }
-
-    private func applyDefaultCountry() {
-        guard selectedCountry == nil else { return }
-        if let defaultCountry = profile?.countryOrDefault, groupedCountries.contains(defaultCountry) {
-            selectedCountry = defaultCountry
-        }
-    }
-
-    private func goBackOneLevel() {
-        if selectedCourse != nil {
-            selectedCourse = nil
-        } else if selectedClub != nil {
-            selectedClub = nil
-        } else if selectedCity != nil {
-            selectedCity = nil
-        } else if selectedCountry != nil {
-            selectedCountry = nil
-        }
-    }
-
-    private var sourceTeeForPrefill: TeeSet? {
-        guard let club = selectedClub, let course = selectedCourse else { return nil }
-        return teesIn(club: club, course: course).first
-    }
-
-    @ViewBuilder
-    private var allSections: some View {
-        if customTees.isEmpty {
-            Section {
-                ContentUnavailableView(
-                    "No Custom Courses",
-                    systemImage: "flag.badge.ellipsis",
-                    description: Text("Add courses that are missing from the built-in database.")
-                )
-            }
-            .listRowBackground(PureLineStyle.surface)
-        } else {
-            Section {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("Search club, course or tee...", text: $searchText)
-                        .textInputAutocapitalization(.never)
-                        .disableAutocorrection(true)
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .listRowBackground(PureLineStyle.surface)
-
-            if filteredTees.isEmpty {
-                Section {
-                    ContentUnavailableView(
-                        "No Matches",
-                        systemImage: "magnifyingglass",
-                        description: Text("No custom courses match \"\(searchText)\".")
-                    )
-                }
-                .listRowBackground(PureLineStyle.surface)
-            } else {
-                Section("Your Custom Tees") {
-                    ForEach(filteredTees) { tee in
-                        CustomTeeListRow(tee: tee, club: clubs.first { $0.name == tee.clubName })
-                    }
-                    .onDelete(perform: deleteTees)
-                }
-                .listRowBackground(PureLineStyle.surface)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var groupedSections: some View {
-        if let club = selectedClub, let course = selectedCourse {
-            teeSections(club: club, course: course)
-        } else if let club = selectedClub {
-            courseSections(club: club)
-        } else if let country = selectedCountry, let city = selectedCity {
-            clubSections(country: country, city: city)
-        } else if let country = selectedCountry {
-            citySections(country: country)
-        } else {
-            countrySections
-        }
-    }
-
-    private var countrySections: some View {
-        Section("Countries") {
-            if groupedCountries.isEmpty {
-                Text("No custom courses yet")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(groupedCountries, id: \.self) { country in
-                    Button {
-                        selectedCountry = country
-                    } label: {
-                        DrillRowView(title: country, subtitle: nil)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .listRowBackground(PureLineStyle.surface)
-    }
-
-    private func citySections(country: String) -> some View {
-        let list = cities(in: country)
-        return Section("Cities in \(country)") {
-            if list.isEmpty {
-                Text("No cities with custom courses")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(list, id: \.self) { city in
-                    Button {
-                        selectedCity = city
-                    } label: {
-                        DrillRowView(title: city, subtitle: nil)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .listRowBackground(PureLineStyle.surface)
-    }
-
-    private func clubSections(country: String, city: String) -> some View {
-        let list = clubsIn(country: country, city: city)
-        return Section("Clubs in \(city)") {
-            if list.isEmpty {
-                Text("No clubs with custom courses")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(list, id: \.name) { club in
-                    Button {
-                        selectedClub = club.name
-                    } label: {
-                        DrillRowView(title: club.name, subtitle: nil)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .listRowBackground(PureLineStyle.surface)
-    }
-
-    private func courseSections(club: String) -> some View {
-        let list = coursesIn(club: club)
-        return Section("Courses at \(club)") {
-            if list.isEmpty {
-                Text("No custom courses")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(list, id: \.name) { course in
-                    Button {
-                        selectedCourse = course.name
-                    } label: {
-                        DrillRowView(title: course.name, subtitle: nil)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .listRowBackground(PureLineStyle.surface)
-    }
-
-    private func teeSections(club: String, course: String) -> some View {
-        let list = teesIn(club: club, course: course)
-        return Section("Tees at \(course)") {
-            if list.isEmpty {
-                Text("No custom tees")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(list) { tee in
-                    CustomTeeListRow(tee: tee, club: clubs.first { $0.name == tee.clubName })
-                }
-            }
-        }
-        .listRowBackground(PureLineStyle.surface)
-    }
-
-    private func deleteTees(at offsets: IndexSet) {
-        let deletedTees = offsets.map { filteredTees[$0] }
-        let deletedIDs = Set(deletedTees.map(\.persistentModelID))
-        let remainingTees = customTees.filter { !deletedIDs.contains($0.persistentModelID) }
-
-        for tee in deletedTees {
-            modelContext.delete(tee)
-
-            let courseStillUsed = remainingTees.contains {
-                $0.clubName == tee.clubName && $0.courseName == tee.courseName
-            }
-            if !courseStillUsed, let relatedCourse = courses.first(where: {
-                $0.isCustom == true && $0.clubName == tee.clubName && $0.name == tee.courseName
-            }) {
-                modelContext.delete(relatedCourse)
-            }
-
-            let clubStillUsed = remainingTees.contains { $0.clubName == tee.clubName }
-            if !clubStillUsed, let relatedClub = clubs.first(where: {
-                $0.isCustom == true && $0.name == tee.clubName
-            }) {
-                modelContext.delete(relatedClub)
             }
         }
     }
 }
 
-private enum CustomCourseGroupLevel: Hashable {
-    case country(String)
-    case city(country: String, city: String)
-    case club(country: String, city: String, club: String)
-    case course(country: String, city: String, club: String, course: String)
-}
+private struct CustomCourseSummaryView: View {
+    let courseName: String
+    let club: GolfClub
+    let tees: [TeeSet]
 
-private struct CustomCourseGroupedLevelView: View {
-    let level: CustomCourseGroupLevel
-    let courseCatalog: CourseCatalogStore
-    var profile: PlayerProfile?
-    var clubs: [GolfClub]
-    var courses: [GolfCourse]
-    var tees: [TeeSet]
-
-    @State private var showingAddCourse = false
-
-    private var customClubs: [GolfClub] {
-        clubs.filter { $0.isCustom ?? false }
-    }
-
-    private var customTees: [TeeSet] {
-        tees.filter { $0.isCustom ?? false }
-    }
-
-    private var navigationTitle: String {
-        switch level {
-        case .country(let country): country
-        case .city(_, let city): city
-        case .club(_, _, let club): club
-        case .course(_, _, _, let course): course
-        }
-    }
-
-    private var prefill: (country: String, city: String, club: String, course: String) {
-        switch level {
-        case .country(let country): (country, "", "", "")
-        case .city(let country, let city): (country, city == "Unknown City" ? "" : city, "", "")
-        case .club(let country, let city, let club): (country, city == "Unknown City" ? "" : city, club, "")
-        case .course(let country, let city, let club, let course): (country, city == "Unknown City" ? "" : city, club, course)
-        }
-    }
-
-    private var sourceTee: TeeSet? {
-        guard case .course(_, _, let club, let course) = level else { return nil }
-        return customTees.first { $0.clubName == club && $0.courseName == course }
+    private var region: String {
+        GolfAPICoverage.regions.first { region in
+            region.countries.contains {
+                HCPCustomCourseSearch.normalizedCountry($0) == HCPCustomCourseSearch.normalizedCountry(club.country)
+            }
+        }?.name ?? "Other"
     }
 
     var body: some View {
         List {
-            switch level {
-            case .country(let country):
-                let cities = Array(Set(customClubs.filter { $0.country == country }.map { cityName($0) })).sorted()
-                Section("Cities") {
-                    ForEach(cities, id: \.self) { city in
-                        NavigationLink(value: CustomCourseGroupLevel.city(country: country, city: city)) {
-                            DrillRowView(title: city, subtitle: nil)
-                        }
-                    }
-                }
-                .listRowBackground(PureLineStyle.surface)
-
-            case .city(let country, let city):
-                let matchingClubs = customClubs.filter { $0.country == country && cityName($0) == city }.sorted { $0.name < $1.name }
-                Section("Clubs") {
-                    ForEach(matchingClubs, id: \.name) { club in
-                        NavigationLink(value: CustomCourseGroupLevel.club(country: country, city: city, club: club.name)) {
-                            DrillRowView(title: club.name, subtitle: nil)
-                        }
-                    }
-                }
-                .listRowBackground(PureLineStyle.surface)
-
-            case .club(let country, let city, let club):
-                let matchingCourses = courses.filter { ($0.isCustom ?? false) && $0.clubName == club }.sorted { $0.name < $1.name }
-                Section("Courses") {
-                    ForEach(matchingCourses, id: \.name) { course in
-                        NavigationLink(value: CustomCourseGroupLevel.course(country: country, city: city, club: club, course: course.name)) {
-                            DrillRowView(title: course.name, subtitle: nil)
-                        }
-                    }
-                }
-                .listRowBackground(PureLineStyle.surface)
-
-            case .course(_, _, let club, let course):
-                let matchingTees = customTees.filter { $0.clubName == club && $0.courseName == course }.sorted { $0.name < $1.name }
-                Section("Tees") {
-                    ForEach(matchingTees) { tee in
-                        CustomTeeListRow(tee: tee, club: customClubs.first { $0.name == tee.clubName })
-                    }
-                }
-                .listRowBackground(PureLineStyle.surface)
-            }
-        }
-        .hcpPureLineList()
-        .navigationTitle(navigationTitle)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingAddCourse = true
-                } label: {
-                    Label("Add Course", systemImage: "plus")
-                }
-            }
-        }
-        .sheet(isPresented: $showingAddCourse) {
-            AddCourseView(
-                courseCatalog: courseCatalog,
-                profile: profile,
-                clubs: clubs,
-                courses: courses,
-                tees: tees,
-                initialClubName: prefill.club,
-                initialCountry: prefill.country,
-                initialCourseName: prefill.course,
-                sourceTee: sourceTee
-            )
-        }
-    }
-
-    private func cityName(_ club: GolfClub) -> String {
-        club.city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Unknown City" : club.city
-    }
-}
-
-private struct CustomTeeDetailView: View {
-    var tee: TeeSet
-    var club: GolfClub?
-
-    private var holeParsData: [Int] {
-        tee.holeParsData ?? []
-    }
-
-    private var holeHandicapData: [Int] {
-        tee.holeHandicapIndicesData ?? []
-    }
-
-    private var hasHoleDetails: Bool {
-        holeParsData.count == tee.holes && holeHandicapData.count == tee.holes && !holeParsData.isEmpty
-    }
-
-    var body: some View {
-        List {
-            Section("Club") {
-                LabeledContent("Club", value: tee.clubName)
-                if let club, !club.city.isEmpty {
+            Section("Course") {
+                LabeledContent("Course", value: courseName)
+                LabeledContent("Club", value: club.name)
+                LabeledContent("Region", value: region)
+                LabeledContent("Country", value: club.country)
+                if !club.city.isEmpty {
                     LabeledContent("City", value: club.city)
                 }
-                if let club, !club.country.isEmpty {
-                    LabeledContent("Country", value: club.country)
-                }
             }
             .listRowBackground(PureLineStyle.surface)
 
-            Section("Course") {
-                LabeledContent("Course", value: tee.courseName)
-                LabeledContent("Tee", value: tee.name)
-                LabeledContent("Holes", value: "\(tee.holes)")
-            }
-            .listRowBackground(PureLineStyle.surface)
-
-            Section("WHS Ratings") {
-                LabeledContent("Rating for", value: tee.ratingSex?.label ?? "Universal")
-                LabeledContent("Par", value: "\(tee.par)")
-                LabeledContent("Course Rating", value: tee.courseRating.formatted(.number.precision(.fractionLength(1))))
-                LabeledContent("Slope", value: "\(tee.slopeRating)")
-            }
-            .listRowBackground(PureLineStyle.surface)
-
-            if tee.holes == 9 {
-                Section {
-                    HCPNineHoleNotice()
-                }
-                .listRowBackground(PureLineStyle.surface)
-            }
-
-            if hasHoleDetails {
-                Section("Hole Details") {
-                    ForEach(0..<tee.holes, id: \.self) { index in
-                        HStack {
-                            Text("Hole \(index + 1)")
-                            Spacer()
-                            Text("Par \(holeParsData[index]) · HCP \(holeHandicapData[index])")
-                                .foregroundStyle(.secondary)
+            Section("Tees") {
+                if tees.isEmpty {
+                    Text("No tees have been added for this course.")
+                        .font(.subheadline)
+                        .foregroundStyle(PureLineStyle.muted)
+                } else {
+                    ForEach(tees) { tee in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(tee.name)
+                                .font(.headline)
+                                .foregroundStyle(PureLineStyle.ink)
+                            Text("\(tee.ratingSex?.label ?? "Universal") · Par \(tee.par) · CR \(tee.courseRating.formatted(.number.precision(.fractionLength(1)))) · Slope \(tee.slopeRating)")
+                                .font(.caption)
+                                .foregroundStyle(PureLineStyle.muted)
                         }
+                        .padding(.vertical, 4)
+                        .accessibilityElement(children: .combine)
                     }
                 }
-                .listRowBackground(PureLineStyle.surface)
             }
+            .listRowBackground(PureLineStyle.surface)
         }
         .hcpPureLineList()
-        .navigationTitle(tee.courseName)
+        .navigationTitle(courseName)
     }
 }
 
@@ -2891,9 +2545,26 @@ struct HCPCustomCoursesEntryView: View {
     @Query(filter: #Predicate<GolfCourse> { $0.isCustom == true }, sort: \GolfCourse.name) private var courses: [GolfCourse]
     @Query(filter: #Predicate<TeeSet> { $0.isCustom == true }, sort: \TeeSet.name) private var tees: [TeeSet]
     @Query private var profiles: [PlayerProfile]
+    @State private var courseCatalog: CourseCatalogStore?
 
     var body: some View {
-        CustomCoursesView(courseCatalog: CourseCatalogStore(), profile: profiles.first, clubs: clubs, courses: courses, tees: tees)
+        Group {
+            if let courseCatalog {
+                CustomCoursesView(courseCatalog: courseCatalog, profile: profiles.first, clubs: clubs, courses: courses, tees: tees)
+            } else {
+                ProgressView("Loading course catalog…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(PureLineStyle.canvas)
+                    .navigationTitle("Custom Courses")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .task {
+            guard courseCatalog == nil else { return }
+            courseCatalog = await Task.detached(priority: .userInitiated) {
+                CourseCatalogStore()
+            }.value
+        }
     }
 }
 

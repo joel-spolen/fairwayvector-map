@@ -8,6 +8,14 @@ struct UnifiedSettingsView: View {
     @AppStorage("distanceUnit") private var mapUnit: DistanceUnit = .meters
     @AppStorage("wedgeMatrix.distanceUnit") private var wedgeUnit = WedgeDistanceUnit.yards.rawValue
     @EnvironmentObject private var trajectoryModel: TrajectoryCalculatorViewModel
+    @State private var aboutSheet: AboutSheet?
+
+    private enum AboutSheet: String, Identifiable {
+        case company
+        case privacy
+
+        var id: String { rawValue }
+    }
 
     private var profile: PlayerProfile? { profiles.first }
     private var countries: [String] {
@@ -47,7 +55,7 @@ struct UnifiedSettingsView: View {
                     Text("Applies to course distances, wedge carries, and trajectory defaults.")
                         .font(.footnote)
                         .foregroundStyle(PureLineStyle.muted)
-                    NavigationLink("Advanced field overrides") {
+                    NavigationLink("Advanced settings") {
                         TrajectoryUnitSettingsView(unitPreferences: trajectoryModel.unitPreferences)
                     }
                 }
@@ -77,18 +85,24 @@ struct UnifiedSettingsView: View {
                 }
                 .listRowBackground(PureLineStyle.surface)
 
-                Section("Equipment & courses") {
-                    NavigationLink("Custom courses & tees") {
+                Section("Custom course") {
+                    NavigationLink("Courses") {
                         HCPCustomCoursesEntryView()
                     }
                 }
                 .listRowBackground(PureLineStyle.surface)
 
                 Section("About") {
-                    Link("Handicap privacy", destination: URL(string: "https://fairwayvector.com/hcp-projection/privacy-policy")!)
-                    Link("Trajectory privacy", destination: URL(string: "https://fairwayvector.com/trajectory/privacy-policy")!)
-                    Link("Wedge Matrix privacy", destination: URL(string: "https://fairwayvector.com/wedge-matrix/privacy-policy")!)
-                    Link("Weather data by Open-Meteo", destination: URL(string: "https://open-meteo.com/")!)
+                    Button {
+                        aboutSheet = .company
+                    } label: {
+                        Label("FairwayVector", systemImage: "info.circle")
+                    }
+                    Button {
+                        aboutSheet = .privacy
+                    } label: {
+                        Label("Privacy policy", systemImage: "hand.raised")
+                    }
                 }
                 .listRowBackground(PureLineStyle.surface)
             }
@@ -106,6 +120,30 @@ struct UnifiedSettingsView: View {
             }
         }
         .tint(PureLineStyle.accent)
+        .sheet(item: $aboutSheet) { destination in
+            NavigationStack {
+                Group {
+                    switch destination {
+                    case .company:
+                        FairwayVectorAboutView()
+                            .navigationTitle("FairwayVector")
+                    case .privacy:
+                        FairwayVectorPrivacyPolicyView()
+                            .navigationTitle("Privacy policy")
+                    }
+                }
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { aboutSheet = nil }
+                    }
+                }
+            }
+            .tint(PureLineStyle.accent)
+            .preferredColorScheme(.light)
+        }
     }
 
     private func updateProfile(_ edit: (PlayerProfile) -> Void) {
@@ -116,6 +154,90 @@ struct UnifiedSettingsView: View {
             modelContext.insert(newProfile)
             edit(newProfile)
         }
+    }
+}
+
+private struct FairwayVectorAboutView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Image(systemName: "location.north.circle")
+                    .font(.system(size: 42, weight: .light))
+                    .foregroundStyle(PureLineStyle.accent)
+                    .accessibilityHidden(true)
+
+                Text("Golf, made clearer.")
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(PureLineStyle.ink)
+
+                Text("FairwayVector is a Sweden-based software company building digital tools for golf.")
+                    .font(.body)
+                    .foregroundStyle(PureLineStyle.ink)
+
+                Text("We bring together course information, handicap planning, club setup and shot insights to help golfers make more informed decisions on and off the course.")
+                    .font(.body)
+                    .foregroundStyle(PureLineStyle.muted)
+
+                Text("Our focus is software designed specifically for the golf domain: practical tools that make the game easier to understand and plan.")
+                    .font(.body)
+                    .foregroundStyle(PureLineStyle.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
+            .pureLineCard()
+            .padding(18)
+        }
+        .background(PureLineStyle.canvas)
+    }
+}
+
+private struct FairwayVectorPrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Privacy Policy")
+                        .font(.largeTitle.weight(.semibold))
+                        .foregroundStyle(PureLineStyle.ink)
+                    Text("Last updated: 2026-08-24")
+                        .font(.caption)
+                        .foregroundStyle(PureLineStyle.muted)
+                    Text("fairwayvector-hcp-projection is an offline golf handicap projection calculator. It does not collect, store, transmit, or share any personal data.")
+                        .font(.body)
+                        .foregroundStyle(PureLineStyle.ink)
+                        .padding(.top, 8)
+                }
+
+                policySection("Data Collection", text: "fairwayvector-hcp-projection does not collect any data. All handicap calculations and projections are performed entirely on your device. The app does not use the network, analytics, advertising, or tracking of any kind.")
+                policySection("Data Storage", text: "The information the app saves, including player profiles, course data, rounds, and preferences, is stored locally on your device via Apple’s standard SwiftData and system storage mechanisms. This information never leaves your device.")
+                policySection("Third-Party Services", text: "fairwayvector-hcp-projection does not integrate with any third-party SDKs, analytics providers, or advertising networks.")
+                policySection("Children’s Privacy", text: "Since no data is collected from any user, this app is safe for use by individuals of all ages.")
+                policySection("Changes to This Policy", text: "If this policy changes in the future, an updated version will be posted with a revised ‘Last updated’ date.")
+                policySection("Contact", text: "Questions about this policy can be directed to the developer via the support contact listed on the app’s App Store page.")
+
+                Text("© 2026 Fairway Vector")
+                    .font(.caption)
+                    .foregroundStyle(PureLineStyle.muted)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+        }
+        .background(PureLineStyle.canvas)
+    }
+
+    private func policySection(_ title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(PureLineStyle.ink)
+            Text(text)
+                .font(.body)
+                .foregroundStyle(PureLineStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

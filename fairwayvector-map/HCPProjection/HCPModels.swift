@@ -6,7 +6,7 @@
 import Foundation
 import SwiftData
 
-enum PlayerSex: String, CaseIterable, Identifiable, Codable {
+nonisolated enum PlayerSex: String, CaseIterable, Identifiable, Codable, Sendable {
     case male
     case female
 
@@ -294,7 +294,7 @@ enum RoundInputMode: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-struct TeeSnapshot: Hashable, Codable {
+nonisolated struct TeeSnapshot: Hashable, Codable, Sendable {
     var clubName: String
     var courseName: String
     var teeName: String

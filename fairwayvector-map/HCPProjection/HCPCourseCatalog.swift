@@ -1,6 +1,6 @@
 import Foundation
 
-struct CountryCourseCatalog: Codable {
+nonisolated struct CountryCourseCatalog: Codable, Sendable {
     let schemaVersion: Int
     let revision: String
     let country: String
@@ -8,34 +8,34 @@ struct CountryCourseCatalog: Codable {
     let clubs: [CourseCatalogClub]
 }
 
-struct CourseCatalogSource: Codable {
+nonisolated struct CourseCatalogSource: Codable, Sendable {
     let name: String
     let url: String
     let retrievedAt: String
 }
 
-struct CourseCatalogClub: Codable {
+nonisolated struct CourseCatalogClub: Codable, Sendable {
     let name: String
     let city: String?
     let region: String?
     let courses: [CourseCatalogCourse]
 }
 
-struct CourseCatalogCourse: Codable {
+nonisolated struct CourseCatalogCourse: Codable, Sendable {
     let name: String
     let holes: Int
     let par: Int
     let ratings: [CourseCatalogRating]
 }
 
-struct CourseCatalogRating: Codable {
+nonisolated struct CourseCatalogRating: Codable, Sendable {
     let tee: String
     let sex: PlayerSex
     let courseRating: Double
     let slopeRating: Int
 }
 
-struct CourseClubInfo: Hashable, Identifiable {
+nonisolated struct CourseClubInfo: Hashable, Identifiable, Sendable {
     var id: String { "\(country)|\(name)" }
     let name: String
     let city: String
@@ -52,7 +52,7 @@ struct CourseClubInfo: Hashable, Identifiable {
     }
 }
 
-struct CourseInfo: Hashable, Identifiable {
+nonisolated struct CourseInfo: Hashable, Identifiable, Sendable {
     var id: String { "\(clubName)|\(name)" }
     let clubName: String
     let name: String
@@ -67,7 +67,7 @@ struct CourseInfo: Hashable, Identifiable {
     }
 }
 
-struct CourseTeeInfo: Hashable, Identifiable {
+nonisolated struct CourseTeeInfo: Hashable, Identifiable, Sendable {
     var id: String { "\(clubName)|\(courseName)|\(name)|\(ratingSex?.rawValue ?? "universal")" }
     let clubName: String
     let courseName: String
@@ -146,12 +146,12 @@ struct CourseTeeInfo: Hashable, Identifiable {
     }
 }
 
-final class CourseCatalogStore {
+nonisolated final class CourseCatalogStore: @unchecked Sendable {
     private let clubsByCountry: [String: [CourseClubInfo]]
     private let coursesByCountry: [String: [CourseInfo]]
     private let teesByCountryAndSex: [String: [PlayerSex: [CourseTeeInfo]]]
 
-    init(bundle: Bundle = .main) {
+    nonisolated init(bundle: Bundle = .main) {
         var clubsByCountry: [String: [CourseClubInfo]] = [:]
         var coursesByCountry: [String: [CourseInfo]] = [:]
         var teesByCountryAndSex: [String: [PlayerSex: [CourseTeeInfo]]] = [:]
@@ -225,7 +225,7 @@ final class CourseCatalogStore {
 }
 
 enum CourseCatalogLoader {
-    static func bundledCatalogs(bundle: Bundle = .main) -> [CountryCourseCatalog] {
+    nonisolated static func bundledCatalogs(bundle: Bundle = .main) -> [CountryCourseCatalog] {
         let nestedURLs = bundle.urls(forResourcesWithExtension: "json", subdirectory: "CourseCatalogs") ?? []
         let rootURLs = bundle.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? []
         let urls = Array(Set(nestedURLs + rootURLs))
