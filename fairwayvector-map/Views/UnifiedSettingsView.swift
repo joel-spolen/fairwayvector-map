@@ -18,12 +18,15 @@ struct UnifiedSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Player & calibration") {
-                    NavigationLink {
-                        UnifiedProfileView()
-                    } label: {
-                        Label("Player profile", systemImage: "person.crop.circle")
+                Section("Tee played from") {
+                    Picker("Tee rating", selection: Binding(
+                        get: { profile?.sexOrDefault ?? .male },
+                        set: { sex in updateProfile { $0.sexOrDefault = sex } }
+                    )) {
+                        Text("Men").tag(PlayerSex.male)
+                        Text("Women").tag(PlayerSex.female)
                     }
+                    .pickerStyle(.segmented)
                 }
                 .listRowBackground(PureLineStyle.surface)
 
@@ -44,6 +47,9 @@ struct UnifiedSettingsView: View {
                     Text("Applies to course distances, wedge carries, and trajectory defaults.")
                         .font(.footnote)
                         .foregroundStyle(PureLineStyle.muted)
+                    NavigationLink("Advanced field overrides") {
+                        TrajectoryUnitSettingsView(unitPreferences: trajectoryModel.unitPreferences)
+                    }
                 }
                 .listRowBackground(PureLineStyle.surface)
 
@@ -70,13 +76,6 @@ struct UnifiedSettingsView: View {
                 Section("Equipment & courses") {
                     NavigationLink("Custom courses & tees") {
                         HCPCustomCoursesEntryView()
-                    }
-                }
-                .listRowBackground(PureLineStyle.surface)
-
-                Section("Flight units") {
-                    NavigationLink("Advanced field overrides") {
-                        TrajectoryUnitSettingsView(unitPreferences: trajectoryModel.unitPreferences)
                     }
                 }
                 .listRowBackground(PureLineStyle.surface)
