@@ -21,14 +21,19 @@ struct TrajectoryProfileSettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
 
             activeDetailSettings
         }
         .id(unitRefreshID)
         .scrollContentBackground(.hidden)
-        .background(FairwayVectorColors.background)
-        .tint(FairwayVectorColors.navy)
+        .background(PureLineStyle.canvas)
+        .tint(PureLineStyle.accent)
+        .foregroundStyle(PureLineStyle.ink)
+        .preferredColorScheme(.light)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         // Effective units include field overrides; the global default alone is insufficient.
         .onChange(of: [unitPreferences.unitSystem(for: .distance), unitPreferences.unitSystem(for: .ballSpeed)]) { _, _ in
             unitRefreshID = UUID()
@@ -85,7 +90,7 @@ private struct EasyProfileView: View {
             } header: {
                 Text("Handicap")
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
         }
     }
 
@@ -126,7 +131,7 @@ private struct MediumProfileView: View {
             } header: {
                 Text("Club Carry Distances")
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
         }
     }
 
@@ -174,20 +179,20 @@ private struct ExpertProfileView: View {
                 } label: {
                     HStack {
                         Image(systemName: "figure.golf")
-                            .foregroundStyle(FairwayVectorColors.navy)
+                            .foregroundStyle(PureLineStyle.accent)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Club")
                                 .font(.caption)
-                                .foregroundStyle(FairwayVectorColors.slate)
+                                .foregroundStyle(PureLineStyle.muted)
                             Text(selectedClub.label)
                                 .font(.headline)
-                                .foregroundStyle(FairwayVectorColors.navy)
+                                .foregroundStyle(PureLineStyle.ink)
                         }
                         Spacer()
                     }
                 }
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
 
             Section {
                 let effective = profileStore.effectiveProfile(for: selectedClub)
@@ -226,7 +231,7 @@ private struct ExpertProfileView: View {
             } header: {
                 Text("Launch Data")
             }
-            .listRowBackground(FairwayVectorColors.surface)
+            .listRowBackground(PureLineStyle.surface)
 
         }
         .onAppear {
@@ -335,8 +340,8 @@ struct BagClubsView: View {
 private extension View {
     func profileFormStyle() -> some View {
         scrollContentBackground(.hidden)
-            .background(FairwayVectorColors.background)
-            .tint(FairwayVectorColors.navy)
+            .background(PureLineStyle.canvas)
+            .tint(PureLineStyle.accent)
     }
 }
 
@@ -456,10 +461,12 @@ private struct ProfileOptionalNumberRow: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(PureLineStyle.ink)
                     if let defaultValue {
                         Text("Default: \(defaultValue)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(PureLineStyle.muted)
                     }
                 }
                 Spacer()
@@ -476,9 +483,11 @@ private struct ProfileOptionalNumberRow: View {
                 .frame(width: 96, height: 34)
                 if let unit {
                     Text(unit)
-                        .foregroundStyle(.secondary)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(PureLineStyle.muted)
                 }
             }
+            .padding(.vertical, 5)
         }
         .id(refreshID)
         .onAppear {
@@ -532,7 +541,8 @@ private struct DoneAccessoryNumberField: UIViewRepresentable {
         textField.keyboardType = .decimalPad
         textField.textAlignment = .right
         textField.borderStyle = .none
-        textField.backgroundColor = .clear
+        textField.backgroundColor = UIColor(PureLineStyle.canvas)
+        textField.textColor = UIColor(PureLineStyle.ink)
         textField.delegate = context.coordinator
         textField.inputAccessoryView = context.coordinator.toolbar(for: textField)
         return textField
