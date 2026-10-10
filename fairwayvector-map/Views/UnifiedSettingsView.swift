@@ -5,14 +5,14 @@ struct UnifiedSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [PlayerProfile]
-    @Query(filter: #Predicate<GolfClub> { $0.isCustom == true }) private var customClubs: [GolfClub]
     @AppStorage("distanceUnit") private var mapUnit: DistanceUnit = .meters
     @AppStorage("wedgeMatrix.distanceUnit") private var wedgeUnit = WedgeDistanceUnit.yards.rawValue
     @EnvironmentObject private var trajectoryModel: TrajectoryCalculatorViewModel
 
     private var profile: PlayerProfile? { profiles.first }
     private var countries: [String] {
-        Array(Set(CourseCatalogStore().countries + customClubs.map(\.country).filter { !$0.isEmpty })).sorted()
+        let apiCountries = Set(GolfAPICoverage.regions.flatMap(\.countries))
+        return Array(apiCountries.union([profile?.countryOrDefault ?? "Sweden"])).sorted()
     }
 
     var body: some View {
@@ -53,6 +53,18 @@ struct UnifiedSettingsView: View {
                 }
                 .listRowBackground(PureLineStyle.surface)
 
+                Section("Country / Region") {
+                    Picker("Country / Region", selection: Binding(
+                        get: { profile?.countryOrDefault ?? "Sweden" },
+                        set: { country in updateProfile { $0.selectedCountry = country } }
+                    )) {
+                        ForEach(countries, id: \.self) { country in
+                            Text(country).tag(country)
+                        }
+                    }
+                }
+                .listRowBackground(PureLineStyle.surface)
+
                 Section("Handicap rounds") {
                     Picker("Default scoring", selection: Binding(
                         get: { profile?.defaultInputMode ?? .adjustedGrossScore },
@@ -60,14 +72,6 @@ struct UnifiedSettingsView: View {
                     )) {
                         ForEach(RoundInputMode.allCases) { mode in
                             Text(mode.title).tag(mode)
-                        }
-                    }
-                    Picker("Country / Region", selection: Binding(
-                        get: { profile?.countryOrDefault ?? "Sweden" },
-                        set: { country in updateProfile { $0.selectedCountry = country } }
-                    )) {
-                        ForEach(countries, id: \.self) { country in
-                            Text(country).tag(country)
                         }
                     }
                 }
