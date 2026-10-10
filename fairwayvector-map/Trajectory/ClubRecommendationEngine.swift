@@ -13,7 +13,7 @@ actor ClubRecommendationEngine {
     @MainActor static func launches(profile: TrajectoryPlayerProfile,
                                    conditions: ClubRecommendationConditions) throws -> [RecommendationLaunch] {
         let pressure = try conditions.effectivePressureHpa()
-        return TrajectoryGolfClub.allCases.filter { profile.availableClubs.contains($0) }.map { club in
+        return TrajectoryGolfClub.allCases.filter { ClubProfileDefaults.isAvailable(for: $0, playerProfile: profile) }.map { club in
             let launch = ClubProfileDefaults.effectiveProfile(for: club, playerProfile: profile)
             return RecommendationLaunch(club: club, shot: ShotInputs(
                 ballSpeedMps: launch.ballSpeedMps.value,

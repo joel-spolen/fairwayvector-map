@@ -90,7 +90,7 @@ struct InTheBagView: View {
                         )
                         .navigationTitle("Club distances & launch")
                     case .wedges:
-                        WedgeMatrixView(startInBag: true)
+                        WedgeBagSetupView(profileStore: trajectoryModel.playerProfileStore)
                     }
                 }
                 .navigationBarTitleDisplayMode(.inline)

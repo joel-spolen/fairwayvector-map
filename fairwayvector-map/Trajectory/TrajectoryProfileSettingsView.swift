@@ -141,7 +141,7 @@ private struct MediumProfileView: View {
     }
 
     private var ownedClubs: [TrajectoryGolfClub] {
-        TrajectoryGolfClub.allCases.filter { profileStore.profile.availableClubs.contains($0) }
+        TrajectoryGolfClub.allCases.filter { profileStore.profile.availableClubs.contains($0) && !$0.isWedge }
     }
 
     private func updateCarry(_ carryDistanceM: Double?, for club: TrajectoryGolfClub) {
@@ -243,12 +243,12 @@ private struct ExpertProfileView: View {
     }
 
     private var ownedClubs: [TrajectoryGolfClub] {
-        let clubs = TrajectoryGolfClub.allCases.filter { profileStore.profile.availableClubs.contains($0) }
+        let clubs = TrajectoryGolfClub.allCases.filter { profileStore.profile.availableClubs.contains($0) && !$0.isWedge }
         return clubs.isEmpty ? [selectedClub] : clubs
     }
 
     private func ensureSelectedClubIsAvailable() {
-        guard !profileStore.profile.availableClubs.contains(selectedClub),
+        guard selectedClub.isWedge || !profileStore.profile.availableClubs.contains(selectedClub),
               let highestAvailableClub = ownedClubs.first else { return }
         selectedClub = highestAvailableClub
     }
@@ -256,6 +256,7 @@ private struct ExpertProfileView: View {
 
 struct BagClubsView: View {
     @ObservedObject var profileStore: PlayerProfileStore
+    @AppStorage("wedgeMatrix.wedges") private var storedWedges = ""
 
     var body: some View {
         List {
@@ -265,28 +266,65 @@ struct BagClubsView: View {
                 .listRowBackground(Color.white)
 
             Section {
-                ForEach(TrajectoryGolfClub.allCases) { club in
+                ForEach(TrajectoryGolfClub.allCases.filter { !$0.isWedge }) { club in
                     Toggle(club.label, isOn: binding(for: club))
                 }
                 .listRowBackground(Color.white)
+            } header: {
+                Text("Clubs")
             } footer: {
-                Text("Available clubs appear in the Trajectory club selector and Medium profile carry distances.")
+                Text("Available clubs can use the carry and launch settings in Club Distances & Launch.")
+            }
+
+            Section {
+                ForEach(TrajectoryGolfClub.allCases.filter { $0.isWedge }) { club in
+                    Toggle(isOn: binding(for: club)) {
+                        HStack {
+                            Text(club.label)
+                            Spacer()
+                            Text("WEDGE")
+                                .font(.caption2.weight(.semibold))
+                                .tracking(0.8)
+                                .foregroundStyle(PureLineStyle.accent)
+                        }
+                    }
+                }
+                .listRowBackground(Color.white)
+            } header: {
+                Text("Wedges")
+            } footer: {
+                Text("Wedge carry values are edited in the Wedge Bag. They are not editable in Club Distances & Launch.")
             }
         }
         .scrollContentBackground(.hidden)
         .background(Color.white)
-        .tint(FairwayVectorColors.navy)
+        .tint(PureLineStyle.accent)
     }
 
     private func binding(for club: TrajectoryGolfClub) -> Binding<Bool> {
         Binding(
-            get: { profileStore.profile.availableClubs.contains(club) },
+            get: {
+                if club.isWedge,
+                   let wedge = Wedge.catalog(from: storedWedges).first(where: { TrajectoryGolfClub.wedge(named: $0.name) == club }) {
+                    return wedge.isInBag
+                }
+                return profileStore.profile.availableClubs.contains(club)
+            },
             set: { isOwned in
                 profileStore.update { profile in
                     if isOwned {
                         profile.availableClubs.insert(club)
                     } else {
                         profile.availableClubs.remove(club)
+                    }
+                }
+                if club.isWedge {
+                    var wedges = Wedge.catalog(from: storedWedges, availableClubs: profileStore.profile.availableClubs)
+                    guard let index = wedges.firstIndex(where: { TrajectoryGolfClub.wedge(named: $0.name) == club }) else { return }
+                    wedges[index].isInBag = isOwned
+                    if let data = try? JSONEncoder().encode(wedges),
+                       let encoded = String(data: data, encoding: .utf8) {
+                        storedWedges = encoded
                     }
                 }
             }

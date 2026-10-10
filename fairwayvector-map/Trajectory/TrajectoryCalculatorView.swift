@@ -224,7 +224,9 @@ struct TrajectoryCalculatorView: View {
     }
 
     private var ownedClubs: [TrajectoryGolfClub] {
-        let clubs = TrajectoryGolfClub.allCases.filter { viewModel.playerProfileStore.profile.availableClubs.contains($0) }
+        let clubs = TrajectoryGolfClub.allCases.filter {
+            ClubProfileDefaults.isAvailable(for: $0, playerProfile: viewModel.playerProfileStore.profile)
+        }
         return clubs.isEmpty ? [viewModel.activeClub] : clubs
     }
 
@@ -510,7 +512,7 @@ private struct ClubCarouselCard: View {
         case .threeWood, .fourWood, .fiveWood, .sixWood, .sevenWood, .eightWood, .nineWood: return "fairwaywood"
         case .threeHybrid, .fourHybrid, .fiveHybrid: return "hybrid"
         case .twoIron, .threeIron, .fourIron, .fiveIron, .sixIron, .sevenIron, .eightIron, .nineIron: return "iron"
-        case .pitchingWedge, .gapWedge, .fiftyTwoWedge, .sandWedge, .fiftySixWedge, .fiftyEightWedge, .lobWedge: return "wedge"
+        case .pitchingWedge, .approachWedge, .gapWedge, .fiftyTwoWedge, .sandWedge, .fiftySixWedge, .fiftyEightWedge, .lobWedge: return "wedge"
         }
     }
 

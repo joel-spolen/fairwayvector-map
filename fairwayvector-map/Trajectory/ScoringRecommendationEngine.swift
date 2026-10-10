@@ -23,21 +23,10 @@ struct ScoringShotPlan: Equatable {
         return distanceM.isFinite && distanceM > 0 && distanceM <= maxFullCarryM
     }
 
-    static let wedgeClubs: [TrajectoryGolfClub] = [.pitchingWedge, .gapWedge, .fiftyTwoWedge,
-        .sandWedge, .fiftySixWedge, .fiftyEightWedge, .lobWedge]
+    static let wedgeClubs: [TrajectoryGolfClub] = TrajectoryGolfClub.allCases.filter(\.isWedge)
 
     static func club(named name: String) -> TrajectoryGolfClub? {
-        let key = name.lowercased().filter { $0.isLetter || $0.isNumber }
-        switch key {
-        case "pw", "pitchingwedge": return .pitchingWedge
-        case "gw", "gapwedge", "50", "50wedge": return .gapWedge
-        case "52", "52wedge": return .fiftyTwoWedge
-        case "sw", "sandwedge", "54", "54wedge": return .sandWedge
-        case "56", "56wedge": return .fiftySixWedge
-        case "58", "58wedge": return .fiftyEightWedge
-        case "lw", "lobwedge", "60", "60wedge": return .lobWedge
-        default: return nil
-        }
+        TrajectoryGolfClub.wedge(named: name)
     }
 
     static func make(profile: TrajectoryPlayerProfile, wedges: [Wedge]) -> Self {
@@ -100,7 +89,7 @@ struct ScoringShotPlan: Equatable {
 
         for wedge in matrixBag {
             guard let club = club(named: wedge.name) else {
-                issues.append("Map \(wedge.name) to PW, GW/50, 52, SW/54, 56, 58 or LW/60; unknown loft is not guessed.")
+                issues.append("Map \(wedge.name) to PW, AW/48, GW/50, 52, SW/54, 56, 58 or LW/60; unknown loft is not guessed.")
                 continue
             }
             let entered = wedge.overrideCarry(for: .stock, swing: .full)

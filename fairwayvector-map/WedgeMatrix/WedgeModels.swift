@@ -69,11 +69,32 @@ struct Wedge: Identifiable, Codable, Equatable {
     }
 
     static let defaults = [
-        Wedge(name: "PW", fullCarry: 125),
-        Wedge(name: "50", fullCarry: 112),
-        Wedge(name: "54", fullCarry: 98),
-        Wedge(name: "58", fullCarry: 84)
+        Wedge(name: "PW", fullCarry: 125, isInBag: TrajectoryGolfClub.standardBag.contains(.pitchingWedge)),
+        Wedge(name: "AW", fullCarry: 118, isInBag: TrajectoryGolfClub.standardBag.contains(.approachWedge)),
+        Wedge(name: "GW", fullCarry: 112, isInBag: TrajectoryGolfClub.standardBag.contains(.gapWedge)),
+        Wedge(name: "52", fullCarry: 106, isInBag: TrajectoryGolfClub.standardBag.contains(.fiftyTwoWedge)),
+        Wedge(name: "54", fullCarry: 100, isInBag: TrajectoryGolfClub.standardBag.contains(.sandWedge)),
+        Wedge(name: "56", fullCarry: 94, isInBag: TrajectoryGolfClub.standardBag.contains(.fiftySixWedge)),
+        Wedge(name: "58", fullCarry: 90, isInBag: TrajectoryGolfClub.standardBag.contains(.fiftyEightWedge)),
+        Wedge(name: "60", fullCarry: 86, isInBag: TrajectoryGolfClub.standardBag.contains(.lobWedge))
     ]
+
+    static func catalog(from storedValue: String, availableClubs: Set<TrajectoryGolfClub> = TrajectoryGolfClub.standardBag) -> [Wedge] {
+        let stored = storedValue.data(using: .utf8)
+            .flatMap { try? JSONDecoder().decode([Wedge].self, from: $0) } ?? []
+        var remaining = stored
+        var catalog = defaults.map { template in
+            guard let club = TrajectoryGolfClub.wedge(named: template.name) else { return template }
+            if let index = remaining.firstIndex(where: { TrajectoryGolfClub.wedge(named: $0.name) == club }) {
+                return remaining.remove(at: index)
+            }
+            var newEntry = template
+            newEntry.isInBag = availableClubs.contains(club)
+            return newEntry
+        }
+        catalog.append(contentsOf: remaining.filter { TrajectoryGolfClub.wedge(named: $0.name) == nil })
+        return catalog
+    }
 }
 
 enum SwingLength: String, CaseIterable, Identifiable {

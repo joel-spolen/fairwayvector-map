@@ -97,11 +97,12 @@ nonisolated enum TrajectoryGolfClub: String, CaseIterable, Codable, Identifiable
     case eightIron
     case nineIron
     case pitchingWedge
+    case approachWedge
     case gapWedge
     case fiftyTwoWedge
+    case sandWedge
     case fiftySixWedge
     case fiftyEightWedge
-    case sandWedge
     case lobWedge
 
     var id: String { rawValue }
@@ -128,12 +129,38 @@ nonisolated enum TrajectoryGolfClub: String, CaseIterable, Codable, Identifiable
         case .eightIron: return "8 Iron"
         case .nineIron: return "9 Iron"
         case .pitchingWedge: return "PW"
-        case .gapWedge: return "50° Wedge"
+        case .approachWedge: return "AW · 48° Wedge"
+        case .gapWedge: return "GW · 50° Wedge"
         case .fiftyTwoWedge: return "52° Wedge"
         case .fiftySixWedge: return "56° Wedge"
         case .fiftyEightWedge: return "58° Wedge"
         case .sandWedge: return "54° Wedge"
         case .lobWedge: return "60° Wedge"
+        }
+    }
+
+    var isWedge: Bool {
+        switch self {
+        case .pitchingWedge, .approachWedge, .gapWedge, .fiftyTwoWedge,
+             .sandWedge, .fiftySixWedge, .fiftyEightWedge, .lobWedge:
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func wedge(named name: String) -> TrajectoryGolfClub? {
+        let key = name.lowercased().filter { $0.isLetter || $0.isNumber }
+        switch key {
+        case "pw", "pitchingwedge": return .pitchingWedge
+        case "aw", "approachwedge", "48", "48wedge": return .approachWedge
+        case "gw", "gapwedge", "50", "50wedge": return .gapWedge
+        case "52", "52wedge": return .fiftyTwoWedge
+        case "sw", "sandwedge", "54", "54wedge": return .sandWedge
+        case "56", "56wedge": return .fiftySixWedge
+        case "58", "58wedge": return .fiftyEightWedge
+        case "lw", "lobwedge", "60", "60wedge": return .lobWedge
+        default: return nil
         }
     }
 
@@ -309,14 +336,46 @@ enum ClubProfileDefaults {
     }
 
     static func effectiveProfile(for club: TrajectoryGolfClub, playerProfile: TrajectoryPlayerProfile) -> ClubLaunchProfile {
+        let profile: ClubLaunchProfile
         switch playerProfile.detailLevel {
         case .easy:
-            return simpleProfile(for: club, playerProfile: playerProfile)
+            profile = simpleProfile(for: club, playerProfile: playerProfile)
         case .medium:
-            return mediumProfile(for: club, playerProfile: playerProfile) ?? simpleProfile(for: club, playerProfile: playerProfile)
+            profile = mediumProfile(for: club, playerProfile: playerProfile) ?? simpleProfile(for: club, playerProfile: playerProfile)
         case .expert:
-            return expertProfile(for: club, playerProfile: playerProfile)
+            profile = expertProfile(for: club, playerProfile: playerProfile)
         }
+
+        guard let wedgeCarryM = wedgeBagCarryMeters(for: club) else { return profile }
+        var wedgeProfile = profile
+        let carryScale = wedgeCarryM / max(profile.carryDistanceM.value, 1)
+        wedgeProfile.carryDistanceM = ProfileValue(value: wedgeCarryM, source: .userProvided)
+        wedgeProfile.ballSpeedMps = ProfileValue(
+            value: profile.ballSpeedMps.value * (1 + (carryScale - 1) * 0.8),
+            source: .userProvided
+        )
+        return wedgeProfile
+    }
+
+    static func isAvailable(for club: TrajectoryGolfClub, playerProfile: TrajectoryPlayerProfile) -> Bool {
+        if club.isWedge, let wedge = wedgeEntry(for: club) {
+            return wedge.isInBag
+        }
+        return playerProfile.availableClubs.contains(club)
+    }
+
+    private static func wedgeBagCarryMeters(for club: TrajectoryGolfClub) -> Double? {
+        guard let wedge = wedgeEntry(for: club), wedge.isInBag else { return nil }
+        let carryYards = wedge.overrideCarry(for: .stock, swing: .full)
+            ?? (wedge.fullCarryUserProvided ? wedge.fullCarry : nil)
+        guard let carryYards, carryYards.isFinite, carryYards > 0 else { return nil }
+        return Units.metersFromYards(carryYards)
+    }
+
+    private static func wedgeEntry(for club: TrajectoryGolfClub) -> Wedge? {
+        guard club.isWedge else { return nil }
+        let stored = UserDefaults.standard.string(forKey: "wedgeMatrix.wedges") ?? ""
+        return Wedge.catalog(from: stored).first { TrajectoryGolfClub.wedge(named: $0.name) == club }
     }
 
     private static func simpleProfile(for club: TrajectoryGolfClub, playerProfile: TrajectoryPlayerProfile) -> ClubLaunchProfile {
@@ -381,6 +440,7 @@ enum ClubProfileDefaults {
         case .eightIron: return 0.567
         case .nineIron: return 0.525
         case .pitchingWedge: return 0.483
+        case .approachWedge: return 0.46
         case .gapWedge: return 0.437
         case .fiftyTwoWedge: return 0.415
         case .fiftySixWedge: return 0.365
@@ -703,6 +763,7 @@ enum ClubProfileDefaults {
         case .eightIron: return 1.18
         case .nineIron: return 1.36
         case .pitchingWedge: return 1.54
+        case .approachWedge: return 1.63
         case .gapWedge: return 1.72
         case .fiftyTwoWedge: return 1.80
         case .fiftySixWedge: return 1.92
@@ -733,6 +794,7 @@ enum ClubProfileDefaults {
         .eightIron: BaselineClubData(carryYards: 147, ballSpeedMph: 106, launchAngleDeg: 18.5, spinRateRpm: 6900),
         .nineIron: BaselineClubData(carryYards: 136, ballSpeedMph: 100, launchAngleDeg: 20.0, spinRateRpm: 7800),
         .pitchingWedge: BaselineClubData(carryYards: 124, ballSpeedMph: 94, launchAngleDeg: 24.0, spinRateRpm: 8700),
+        .approachWedge: BaselineClubData(carryYards: 118, ballSpeedMph: 90, launchAngleDeg: 26.0, spinRateRpm: 8950),
         .gapWedge: BaselineClubData(carryYards: 112, ballSpeedMph: 86, launchAngleDeg: 28.0, spinRateRpm: 9200),
         .fiftyTwoWedge: BaselineClubData(carryYards: 106, ballSpeedMph: 82, launchAngleDeg: 30.0, spinRateRpm: 9400),
         .sandWedge: BaselineClubData(carryYards: 100, ballSpeedMph: 78, launchAngleDeg: 32.0, spinRateRpm: 9600),

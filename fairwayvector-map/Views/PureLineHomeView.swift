@@ -100,6 +100,15 @@ struct PureLineHomeView: View {
                     }
                     .foregroundStyle(PureLineStyle.ink)
 
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("See your game")
+                            .font(.title3.weight(.semibold)).tracking(-0.4)
+                            .padding(.bottom, 10)
+                        destination("Rounds & statistics", detail: "Review your scores and spot the trends", symbol: "chart.xyaxis.line", action: onOpenStatistics)
+                            .accessibilityIdentifier("home-rounds-statistics-button")
+                    }
+                    .foregroundStyle(PureLineStyle.ink)
+
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "location")
                             .foregroundStyle(PureLineStyle.accent)
@@ -108,19 +117,6 @@ struct PureLineHomeView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(PureLineStyle.muted)
-                    .padding(.bottom, 16)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("See your game")
-                            .font(.title3.weight(.semibold)).tracking(-0.4)
-                            .foregroundStyle(PureLineStyle.ink)
-                        Text("Your rounds, scorecards and progress over time.")
-                            .font(.subheadline)
-                            .foregroundStyle(PureLineStyle.muted)
-                        destination("Rounds & statistics", detail: "Review your scores and spot the trends", symbol: "chart.xyaxis.line", action: onOpenStatistics)
-                            .accessibilityIdentifier("home-rounds-statistics-button")
-                    }
-                    .pureLineCard(padding: 24)
                     .padding(.bottom, 24)
                 }
                 .padding(.horizontal, 24)

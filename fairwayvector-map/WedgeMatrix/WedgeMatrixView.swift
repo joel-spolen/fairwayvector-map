@@ -3,14 +3,13 @@ import UIKit
 
 struct WedgeMatrixView: View {
     private enum Section: String, CaseIterable {
-        case overview, selector, matrix, bag
+        case overview, selector, matrix
 
         var title: String {
             switch self {
             case .overview: "Overview"
             case .selector: "Selector"
             case .matrix: "Matrix"
-            case .bag: "Bag"
             }
         }
     }
@@ -22,12 +21,7 @@ struct WedgeMatrixView: View {
     @State private var targetDistance = 92.0
     @State private var selectorElevationMeters = 0.0
     @State private var selectorPinFraction = 0.5
-    @State private var showAddClub = false
     @State private var section: Section = .overview
-
-    init(startInBag: Bool = false) {
-        _section = State(initialValue: startInBag ? .bag : .overview)
-    }
 
     private var bagWedges: [Wedge] {
         wedges.filter(\.isInBag)
@@ -35,10 +29,6 @@ struct WedgeMatrixView: View {
 
     private var selectedUnit: WedgeDistanceUnit {
         WedgeDistanceUnit(rawValue: selectedUnitRawValue) ?? .yards
-    }
-
-    private var selectedUnitBinding: Binding<WedgeDistanceUnit> {
-        Binding(get: { selectedUnit }, set: { selectedUnitRawValue = $0.rawValue })
     }
 
     var body: some View {
@@ -129,17 +119,6 @@ struct WedgeMatrixView: View {
                         .navigationBarTitleDisplayMode(.inline)
                     }
 
-                case .bag:
-                    NavigationStack {
-                        WedgeBagManagementList(wedges: $wedges, unit: selectedUnit) {
-                            showAddClub = true
-                        }
-                        .toolbar(.hidden, for: .navigationBar)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .sheet(isPresented: $showAddClub) {
-                            WedgeAddClubView(wedges: $wedges, unit: selectedUnit)
-                        }
-                    }
                 }
             }
         }
@@ -154,11 +133,58 @@ struct WedgeMatrixView: View {
     }
 
     private func loadStoredWedges() {
-        guard !storedWedges.isEmpty,
-              let data = storedWedges.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([Wedge].self, from: data),
-              !decoded.isEmpty else { return }
-        wedges = decoded
+        wedges = Wedge.catalog(from: storedWedges)
+    }
+}
+
+struct WedgeBagSetupView: View {
+    @AppStorage("wedgeMatrix.wedges") private var storedWedges = ""
+    @AppStorage("wedgeMatrix.distanceUnit") private var selectedUnitRawValue = WedgeDistanceUnit.yards.rawValue
+    @State private var wedges: [Wedge] = Wedge.defaults
+    @ObservedObject var profileStore: PlayerProfileStore
+
+    init(profileStore: PlayerProfileStore) {
+        self.profileStore = profileStore
+    }
+
+    private var selectedUnit: WedgeDistanceUnit {
+        WedgeDistanceUnit(rawValue: selectedUnitRawValue) ?? .yards
+    }
+
+    var body: some View {
+        WedgeBagManagementList(wedges: $wedges, unit: selectedUnit)
+        .onAppear(perform: loadStoredWedges)
+        .onChange(of: wedges) { _, newValue in
+            guard let data = try? JSONEncoder().encode(newValue),
+                  let encoded = String(data: data, encoding: .utf8) else { return }
+            storedWedges = encoded
+            syncProfileBag(from: newValue)
+        }
+    }
+
+    private func loadStoredWedges() {
+        wedges = Wedge.catalog(from: storedWedges, availableClubs: profileStore.profile.availableClubs)
+        if let data = try? JSONEncoder().encode(wedges),
+           let encoded = String(data: data, encoding: .utf8) {
+            storedWedges = encoded
+        }
+        syncProfileBag(from: wedges)
+    }
+
+    private func syncProfileBag(from wedges: [Wedge]) {
+        let inBag = Set(wedges.compactMap { wedge -> TrajectoryGolfClub? in
+            guard wedge.isInBag else { return nil }
+            return TrajectoryGolfClub.wedge(named: wedge.name)
+        })
+        profileStore.update { profile in
+            for club in TrajectoryGolfClub.allCases where club.isWedge {
+                if inBag.contains(club) {
+                    profile.availableClubs.insert(club)
+                } else {
+                    profile.availableClubs.remove(club)
+                }
+            }
+        }
     }
 }
 
@@ -354,7 +380,7 @@ private struct WedgeMatrixCard: View {
                         .foregroundStyle(PureLineStyle.muted)
                     Text("No Wedges In Bag")
                         .font(.headline)
-                    Text("Open Bag and add clubs to your bag.")
+                    Text("Choose wedges in Clubs in my bag to include them here.")
                         .font(.subheadline)
                         .foregroundStyle(PureLineStyle.muted)
                         .multilineTextAlignment(.center)
@@ -410,7 +436,6 @@ private struct WedgeMatrixCard: View {
 private struct WedgeBagManagementList: View {
     @Binding var wedges: [Wedge]
     var unit: WedgeDistanceUnit
-    let onAddClub: () -> Void
 
     var body: some View {
         List {
@@ -427,45 +452,20 @@ private struct WedgeBagManagementList: View {
             .listSectionMargins(.horizontal, 0)
 
             Section {
-                Button(action: onAddClub) {
-                    Label("Add Club", systemImage: "plus")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(PureLineStyle.accent)
-                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .listRowBackground(PureLineStyle.canvas)
-                .listRowInsets(EdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18))
-                .listRowSeparator(.hidden)
-            }
-            .listSectionMargins(.top, 0)
-            .listSectionMargins(.bottom, 0)
-
-            Section {
-                if wedges.isEmpty {
-                    ContentUnavailableView(
-                        "No Clubs",
-                        systemImage: "bag.badge.questionmark",
-                        description: Text("Tap plus to add the clubs you own.")
-                    )
-                    .foregroundStyle(PureLineStyle.muted)
-                } else {
-                    ForEach(wedges) { wedge in
-                        if let wedgeBinding = binding(for: wedge) {
-                            HStack {
-                                NavigationLink {
-                                    WedgeClubDetailView(wedge: wedgeBinding, unit: unit)
-                                } label: {
-                                    WedgeClubInventoryRow(wedge: wedge, unit: unit)
-                                }
-                                Toggle("In Bag", isOn: wedgeBinding.isInBag)
-                                    .labelsHidden()
-                                    .tint(PureLineStyle.accent)
+                ForEach(wedges) { wedge in
+                    if let wedgeBinding = binding(for: wedge) {
+                        HStack {
+                            NavigationLink {
+                                WedgeClubDetailView(wedge: wedgeBinding, unit: unit)
+                            } label: {
+                                WedgeClubInventoryRow(wedge: wedge, unit: unit)
                             }
+                            .disabled(!wedge.isInBag)
+                            Toggle("In Bag", isOn: wedgeBinding.isInBag)
+                                .labelsHidden()
+                                .tint(PureLineStyle.accent)
                         }
                     }
-                    .onDelete(perform: deleteWedges)
                 }
             } header: {
                 HStack {
@@ -493,9 +493,6 @@ private struct WedgeBagManagementList: View {
         )
     }
 
-    private func deleteWedges(offsets: IndexSet) {
-        wedges.remove(atOffsets: offsets)
-    }
 }
 
 private struct WedgeClubInventoryRow: View {
@@ -504,7 +501,7 @@ private struct WedgeClubInventoryRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(wedge.name)
+            Text(TrajectoryGolfClub.wedge(named: wedge.name)?.label ?? wedge.name)
                 .font(.subheadline.bold())
                 .foregroundStyle(PureLineStyle.ink)
             if let brand = wedge.brandDisplay {
@@ -637,127 +634,6 @@ private struct WedgeClubDistancesCard: View {
             }
         }
         drafts = values
-    }
-}
-
-private struct WedgeAddClubView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var wedges: [Wedge]
-    let unit: WedgeDistanceUnit
-    @State private var name = ""
-    @State private var brand = ""
-    @State private var notes = ""
-    @State private var isInBag = true
-    @State private var stockDistanceText = "100"
-
-    private var trimmedName: String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var stockDistance: Double? {
-        guard let value = Double(stockDistanceText.trimmingCharacters(in: .whitespacesAndNewlines)), value > 0 else { return nil }
-        return unit == .yards ? value : value / 0.9144
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    WedgeClubFormCard(name: $name, brand: $brand, notes: $notes, isInBag: $isInBag)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Stock distance")
-                            .font(.headline)
-                            .foregroundStyle(PureLineStyle.ink)
-                        HStack {
-                            WedgeDoneAccessoryNumberField(placeholder: "100% stock carry", text: $stockDistanceText)
-                                .padding(10)
-                                .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
-                            Text(unit.abbreviation)
-                                .foregroundStyle(PureLineStyle.muted)
-                        }
-                    }
-                    .pureLineCard()
-
-                    Text("You can fine-tune 50%, 75%, and low/high carries later from the club's detail page in Bag.")
-                        .font(.caption)
-                        .foregroundStyle(PureLineStyle.muted)
-                }
-                .padding(18)
-            }
-            .background(PureLineStyle.canvas)
-            .navigationTitle("Add Club")
-            .toolbarBackground(PureLineStyle.canvas, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        guard let stockDistance else { return }
-                        wedges.append(
-                            Wedge(
-                                name: trimmedName,
-                                brand: brand.trimmingCharacters(in: .whitespacesAndNewlines),
-                                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
-                                fullCarry: stockDistance,
-                                isInBag: isInBag,
-                                fullCarryUserProvided: true
-                            )
-                        )
-                        dismiss()
-                    }
-                    .disabled(trimmedName.isEmpty || stockDistance == nil)
-                }
-            }
-        }
-    }
-}
-
-private struct WedgeClubFormCard: View {
-    @Binding var name: String
-    @Binding var brand: String
-    @Binding var notes: String
-    @Binding var isInBag: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Club")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 10) {
-                WedgeStyledTextField(title: "Name", text: $name)
-                WedgeStyledTextField(title: "Brand optional", text: $brand)
-            }
-
-            Toggle("In Bag", isOn: $isInBag)
-                .tint(PureLineStyle.accent)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Notes")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(PureLineStyle.ink)
-                TextEditor(text: $notes)
-                    .frame(minHeight: 100)
-                    .scrollContentBackground(.hidden)
-                    .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
-            }
-        }
-        .pureLineCard()
-    }
-}
-
-private struct WedgeStyledTextField: View {
-    var title: String
-    @Binding var text: String
-
-    var body: some View {
-        TextField(title, text: $text)
-            .font(.subheadline)
-            .foregroundStyle(PureLineStyle.ink)
-            .padding(12)
-            .background(PureLineStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
