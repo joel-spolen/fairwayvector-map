@@ -127,7 +127,7 @@ struct RoundHoleEntryView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Par \(hole?.par.map(String.init) ?? "—") · SI \(hole?.strokeIndex.map(String.init) ?? "—")")
+                    Text("Par \(hole?.par.map(String.init) ?? "—") · HCP \(hole?.strokeIndex.map(String.init) ?? "—")")
                     Text("Strokes are the TOTAL including putts and penalties. Detail counts are included, never added again.")
                         .font(.footnote).foregroundStyle(FairwayVectorColors.slate)
                 }
@@ -238,7 +238,7 @@ struct RoundReviewView: View {
                             let score = round.score(player: player.id, hole: hole.number)
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {
-                                    Text("Hole \(hole.number) · Par \(hole.par.map(String.init) ?? "—") · SI \(hole.strokeIndex.map(String.init) ?? "—")")
+                                    Text("Hole \(hole.number) · Par \(hole.par.map(String.init) ?? "—") · HCP \(hole.strokeIndex.map(String.init) ?? "—")")
                                     Spacer()
                                     Text(score.map { "\($0.strokes)" } ?? "—").bold().monospacedDigit()
                                 }

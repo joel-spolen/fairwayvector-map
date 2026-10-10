@@ -544,7 +544,7 @@ struct CourseMapView: View {
         HStack(alignment: .center, spacing: 10) {
             holeNavigationButton(isPrevious: true, count: holeCount)
             Button { isShowingCourseInfo = true } label: {
-                Text("Hole \(hole.number) · Par \(hole.par.map(String.init) ?? "–") · SI \(hole.handicapIndex.map(String.init) ?? "–") · \(hole.length > 0 ? unit.format(hole.length) : "–")")
+                Text("Hole \(hole.number) · Par \(hole.par.map(String.init) ?? "–") · HCP \(hole.handicapIndex.map(String.init) ?? "–") · \(hole.length > 0 ? unit.format(hole.length) : "–")")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(PureLineStyle.ink)
                     .frame(minHeight: 44)

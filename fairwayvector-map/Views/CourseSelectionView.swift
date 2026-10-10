@@ -146,10 +146,6 @@ struct CourseSelectionView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("recent-course-button")
             .accessibilityHint("Opens this course with your previously selected tee set")
-            if let onStartRound {
-                Button("Start round on this tee", systemImage: "flag.checkered") { onStartRound(reference) }
-                    .buttonStyle(.bordered).disabled(roundStore.active != nil)
-            }
         }
     }
 }
